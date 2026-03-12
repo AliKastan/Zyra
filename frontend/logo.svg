@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 200" width="360" height="200" role="img" aria-label="Zyra">
+  <title>Zyra</title>
+  <!-- Z lightning bolt symbol (same geometry as logo-symbol.svg) -->
+  <path
+    d="M 0,0 L 150,0 L 185,60 L 150,120 L 96,200 L 50,120 L 85,60 L 35,60 Z"
+    fill="#8A2E1A"
+  />
+  <!-- Zyra wordmark — vertically centered (y=100 = midpoint of 200px height) -->
+  <text
+    x="210"
+    y="100"
+    dominant-baseline="middle"
+    font-family="'Playfair Display', Georgia, 'Palatino Linotype', serif"
+    font-weight="700"
+    font-size="72"
+    fill="#8A2E1A"
+    letter-spacing="4"
+  >Zyra</text>
+</svg>

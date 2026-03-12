@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zyra — AI App Builder</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="studio">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <header class="studio-header">
+    <div class="header-brand">
+      <img src="logo-symbol.svg" class="brand-mark" height="28" alt="Zyra" />
+      <span class="brand-name">Zyra</span>
+    </div>
+
+    <div class="header-right">
+      <!-- Account avatar + dropdown -->
+      <div class="account-menu-wrap" id="account-menu-wrap">
+        <button class="account-avatar-btn hidden" id="account-avatar-btn" title="Account" type="button">
+          <img class="avatar-img hidden" id="avatar-img" alt="Profile photo" />
+          <span class="avatar-initials" id="avatar-initials">Z</span>
+        </button>
+        <div class="account-dropdown hidden" id="account-dropdown">
+          <div class="dropdown-user">
+            <span class="dropdown-user-name" id="dropdown-user-name">Account</span>
+            <span class="dropdown-user-email" id="dropdown-user-email"></span>
+          </div>
+          <div class="dropdown-sep"></div>
+          <a class="dropdown-item" href="/billing">Billing</a>
+          <div class="dropdown-sep"></div>
+          <button class="dropdown-item dropdown-item--danger" id="dropdown-signout" type="button">Sign out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Body ────────────────────────────────────────────────────────────── -->
+  <div class="studio-body">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+      <!-- New project button -->
+      <div class="sidebar-topbar">
+        <button id="new-chat-btn" class="new-chat-btn" type="button">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New project
+        </button>
+      </div>
+
+      <!-- Your Projects (conversation history) -->
+      <div class="conv-history" id="conv-history">
+        <div class="history-section history-section--starred hidden" id="history-starred-section">
+          <div class="history-section-label">Starred</div>
+          <div class="history-list" id="history-starred-list"></div>
+        </div>
+        <div class="history-section" id="history-recent-section">
+          <div class="history-section-label">Your Projects</div>
+          <div class="history-list" id="history-recent-list">
+            <div class="history-empty">No past projects yet.</div>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar-divider hidden" id="current-chat-divider"><span>Current</span></div>
+
+      <!-- Conversation thread -->
+      <div class="conv-thread" id="conv-thread">
+        <div class="conv-welcome" id="conv-welcome">
+          <div class="welcome-mark">
+            <img src="logo-symbol.svg" height="52" alt="Zyra" style="display:block;" />
+          </div>
+          <p class="welcome-title">What would you like to build?</p>
+          <p class="welcome-sub">Describe any app, website, or tool and I'll generate it for you.</p>
+          <div class="welcome-chips">
+            <span class="example-chip" data-prompt="A landing page for a boutique design studio">Design studio page</span>
+            <span class="example-chip" data-prompt="A pill reminder app with daily schedule and tracking">Pill reminder</span>
+            <span class="example-chip" data-prompt="A clean todo app with priorities and local storage">Todo app</span>
+            <span class="example-chip" data-prompt="A personal portfolio with project gallery and contact">Portfolio</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editing banner — shown when a project is active -->
+      <div class="editing-banner hidden" id="editing-banner">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        <span class="editing-banner-label">Modifying</span>
+        <span class="editing-banner-name" id="editing-project-name"></span>
+      </div>
+
+      <!-- Input area -->
+      <div class="sidebar-input">
+        <div class="mode-bar" id="mode-bar">
+          <button class="mode-btn" data-mode="fast" type="button">Fast</button>
+          <button class="mode-btn mode-btn--active" data-mode="balanced" type="button">Standard</button>
+          <button class="mode-btn" data-mode="quality" type="button">Quality</button>
+        </div>
+
+        <div class="input-box">
+          <textarea
+            id="prompt-input"
+            rows="3"
+            maxlength="3000"
+            placeholder="Describe what you want to build..."
+          ></textarea>
+          <div class="input-meta-row">
+            <span id="complexity-badge" class="complexity-badge complexity-unknown">—</span>
+            <div class="input-right-meta">
+              <span id="char-count" class="char-count">0 / 3000</span>
+              <button id="generate-btn" class="send-btn" type="button" title="Generate (Ctrl+Enter)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div id="prompt-error" class="prompt-error"></div>
+      </div>
+
+    </aside>
+
+    <!-- RIGHT: Preview Panel -->
+    <main class="preview-main">
+
+      <!-- Preview Topbar -->
+      <div class="preview-topbar">
+        <div class="preview-tabs">
+          <button class="tab-btn tab-btn--active" id="tab-preview" type="button">Preview</button>
+          <button class="tab-btn" id="tab-code" type="button">Code</button>
+        </div>
+
+        <div class="preview-url-bar" id="preview-url-bar" style="display:none;">
+          <span class="url-dot"></span>
+          <span id="preview-url-text" class="url-text">—</span>
+        </div>
+
+        <div class="preview-controls">
+          <button id="fix-my-app-btn" class="fix-btn hidden" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            Fix My App
+          </button>
+          <div class="device-btns" id="device-btns">
+            <button class="device-btn device-btn--active" data-device="desktop" title="Desktop" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </button>
+            <button class="device-btn" data-device="tablet" title="Tablet" type="button">
+              <svg width="13" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="18.5" r="0.7" fill="currentColor"/></svg>
+            </button>
+            <button class="device-btn" data-device="mobile" title="Mobile" type="button">
+              <svg width="11" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="18.5" r="0.7" fill="currentColor"/><line x1="9" y1="6" x2="15" y2="6"/></svg>
+            </button>
+          </div>
+          <div class="preview-action-btns">
+            <button id="refresh-preview-btn" class="icon-btn" title="Refresh" type="button">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </button>
+            <button id="open-tab-btn" class="icon-btn" title="Open in new tab" type="button">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </button>
+            <button id="deploy-btn" class="deploy-btn hidden" title="Deploy to Vercel" type="button">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              Deploy
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Deploy Status Panel — slides in below the topbar when a deploy is active -->
+      <div class="deploy-panel hidden" id="deploy-panel" role="status" aria-live="polite">
+
+        <!-- Deploying state -->
+        <div class="deploy-state deploy-state--deploying hidden" id="deploy-state-deploying">
+          <div class="deploy-spinner"></div>
+          <span id="deploy-progress-msg" class="deploy-msg">Deploying to Vercel...</span>
+        </div>
+
+        <!-- Success state -->
+        <div class="deploy-state deploy-state--success hidden" id="deploy-state-success">
+          <svg class="deploy-icon deploy-icon--success" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span class="deploy-msg">Live at</span>
+          <a id="deploy-live-url" class="deploy-url" href="#" target="_blank" rel="noopener noreferrer">—</a>
+          <button id="deploy-copy-btn" class="deploy-copy-btn" title="Copy URL" type="button">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button id="deploy-again-btn" class="deploy-action-link" type="button">Redeploy</button>
+        </div>
+
+        <!-- Error state -->
+        <div class="deploy-state deploy-state--error hidden" id="deploy-state-error">
+          <svg class="deploy-icon deploy-icon--error" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="deploy-error-msg" class="deploy-msg deploy-msg--error">Deployment failed.</span>
+          <button id="deploy-retry-btn" class="deploy-action-link" type="button">Retry</button>
+        </div>
+
+      </div>
+
+      <!-- Preview Content -->
+      <div class="preview-content-area" id="preview-content-area">
+
+        <div class="preview-state" id="state-empty">
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </div>
+          <h3 class="empty-title">Preview will appear here</h3>
+          <p class="empty-sub">Send a prompt to generate your app</p>
+        </div>
+
+        <div class="preview-state hidden" id="state-loading">
+          <div class="loading-rings">
+            <div class="ring ring1"></div>
+            <div class="ring ring2"></div>
+            <div class="ring ring3"></div>
+          </div>
+          <div id="loading-message" class="loading-message">Generating...</div>
+          <div id="loading-sub" class="loading-sub"></div>
+        </div>
+
+        <div class="preview-state hidden" id="state-frame">
+          <div class="device-wrapper" id="device-wrapper" data-device="desktop">
+            <div class="browser-chrome" id="browser-chrome">
+              <div class="browser-dots">
+                <span class="bdot bdot-r"></span>
+                <span class="bdot bdot-y"></span>
+                <span class="bdot bdot-g"></span>
+              </div>
+              <div class="browser-url-display" id="browser-url-display">localhost:3001</div>
+              <div style="width:58px;"></div>
+            </div>
+            <div class="phone-notch-bar" id="phone-notch-bar">
+              <div class="phone-notch"></div>
+            </div>
+            <div class="frame-inner">
+              <iframe id="preview-iframe" title="App preview"></iframe>
+            </div>
+            <div class="phone-home-bar" id="phone-home-bar">
+              <div class="home-indicator"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="preview-state hidden" id="state-error">
+          <div class="error-icon">!</div>
+          <div id="preview-error-title" class="error-title">Preview failed</div>
+          <div id="preview-error-msg" class="error-sub"></div>
+          <button id="retry-preview-btn" class="btn btn-secondary btn-sm" type="button">Retry</button>
+        </div>
+
+      </div>
+
+      <!-- Code View -->
+      <div class="code-area hidden" id="code-area">
+        <div class="code-file-sidebar">
+          <div class="code-sidebar-title">Files</div>
+          <div id="code-file-list" class="code-file-list">
+            <div class="empty-state">No project selected.</div>
+          </div>
+        </div>
+        <div class="code-pane">
+          <div class="code-pane-header">
+            <span id="code-file-name" class="code-file-name">Select a file</span>
+          </div>
+          <pre class="code-pre"><code id="code-text">Select a file to view its contents.</code></pre>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+</div>
+
+<!-- ── Debug Modal ────────────────────────────────────────────────────────── -->
+<div class="debug-overlay hidden" id="debug-overlay" role="dialog" aria-modal="true" aria-label="Fix My App">
+  <div class="debug-modal">
+    <div class="debug-modal-header">
+      <div class="debug-modal-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        Fix My App
+      </div>
+      <button class="debug-modal-close" id="debug-modal-close" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div class="debug-modal-body" id="debug-modal-body">
+      <!-- Filled dynamically by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ── Auth Modal ────────────────────────────────────────────────────────── -->
+<div class="auth-modal-overlay hidden" id="auth-modal-overlay" role="dialog" aria-modal="true" aria-label="Sign in">
+  <div class="auth-modal">
+    <button class="auth-modal-close" id="auth-modal-close" aria-label="Close" type="button">&times;</button>
+
+    <div class="auth-modal-logo">
+      <img src="logo-symbol.svg" height="22" alt="Zyra" style="display:inline-block;vertical-align:middle;margin-right:8px;margin-top:-1px;" />Zyra
+    </div>
+    <p class="auth-modal-tagline" id="auth-modal-tagline">Sign in to generate your app.</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab auth-tab--active" id="auth-tab-signin" type="button">Sign in</button>
+      <button class="auth-tab" id="auth-tab-signup" type="button">Create account</button>
+    </div>
+
+    <form id="auth-modal-form" novalidate>
+      <div class="auth-field">
+        <label for="auth-email">Email</label>
+        <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" />
+      </div>
+      <div class="auth-field">
+        <label for="auth-password">Password</label>
+        <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <button type="submit" class="auth-submit-btn" id="auth-submit-btn">Sign in</button>
+    </form>
+
+    <div class="auth-divider"><span>or</span></div>
+
+    <button class="auth-google-btn" id="auth-google-btn" type="button">
+      <svg width="17" height="17" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <div class="auth-error" id="auth-modal-error"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="auth.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+node_modules/
+.env
+.env.local
+generated-projects/
+storage/jobs/
+storage/projects/
+*.log

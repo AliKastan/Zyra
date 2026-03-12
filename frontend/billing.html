@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zyra — Billing</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:       #DAE697;
+      --green-hover: #CDD888;
+      --brown:       #8A2E1A;
+      --brown-hover: #741F0F;
+      --bg:          #FBFBFB;
+      --surface:     #FFFFFF;
+      --surface2:    #F4F4F0;
+      --border:      #E4E4DC;
+      --text:        #1A1A16;
+      --text-dim:    #5A5A52;
+      --text-muted:  #9A9A90;
+      --radius:      10px;
+      --error:       #B91C1C;
+      --warning:     #92400E;
+      --success:     #166534;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--green);
+      border-bottom: 1px solid var(--green-hover);
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--brown);
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+    }
+
+    .header-logo img { display: block; }
+
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.875rem;
+    }
+
+    .header-nav a {
+      text-decoration: none;
+      color: var(--text-dim);
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    .header-nav a:hover { background: var(--green-hover); }
+    .header-nav a.active { color: var(--brown); font-weight: 600; }
+
+    .header-user {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8125rem;
+      color: var(--text-dim);
+    }
+
+    /* ── Layout ── */
+    .page {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 36px 24px 64px;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 4px;
+    }
+
+    .page-subtitle {
+      font-size: 0.9375rem;
+      color: var(--text-dim);
+      margin-bottom: 36px;
+    }
+
+    /* ── Usage card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .usage-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .usage-label { font-size: 0.9375rem; color: var(--text-dim); }
+    .usage-value { font-size: 0.9375rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: var(--surface2);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--brown);
+      transition: width 0.4s ease;
+    }
+
+    .progress-fill.warning { background: #D97706; }
+    .progress-fill.critical { background: var(--error); }
+
+    .usage-note {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      margin-top: 10px;
+    }
+
+    /* ── Plan badge ── */
+    .plan-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-left: 10px;
+      vertical-align: middle;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .plan-badge.free    { background: var(--surface2); color: var(--text-dim); }
+    .plan-badge.pro     { background: #EEF2FF; color: #4338CA; }
+    .plan-badge.max     { background: #FDF2F8; color: #9D174D; }
+
+    /* ── Plan status ── */
+    .subscription-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9375rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .status-dot.active    { background: #16A34A; }
+    .status-dot.trialing  { background: #2563EB; }
+    .status-dot.past-due  { background: #D97706; }
+    .status-dot.canceled  { background: #9CA3AF; }
+    .status-dot.free      { background: #9CA3AF; }
+
+    /* ── Plan grid ── */
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 640px) {
+      .plans-grid { grid-template-columns: 1fr; }
+    }
+
+    .plan-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      position: relative;
+      transition: box-shadow 0.15s;
+    }
+
+    .plan-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
+
+    .plan-card.current {
+      border-color: var(--brown);
+      box-shadow: 0 0 0 2px rgba(138,46,26,0.1);
+    }
+
+    .plan-card.popular::before {
+      content: 'Most popular';
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--brown);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 12px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .plan-name {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .plan-price {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 2px;
+    }
+
+    .plan-price span {
+      font-size: 0.9375rem;
+      font-weight: 400;
+      color: var(--text-dim);
+    }
+
+    .plan-tagline {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+      min-height: 36px;
+    }
+
+    .plan-features {
+      list-style: none;
+      margin-bottom: 20px;
+    }
+
+    .plan-features li {
+      font-size: 0.875rem;
+      color: var(--text-dim);
+      padding: 4px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+    }
+
+    .plan-features li::before {
+      content: '';
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%238A2E1A'%3E%3Cpath d='M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z'/%3E%3C/svg%3E") center/contain no-repeat;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .plan-features li.dim::before {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23D1D5DB'%3E%3Cpath d='M4 8a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 4 8z'/%3E%3C/svg%3E");
+    }
+
+    .btn-plan {
+      width: 100%;
+      padding: 10px 16px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      font-family: inherit;
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .btn-plan:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .btn-plan.primary {
+      background: var(--brown);
+      color: #fff;
+    }
+
+    .btn-plan.primary:hover:not(:disabled) { background: var(--brown-hover); }
+
+    .btn-plan.secondary {
+      background: transparent;
+      color: var(--text-dim);
+      border-color: var(--border);
+    }
+
+    .btn-plan.secondary:hover:not(:disabled) { background: var(--surface2); }
+
+    .btn-plan.current-plan {
+      background: var(--surface2);
+      color: var(--text-muted);
+      cursor: default;
+      border-color: var(--border);
+    }
+
+    /* ── Portal section ── */
+    .portal-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .portal-text { font-size: 0.9375rem; color: var(--text-dim); }
+
+    .btn-portal {
+      padding: 9px 20px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      font-family: inherit;
+      background: transparent;
+      color: var(--brown);
+      border: 1px solid var(--brown);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-portal:hover:not(:disabled) { background: rgba(138,46,26,0.06); }
+    .btn-portal:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    /* ── Alert ── */
+    .alert {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 14px 16px;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      margin-bottom: 20px;
+    }
+
+    .alert.warning { background: #FEF3C7; color: var(--warning); border: 1px solid #FDE68A; }
+    .alert.error   { background: #FEF2F2; color: var(--error);   border: 1px solid #FECACA; }
+    .alert.info    { background: #EFF6FF; color: #1D4ED8;        border: 1px solid #BFDBFE; }
+
+    /* ── Loading / error states ── */
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface2) 25%, var(--surface3, #E4E4DC) 50%, var(--surface2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 6px;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .skeleton-line { height: 14px; margin-bottom: 8px; }
+    .skeleton-line.wide  { width: 80%; }
+    .skeleton-line.short { width: 40%; }
+    .skeleton-line.full  { width: 100%; }
+
+    #page-error {
+      display: none;
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-muted);
+      font-size: 0.9375rem;
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <a href="/" class="header-logo">
+    <img src="logo-symbol.svg" height="28" alt="" />
+    Zyra
+  </a>
+  <nav class="header-nav">
+    <a href="/">Dashboard</a>
+    <a href="/billing" class="active">Billing</a>
+  </nav>
+  <div class="header-user" id="header-user"></div>
+</header>
+
+<main class="page">
+  <div id="page-error">
+    <p>Something went wrong loading billing information. <a href="/billing" style="color:var(--brown)">Reload</a></p>
+  </div>
+
+  <div id="page-content" style="display:none">
+    <h1 class="page-title">Billing</h1>
+    <p class="page-subtitle">Manage your plan and view usage</p>
+
+    <!-- Alert (quota warning, past-due, etc.) -->
+    <div id="billing-alert" style="display:none"></div>
+
+    <!-- Current usage -->
+    <div class="card">
+      <div class="card-title">Usage this period</div>
+
+      <div class="usage-row">
+        <span class="usage-label">Credits used</span>
+        <span class="usage-value"><span id="credits-used">—</span> / <span id="credits-included">—</span></span>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-fill" id="usage-progress" style="width:0%"></div>
+      </div>
+
+      <div class="usage-note" id="usage-note"></div>
+    </div>
+
+    <!-- Subscription status (paid users only) -->
+    <div class="card" id="subscription-card" style="display:none">
+      <div class="card-title">Subscription</div>
+      <div class="portal-row">
+        <div>
+          <div class="subscription-status">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="status-text"></span>
+          </div>
+          <div style="margin-top:6px;font-size:0.8125rem;color:var(--text-muted)" id="period-text"></div>
+        </div>
+        <button class="btn-portal" id="portal-btn" onclick="openPortal()">Manage subscription</button>
+      </div>
+    </div>
+
+    <!-- Plans -->
+    <div style="margin-bottom:16px">
+      <div class="card-title" style="margin-bottom:12px">Plans</div>
+      <div class="plans-grid" id="plans-grid">
+        <!-- injected by JS -->
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="billing.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "watch": ["src"],
+  "ext": "js,json",
+  "ignore": [
+    "storage/**",
+    "generated-projects/**",
+    "frontend/**",
+    "*.test.js"
+  ],
+  "delay": 500
+}

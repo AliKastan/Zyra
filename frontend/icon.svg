@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Zyra">
+  <title>Zyra</title>
+  <!-- Brown rounded square background for legibility at small sizes -->
+  <rect x="0" y="0" width="48" height="48" rx="9" fill="#8A2E1A"/>
+  <!-- Z path: same scale as favicon.svg (0.16×, offset +9,+8) -->
+  <path
+    d="M 9,8 L 33,8 L 39,18 L 33,27 L 24,40 L 17,27 L 23,18 L 15,18 Z"
+    fill="#DAE697"
+  />
+</svg>
