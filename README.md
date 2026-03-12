@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Zyra — AI App Builder Studio
 
 Zyra takes a plain-English prompt and generates a complete, runnable app — then immediately shows it in a **live, interactive preview panel** inside the builder UI. No manual file opening needed.
@@ -299,3 +300,6 @@ Job complete  → metadata saved to /storage/jobs/ and /storage/projects/
 - No database — jobs and projects are stored as JSON files
 - One generation at a time (pipeline runs async)
 - Generated apps target frontend web apps; backend/API apps preview requires a running Node process
+=======
+# Zyra
+>>>>>>> 6020ef7db11a47c40b7d9c6ad1b957c1962954dc
