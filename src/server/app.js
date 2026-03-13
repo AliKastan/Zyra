@@ -46,9 +46,9 @@ app.use((_req, res, next) => {
     [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
       "img-src 'self' data: https:",
-      "font-src 'self'",
+      "font-src 'self' https://cdn.jsdelivr.net",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
       "frame-src 'self'",
       "upgrade-insecure-requests",
