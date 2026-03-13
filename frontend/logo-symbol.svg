@@ -1,24 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 185 200" width="185" height="200" role="img" aria-label="Zyra">
   <title>Zyra</title>
-  <!--
-    3-parallelogram Z lightning bolt. All angles 30° from vertical (offset = height × tan30°).
-
-    Segment 1 (top parallelogram, slants right):
-      Top-left  (0,   0)  → Top-right   (150,  0)   width=150
-      Bot-left  (35,  60) → Bot-right   (185, 60)   offset=35 (60×tan30°)
-
-    Segment 2 (middle parallelogram, slants left):
-      Top-right (185, 60) → Top-left    (85,  60)   width=100
-      Bot-right (150,120) → Bot-left    (50, 120)   offset=35
-
-    Segment 3 (bottom triangle, slants right, tapers to tip):
-      Top-left  (50, 120) → Top-right   (150,120)
-      Tip       (96, 200)                            offset=46 (80×tan30°)
-
-    Outer boundary as single polygon (clockwise from top-left):
-  -->
+  <defs>
+    <linearGradient id="zGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="55%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
   <path
     d="M 0,0 L 150,0 L 185,60 L 150,120 L 96,200 L 50,120 L 85,60 L 35,60 Z"
-    fill="#8A2E1A"
+    fill="url(#zGrad)"
   />
 </svg>
