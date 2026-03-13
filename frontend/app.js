@@ -121,7 +121,6 @@ function switchToConversation(convId) {
 
   renderAllMessages();
   renderHistory();
-  updateEditingBanner();
   updateDeployButton(currentSlug);
 
   if (currentSlug && currentPreviewUrl) {
@@ -206,7 +205,6 @@ const $ = (id) => document.getElementById(id);
 
 const promptInput     = $('prompt-input');
 const charCount       = $('char-count');
-const complexityBadge = $('complexity-badge');
 const generateBtn     = $('generate-btn');
 const promptError     = $('prompt-error');
 const modeBar         = $('mode-bar');
@@ -256,7 +254,6 @@ promptInput.addEventListener('input', () => {
   charCount.textContent = `${len} / ${MAX_CHARS}`;
   charCount.className = 'char-count' +
     (len >= MAX_CHARS ? ' at-limit' : len > MAX_CHARS * 0.9 ? ' near-limit' : '');
-  updateComplexityBadge(promptInput.value);
 });
 
 promptInput.addEventListener('keydown', (e) => {
@@ -266,19 +263,6 @@ promptInput.addEventListener('keydown', (e) => {
   }
   // Shift+Enter: default behaviour (new line) — no handler needed
 });
-
-function updateComplexityBadge(text) {
-  if (!text.trim()) {
-    complexityBadge.textContent = '—';
-    complexityBadge.className = 'complexity-badge complexity-unknown';
-    return;
-  }
-  const c = classifyLocally(text);
-  const labels = { simple: 'Simple', medium: 'Medium', complex: 'Complex' };
-  const est    = { simple: '~30s',   medium: '~2 min', complex: '~5 min' };
-  complexityBadge.textContent = `${labels[c.level]} · ${est[c.level]}`;
-  complexityBadge.className = `complexity-badge complexity-${c.level}`;
-}
 
 function classifyLocally(prompt) {
   const text  = prompt.toLowerCase().trim();
@@ -506,23 +490,6 @@ function classifyIntent(prompt, activeProjectSlug) {
     return 'BUG_FIX_REQUEST';
   }
   return 'PROJECT_EDIT_REQUEST';
-}
-
-// ── Editing banner ────────────────────────────────────────────────────────────
-
-const editingBanner      = $('editing-banner');
-const editingProjectName = $('editing-project-name');
-
-function updateEditingBanner() {
-  const conv = getActiveConv();
-  const slug = conv?.projectSlug;
-  if (slug) {
-    editingBanner.classList.remove('hidden');
-    // Format slug nicely: "my-todo-app" → "my todo app"
-    editingProjectName.textContent = slug.replace(/-/g, ' ');
-  } else {
-    editingBanner.classList.add('hidden');
-  }
 }
 
 // ── Generate ──────────────────────────────────────────────────────────────────
@@ -782,7 +749,6 @@ function updateMessage(id, updates) {
   }
 
   saveAllData();
-  updateEditingBanner();
 
   const existing = convThread.querySelector(`[data-msg-id="${id}"]`);
   const fresh = buildMsgEl(msg);
@@ -844,7 +810,7 @@ function buildAssistantEl(msg) {
     const fc = msg.filesWritten?.length || 0;
     bodyHtml = `
       <p class="msg-text">${escHtml(msg.text || '')}</p>
-      <div class="msg-meta">${fc} file${fc !== 1 ? 's' : ''} · ${escHtml(msg.duration || '—')} · ${escHtml(msg.mode || 'standard')}</div>
+      <div class="msg-meta">${fc} file${fc !== 1 ? 's' : ''} · ${escHtml(msg.duration || '—')} · ${escHtml(msg.mode === 'balanced' ? 'standard' : msg.mode || 'standard')}</div>
       <div class="msg-actions">
         <button class="msg-btn" data-action="preview" data-slug="${escAttr(msg.slug || '')}">Open preview</button>
         <button class="msg-btn msg-btn--ghost" data-action="code" data-slug="${escAttr(msg.slug || '')}">View code</button>
@@ -1943,7 +1909,6 @@ if (_avatarBtn) _avatarBtn.classList.add('hidden');
 loadAllData();
 renderAllMessages();
 renderHistory();
-updateEditingBanner();
 checkHealth();
 setInterval(checkHealth, 30_000);
 setPreviewState('empty');

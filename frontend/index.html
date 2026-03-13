@@ -96,13 +96,6 @@
         </div>
       </div>
 
-      <!-- Editing banner — shown when a project is active -->
-      <div class="editing-banner hidden" id="editing-banner">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        <span class="editing-banner-label">Modifying</span>
-        <span class="editing-banner-name" id="editing-project-name"></span>
-      </div>
-
       <!-- Input area -->
       <div class="sidebar-input">
         <div class="mode-bar" id="mode-bar">
@@ -123,7 +116,6 @@
             placeholder="Describe what you want to build..."
           ></textarea>
           <div class="input-meta-row">
-            <span id="complexity-badge" class="complexity-badge complexity-unknown">—</span>
             <div class="input-right-meta">
               <span id="char-count" class="char-count">0 / 3000</span>
               <button id="generate-btn" class="send-btn" type="button" title="Generate (Ctrl+Enter)">

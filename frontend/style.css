@@ -809,29 +809,6 @@ html, body {
 }
 
 /* ── Editing banner ────────────────────────────────────────────────────────── */
-.editing-banner {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  margin: 0 8px 6px;
-  border-radius: 7px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.10);
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  flex-shrink: 0;
-}
-.editing-banner svg { opacity: 0.5; flex-shrink: 0; color: rgba(255,255,255,0.6); }
-.editing-banner-label { font-weight: 500; opacity: 0.65; }
-.editing-banner-name {
-  font-weight: 600;
-  color: rgba(255,255,255,0.85);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
-}
 
 /* ── Input area ────────────────────────────────────────────────────────────── */
 .sidebar-input {
@@ -967,18 +944,6 @@ textarea::placeholder { color: var(--text-muted); }
   gap: 0.5rem;
 }
 
-.complexity-badge {
-  font-size: 0.65rem;
-  font-weight: 600;
-  padding: 0.12rem 0.5rem;
-  border-radius: 4px;
-  font-family: var(--mono);
-  letter-spacing: 0.02em;
-}
-.complexity-simple  { background: var(--success-dim); color: var(--success); }
-.complexity-medium  { background: var(--warning-dim); color: var(--warning); }
-.complexity-complex { background: var(--danger-dim);  color: var(--danger); }
-.complexity-unknown { background: var(--surface3);    color: var(--text-muted); }
 
 .input-right-meta {
   display: flex;
