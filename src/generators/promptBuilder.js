@@ -63,10 +63,18 @@ Data (returns { data, error }):
 Rules: NEVER use localStorage for app data. NEVER change '__ZYRA_PROJECT_ID__' — it is auto-replaced. Always check error field and show friendly messages. Show loading state while awaiting data.`;
 
 // ── Code reliability rules (injected into all coder prompts) ──────────────────
-// ~40 tokens — prevents the most common runtime errors in generated code.
+// ~110 tokens — prevents the most common runtime errors in generated code.
 
 const CODE_RELIABILITY = `
-Reliability: use let/var for reassigned vars (never reassign const). Check elements exist before addEventListener. Put DOM scripts at body end or in DOMContentLoaded. Wrap fetch in try/catch. Close all HTML tags.`;
+JS reliability (mandatory):
+- Mutable state MUST use let: let items=[], let count=0, let user=null, let isOpen=false — NEVER const for these.
+- Only use const for values that truly never change (DOM refs set once, config, imports).
+- Null check before every DOM operation: const el=document.getElementById('x'); if(el){el.addEventListener(...)}
+- All DOM manipulation in DOMContentLoaded or at </body> — never in <head> without defer.
+- Wrap fetch(), JSON.parse(), localStorage in try/catch with fallback.
+- Close every { } ( ) [ ] bracket and every HTML tag.
+- Null-safe access: arr.length>0?arr[0]:null — never access .property on possibly-null values.
+- Element IDs in JS must exactly match IDs in HTML.`;
 
 // ── Coder system prompts ───────────────────────────────────────────────────────
 

@@ -28,7 +28,9 @@ module.exports = {
   FINALIZE_TIMEOUT_MS: parseInt(process.env.FINALIZE_TIMEOUT_MS || '60000',  10),
 
   // ── Auto-fix (post-generation self-healing) ──────────────────────────────────
-  AUTOFIX_TIMEOUT_MS: parseInt(process.env.AUTOFIX_TIMEOUT_MS || '60000', 10),
+  AUTOFIX_TIMEOUT_MS:  parseInt(process.env.AUTOFIX_TIMEOUT_MS  || '60000', 10),
+  // Max AI fix rounds after the free quick-fix pass (each round = 1 extra API call)
+  AUTOFIX_MAX_ROUNDS:  parseInt(process.env.AUTOFIX_MAX_ROUNDS  || '2',     10),
 
   // ── Retry config ─────────────────────────────────────────────────────────────
   CODER_MAX_RETRIES: parseInt(process.env.CODER_MAX_RETRIES || '2', 10),

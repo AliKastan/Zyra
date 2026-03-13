@@ -5,7 +5,7 @@ const {
   buildCoderRetryPrompt,
   buildAutoFixPrompt,
 } = require('../generators/promptBuilder');
-const { validateGeneratedCode } = require('../utils/codeValidator');
+const { validateGeneratedCode, applyQuickFixes } = require('../utils/codeValidator');
 const {
   buildContentExtractionPrompt,
   detectStyleTag,
@@ -202,27 +202,52 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
   let result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, needsBackend);
   if (needsBackend) result._needsBackend = true;
 
-  // ── Post-generation code validation + single auto-fix attempt ─────────────
-  // Skip validation for fallback output (already a known-good template)
+  // ── Post-generation code validation + multi-round auto-fix ────────────────
+  // Skip for fallback/template output (already known-good)
   if (!result._fallback && !result._template) {
-    const validationErrors = validateGeneratedCode(result.files);
-    if (validationErrors.length > 0) {
-      logger.info(`coderService: validation found ${validationErrors.length} issue(s) — attempting auto-fix`);
-      validationErrors.forEach((e) => logger.debug(`  [${e.type}] ${e.file}: ${e.message}`));
+    const MAX_AI_FIX_ROUNDS = limits.AUTOFIX_MAX_ROUNDS || 2;
+    let files     = result.files;
+    let autoFixed = false;
 
-      if (typeof onRetry === 'function') onRetry('autofix', 'Polishing code...');
+    // Round 0: quick fixes — const→let via regex (no API call, instant)
+    const initialErrors = validateGeneratedCode(files);
+    if (initialErrors.length > 0) {
+      logger.info(`coderService: validation found ${initialErrors.length} issue(s)`);
+      initialErrors.forEach((e) => logger.debug(`  [${e.type}] ${e.file}: ${e.message}`));
 
-      try {
-        const fixed = await runAutoFix(userPrompt, result.files, validationErrors, mode, costTracker);
-        if (fixed) {
-          result = { ...result, files: fixed, _autoFixed: true };
-          logger.info(`coderService: auto-fix applied — ${validationErrors.length} issue(s) addressed`);
+      const quickFixed = applyQuickFixes(files, initialErrors);
+      if (quickFixed !== files) {
+        files     = quickFixed;
+        autoFixed = true;
+        logger.info('coderService: quick-fix applied (const→let)');
+      }
+
+      // Rounds 1…MAX_AI_FIX_ROUNDS: AI-powered fix for remaining issues
+      for (let round = 0; round < MAX_AI_FIX_ROUNDS; round++) {
+        const errors = validateGeneratedCode(files);
+        if (errors.length === 0) break; // clean
+
+        logger.info(`coderService: AI auto-fix round ${round + 1}/${MAX_AI_FIX_ROUNDS} — ${errors.length} issue(s)`);
+        errors.forEach((e) => logger.debug(`  [${e.type}] ${e.file}: ${e.message}`));
+
+        if (round === 0 && typeof onRetry === 'function') onRetry('autofix', 'Polishing code...');
+
+        try {
+          const fixed = await runAutoFix(userPrompt, files, errors, mode, costTracker);
+          if (fixed) {
+            files     = fixed;
+            autoFixed = true;
+          } else {
+            break; // AI returned nothing useful
+          }
+        } catch (fixErr) {
+          logger.warn(`coderService: auto-fix round ${round + 1} failed (non-fatal): ${fixErr.message}`);
+          break;
         }
-      } catch (fixErr) {
-        // Non-fatal — continue with original output
-        logger.warn(`coderService: auto-fix failed (non-fatal): ${fixErr.message}`);
       }
     }
+
+    if (autoFixed) result = { ...result, files, _autoFixed: true };
   }
 
   return result;
@@ -236,7 +261,8 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
  */
 async function runAutoFix(userPrompt, files, errors, mode, costTracker) {
   const modelName = env.DEFAULT_CODER_MODEL;
-  const maxTokens = Math.min(limits.AUTOFIX_TIMEOUT_MS ? 8000 : 8000, limits.MODE_TOKENS[mode]?.coder || 8000);
+  // Cap at 8000 tokens (enough for a targeted fix) but respect mode budget if lower
+  const maxTokens = Math.min(8000, limits.MODE_TOKENS[mode]?.coder || 8000);
 
   const { system, user } = buildAutoFixPrompt(userPrompt, files, errors);
 

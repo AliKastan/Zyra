@@ -199,4 +199,45 @@ function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-module.exports = { validateGeneratedCode };
+// ── Quick fixes ────────────────────────────────────────────────────────────────
+
+/**
+ * Applies regex-based fixes for simple, high-confidence errors without an AI call.
+ * Currently handles: const_reassignment → replaces `const varName =` with `let varName =`.
+ *
+ * @param {Array<{path: string, content: string}>} files
+ * @param {Array<{type: string, file: string, message: string}>} errors
+ * @returns {Array<{path: string, content: string}>} fixed files (same reference if nothing changed)
+ */
+function applyQuickFixes(files, errors) {
+  // Collect const→let targets grouped by file
+  const fixesByFile = new Map();
+  for (const e of errors) {
+    if (e.type !== 'const_reassignment') continue;
+    const match = e.message.match(/"([^"]+)" is declared with const/);
+    if (!match) continue;
+    if (!fixesByFile.has(e.file)) fixesByFile.set(e.file, new Set());
+    fixesByFile.get(e.file).add(match[1]);
+  }
+  if (fixesByFile.size === 0) return files;
+
+  let anyChanged = false;
+  const result = files.map((f) => {
+    const vars = fixesByFile.get(f.path);
+    if (!vars || vars.size === 0) return f;
+    let content = f.content;
+    for (const varName of vars) {
+      content = content.replace(
+        new RegExp(`\\bconst\\s+(${escapeRegex(varName)})\\s*=`, 'g'),
+        'let $1 =',
+      );
+    }
+    if (content === f.content) return f;
+    anyChanged = true;
+    return { ...f, content };
+  });
+
+  return anyChanged ? result : files;
+}
+
+module.exports = { validateGeneratedCode, applyQuickFixes };
