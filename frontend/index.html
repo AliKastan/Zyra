@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+<canvas id="app-particles" aria-hidden="true"></canvas>
 <div class="studio-bg" aria-hidden="true">
   <div class="studio-bg-orb studio-bg-orb--1"></div>
   <div class="studio-bg-orb studio-bg-orb--2"></div>
@@ -210,10 +211,18 @@
 
         <div class="preview-state" id="state-empty">
           <div class="empty-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            <svg viewBox="0 0 185 200" xmlns="http://www.w3.org/2000/svg" fill="none">
+              <defs>
+                <linearGradient id="emptyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#4F9EFF"/>
+                  <stop offset="100%" stop-color="#818CF8"/>
+                </linearGradient>
+              </defs>
+              <path d="M 0,0 L 150,0 L 185,60 L 150,120 L 96,200 L 50,120 L 85,60 L 35,60 Z" fill="url(#emptyGrad)"/>
+            </svg>
           </div>
           <h3 class="empty-title">Preview will appear here</h3>
-          <p class="empty-sub">Send a prompt to generate your app</p>
+          <p class="empty-sub">Describe an app in the chat to generate it</p>
         </div>
 
         <div class="preview-state hidden" id="state-loading">
@@ -341,5 +350,92 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="auth.js"></script>
 <script src="app.js"></script>
+
+<!-- Subtle background particle system — fewer/slower than landing page -->
+<script>
+(function () {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const canvas = document.getElementById('app-particles');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  const COUNT = 55;
+  const BASE_SPEED = 0.08;
+  const MOUSE_RADIUS = 90;
+  const RETURN_SPEED = 0.025;
+
+  let W, H, dpr;
+  const mouse = { x: -9999, y: -9999 };
+  let particles = [], raf;
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function makeParticle() {
+    const x = rand(0, W), y = rand(0, H);
+    return { ox: x, oy: y, x, y,
+      vx: rand(-BASE_SPEED, BASE_SPEED),
+      vy: rand(-BASE_SPEED, BASE_SPEED),
+      r: rand(0.4, 1.1),
+      a: rand(0.06, 0.22) };
+  }
+
+  function init() {
+    resize();
+    particles = Array.from({ length: COUNT }, makeParticle);
+  }
+
+  function tick() {
+    ctx.clearRect(0, 0, W, H);
+    for (const p of particles) {
+      p.ox += p.vx;
+      p.oy += p.vy;
+      if (p.ox < -10) p.ox = W + 10; else if (p.ox > W + 10) p.ox = -10;
+      if (p.oy < -10) p.oy = H + 10; else if (p.oy > H + 10) p.oy = -10;
+
+      const dx = p.x - mouse.x, dy = p.y - mouse.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      let tx = p.ox, ty = p.oy;
+      if (dist < MOUSE_RADIUS && dist > 0.1) {
+        const f = (1 - dist / MOUSE_RADIUS);
+        tx += (dx / dist) * f * 40;
+        ty += (dy / dist) * f * 40;
+      }
+      p.x += (tx - p.x) * RETURN_SPEED;
+      p.y += (ty - p.y) * RETURN_SPEED;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, 6.2832);
+      ctx.fillStyle = 'rgba(255,255,255,' + p.a + ')';
+      ctx.fill();
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  window.addEventListener('resize', () => {
+    resize();
+    for (const p of particles) { p.ox = rand(0, W); p.oy = rand(0, H); p.x = p.ox; p.y = p.oy; }
+  });
+  window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+  window.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) cancelAnimationFrame(raf);
+    else raf = requestAnimationFrame(tick);
+  });
+
+  init();
+  raf = requestAnimationFrame(tick);
+})();
+</script>
 </body>
 </html>
