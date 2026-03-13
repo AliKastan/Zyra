@@ -1544,6 +1544,7 @@ textarea::placeholder { color: var(--text-muted); }
 }
 .error-title { font-size: 0.9rem; font-weight: 600; color: var(--text); }
 .error-sub   { font-size: 0.79rem; color: var(--text-muted); max-width: 300px; text-align: center; }
+.preview-error-actions { display: flex; gap: 8px; margin-top: 2px; }
 
 /* ── Device wrapper & frames ───────────────────────────────────────────────── */
 #state-frame {

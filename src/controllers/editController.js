@@ -1,6 +1,9 @@
+const path                 = require('path');
+const fse                  = require('fs-extra');
 const { startEdit }        = require('../services/editService');
 const { getProject }       = require('../storage/projectStore');
 const { getActiveJobCount } = require('../services/generationService');
+const { GENERATED_PROJECTS_DIR } = require('../generators/projectGenerator');
 const limits               = require('../config/limits');
 const logger               = require('../utils/logger');
 
@@ -14,11 +17,20 @@ async function handleEdit(req, res) {
   if (!['fast', 'balanced', 'quality'].includes(mode)) {
     return res.status(400).json({ error: 'Invalid mode. Use fast, balanced, or quality.' });
   }
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    return res.status(400).json({ error: 'Invalid project slug' });
+  }
 
-  // Verify the project exists
+  // Verify the project exists — check metadata OR files on disk (metadata can be missing after a server issue)
   const project = await getProject(slug);
   if (!project) {
-    return res.status(404).json({ error: `Project "${slug}" not found` });
+    const projectDir = path.join(GENERATED_PROJECTS_DIR, slug);
+    const hasFiles = await fse.pathExists(projectDir);
+    if (!hasFiles) {
+      return res.status(404).json({ error: `Project "${slug}" not found`, expired: true });
+    }
+    // Files exist on disk but metadata is missing — edit service handles this gracefully
+    logger.warn(`editController: metadata missing for "${slug}" but files found on disk — proceeding`);
   }
 
   // Concurrency guard (shared with generation)

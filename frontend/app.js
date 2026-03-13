@@ -280,7 +280,8 @@ const deviceWrapper      = $('device-wrapper');
 const browserUrlDisplay  = $('browser-url-display');
 const refreshPreviewBtn  = $('refresh-preview-btn');
 const openTabBtn         = $('open-tab-btn');
-const retryPreviewBtn    = $('retry-preview-btn');
+const retryPreviewBtn       = $('retry-preview-btn');
+const regenerateProjectBtn  = $('regenerate-project-btn');
 const fixBtn             = $('fix-my-app-btn');
 
 // Code
@@ -656,7 +657,8 @@ async function startEdit(prompt, projectSlug) {
     stopGenerationTimer();
     setGenerating(false);
     updateMessage(asstMsgId, { status: 'failed', error: err.message });
-    setPreviewState('error', 'Edit failed', err.message);
+    const isExpired = err.expired || err.message.toLowerCase().includes('not found');
+    setPreviewState('error', 'Edit failed', err.message, { showRegenerate: isExpired });
     activeMessageId = null;
   }
 }
@@ -732,14 +734,11 @@ async function pollJob(jobId) {
           }
         }
       } else {
-        updateMessage(msgId, {
-          status: job.status,
-          error: job.error || 'An unexpected error occurred.',
-        });
-        setPreviewState('error',
-          job.status === 'cancelled' ? 'Cancelled' : job.isEdit ? 'Edit failed' : 'Generation failed',
-          job.error || ''
-        );
+        const errMsg = job.error || 'An unexpected error occurred.';
+        updateMessage(msgId, { status: job.status, error: errMsg });
+        const isExpired = errMsg.toLowerCase().includes('not found') || errMsg.toLowerCase().includes('expired');
+        const errorTitle = job.status === 'cancelled' ? 'Cancelled' : job.isEdit ? 'Edit failed' : 'Generation failed';
+        setPreviewState('error', errorTitle, errMsg, { showRegenerate: isExpired });
       }
     }
   } catch (_) {}
@@ -1057,8 +1056,8 @@ async function initiatePreview(slug) {
       pollPreviewUntilReady(slug, preview.status);
     }
   } catch (err) {
-    if (err.message && (err.message.toLowerCase().includes('not found') || err.message.toLowerCase().includes('expired'))) {
-      setPreviewState('error', 'Project not found', 'Project files expired. Click Regenerate to rebuild.');
+    if (err.expired || (err.message && err.message.toLowerCase().includes('not found'))) {
+      setPreviewState('error', 'Project not found', 'Project files are no longer available.', { showRegenerate: true });
     } else {
       setPreviewState('error', 'Preview failed', err.message);
     }
@@ -1098,7 +1097,7 @@ function stopPreviewPoll() {
   if (previewPollInterval) { clearInterval(previewPollInterval); previewPollInterval = null; }
 }
 
-function setPreviewState(state, title, sub) {
+function setPreviewState(state, title, sub, opts = {}) {
   [stateEmpty, stateLoading, stateFrame, stateError].forEach((el) => el.classList.add('hidden'));
   if (state === 'empty')   stateEmpty.classList.remove('hidden');
   if (state === 'loading') { stateLoading.classList.remove('hidden'); updateLoadingMessage(title || 'Loading...', sub || ''); }
@@ -1108,6 +1107,9 @@ function setPreviewState(state, title, sub) {
     const t = $('preview-error-title'); const m = $('preview-error-msg');
     if (t) t.textContent = title || 'Error';
     if (m) m.textContent = sub || '';
+    // Show regenerate button only when files are gone / expired
+    const showRegen = opts.showRegenerate || false;
+    regenerateProjectBtn.classList.toggle('hidden', !showRegen);
   }
 }
 
@@ -1151,6 +1153,25 @@ openTabBtn.addEventListener('click', () => {
 retryPreviewBtn.addEventListener('click', () => {
   if (currentSlug) initiatePreview(currentSlug);
 });
+
+regenerateProjectBtn.addEventListener('click', () => {
+  const originalPrompt = getOriginalProjectPrompt();
+  if (originalPrompt) {
+    // Reset project slug so it generates fresh instead of editing
+    const conv = getActiveConv();
+    if (conv) { conv.projectSlug = null; conv.previewUrl = null; saveAllData(); }
+    currentSlug = null;
+    currentPreviewUrl = null;
+    updateDeployButton(null);
+    startGeneration(originalPrompt);
+  }
+});
+
+function getOriginalProjectPrompt() {
+  // Find the first non-edit assistant message with a userPrompt
+  const firstGen = messages.find(m => m.type === 'assistant' && !m.isEdit && m.userPrompt);
+  return firstGen?.userPrompt || null;
+}
 
 // ── Deploy ────────────────────────────────────────────────────────────────────
 const deployBtn            = $('deploy-btn');
@@ -1360,7 +1381,11 @@ async function apiFetch(path, opts = {}) {
     throw new Error('Session expired');
   }
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(data.error || `HTTP ${res.status}`);
+    err.expired = data.expired || false;
+    throw err;
+  }
   return data;
 }
 
@@ -1410,6 +1435,16 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (!debugOverlay.classList.contains('hidden')) closeDebugModal();
     if (!$('delete-confirm-overlay').classList.contains('hidden')) closeDeleteConfirm();
+  }
+  // Ctrl/Cmd+N — new project (don't intercept if a modal is open)
+  if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+    const anyModalOpen = !debugOverlay.classList.contains('hidden') ||
+                         !$('delete-confirm-overlay').classList.contains('hidden') ||
+                         !authModalOverlay.classList.contains('hidden');
+    if (!anyModalOpen) {
+      e.preventDefault();
+      newChatBtn.click();
+    }
   }
 });
 
