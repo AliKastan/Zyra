@@ -112,7 +112,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
       mode !== 'quality';
     await log(isTemplate ? 'Building from template...' : 'Generating project files...');
 
-    const codeOutput = await runCoder(
+    let codeOutput = await runCoder(
       userPrompt,
       plan,
       mode,
