@@ -14,15 +14,22 @@ const debugRoutes    = require('../routes/debugRoutes');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { stripeWebhook } = require('../controllers/billingController');
 const logger = require('../utils/logger');
+const { isValidCode } = require('../config/accessCodes');
 
 const app = express();
 
 // ── Private beta gate ─────────────────────────────────────────────────────────
-const GATE_CODE = 'zyra2026';
+const ACCESS_COOKIE = 'zyra_access';
 
 function hasGateAccess(req) {
   const cookie = req.headers.cookie || '';
-  return /zyra_gate=granted/.test(cookie);
+  return cookie.split(';').some(c => c.trim() === `${ACCESS_COOKIE}=true`);
+}
+
+function requireGate(req, res, next) {
+  if (hasGateAccess(req)) return next();
+  const next_ = encodeURIComponent(req.originalUrl);
+  res.redirect(`/access?next=${next_}`);
 }
 
 // ── Stripe webhook — MUST come before express.json() to get raw body ──────────
@@ -64,9 +71,9 @@ app.use((req, _res, next) => {
 
 // ── Gate verify endpoint ──────────────────────────────────────────────────────
 app.post('/api/gate/verify', (req, res) => {
-  if (req.body?.code === GATE_CODE) {
+  if (isValidCode(req.body?.code)) {
     const maxAge = 30 * 24 * 60 * 60; // 30 days
-    res.setHeader('Set-Cookie', `zyra_gate=granted; Path=/; Max-Age=${maxAge}; SameSite=Lax`);
+    res.setHeader('Set-Cookie', `${ACCESS_COOKIE}=true; Path=/; Max-Age=${maxAge}; SameSite=Lax; HttpOnly`);
     return res.json({ ok: true });
   }
   res.status(401).json({ ok: false });
@@ -78,14 +85,18 @@ app.post('/api/gate/verify', (req, res) => {
 // express.static would serve index.html for /index.html before our route
 // handlers ever run. By placing page routes first, we control every HTML path.
 
-// Landing page — public, no gate required
-app.get('/landing', (_req, res) => {
+// Access gate page — always public (no chicken-and-egg)
+app.get('/access', (_req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../frontend/access.html'));
+});
+
+// Root: gate → landing page
+app.get('/', requireGate, (req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/landing.html'));
 });
 
-// Root: redirect to landing page (gate is now a soft barrier behind the CTA)
-app.get('/', (req, res) => {
-  if (hasGateAccess(req)) return res.redirect('/app');
+// Landing page — gate-protected
+app.get('/landing', requireGate, (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/landing.html'));
 });
 
@@ -93,19 +104,17 @@ app.get('/', (req, res) => {
 app.get('/index.html', (_req, res) => res.redirect(301, '/app'));
 
 // Main app: gate-protected
-app.get('/app', (req, res) => {
-  if (!hasGateAccess(req)) return res.redirect('/');
+app.get('/app', requireGate, (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/index.html'));
 });
 
-// Login page (no gate — users need to reach login without gate access)
-app.get('/login', (_req, res) => {
+// Login page — gate-protected (login is post-access, within the product)
+app.get('/login', requireGate, (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/login.html'));
 });
 
 // Billing page: gate-protected
-app.get('/billing', (req, res) => {
-  if (!hasGateAccess(req)) return res.redirect('/');
+app.get('/billing', requireGate, (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/billing.html'));
 });
 
@@ -131,8 +140,7 @@ app.use('/api/billing',   requireAuth, billingRoutes);
 app.use('/api/debug',     requireAuth, debugRoutes);
 
 // ── Fallback: any unmatched route — gate-protected ───────────────────────────
-app.get(/^(?!\/api)(?!\/preview).*$/, (req, res) => {
-  if (!hasGateAccess(req)) return res.redirect('/');
+app.get(/^(?!\/api)(?!\/preview)(?!\/access).*$/, requireGate, (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/index.html'));
 });
 

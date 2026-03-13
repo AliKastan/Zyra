@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zyra — Private Beta Access</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: #07070A;
+      color: #EEF0F8;
+      font-family: 'Inter', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Subtle ambient light */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(79,158,255,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .card {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      padding: 2.5rem 2.25rem 2.25rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    /* Logo */
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1.75rem;
+    }
+    .logo svg { width: 28px; height: 30px; }
+    .logo-text {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: -0.01em;
+    }
+
+    /* Heading */
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: #fff;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.45rem;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: rgba(238,240,248,0.45);
+      text-align: center;
+      line-height: 1.5;
+      margin-bottom: 2rem;
+    }
+
+    /* Form */
+    form {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 0.8rem 1rem;
+      color: #EEF0F8;
+      font: 500 0.95rem/1 'Inter', sans-serif;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      caret-color: #4F9EFF;
+    }
+    input[type="text"]::placeholder {
+      color: rgba(238,240,248,0.22);
+      text-transform: none;
+      letter-spacing: normal;
+      font-weight: 400;
+    }
+    input[type="text"]:focus {
+      border-color: rgba(79,158,255,0.4);
+      box-shadow: 0 0 0 3px rgba(79,158,255,0.08);
+    }
+
+    button[type="submit"] {
+      width: 100%;
+      padding: 0.85rem;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px;
+      color: #fff;
+      font: 500 0.95rem/1 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s, transform 0.12s;
+    }
+    button[type="submit"]:hover {
+      background: rgba(255,255,255,0.15);
+      border-color: rgba(255,255,255,0.22);
+    }
+    button[type="submit"]:active { transform: scale(0.98); }
+    button[type="submit"]:disabled {
+      opacity: 0.5;
+      cursor: default;
+      transform: none;
+    }
+
+    /* Error */
+    .error {
+      display: none;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.82rem;
+      color: #F87171;
+      padding: 0.6rem 0.75rem;
+      background: rgba(248,113,113,0.08);
+      border: 1px solid rgba(248,113,113,0.15);
+      border-radius: 8px;
+    }
+    .error.visible { display: flex; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <svg viewBox="0 0 185 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zyra">
+        <path d="M 0,0 L 150,0 L 185,60 L 150,120 L 96,200 L 50,120 L 85,60 L 35,60 Z" fill="#ffffff"/>
+      </svg>
+      <span class="logo-text">Zyra</span>
+    </div>
+
+    <h1>Private Beta Access</h1>
+    <p class="subtitle">Enter your access code to continue.</p>
+
+    <form id="gateForm" autocomplete="off">
+      <div class="error" id="errorMsg">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M7 4v3.5M7 9.5v.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <span id="errorText">Invalid access code. Please try again.</span>
+      </div>
+
+      <input
+        type="text"
+        id="codeInput"
+        placeholder="Access code"
+        maxlength="32"
+        spellcheck="false"
+        autocomplete="off"
+        required
+      />
+
+      <button type="submit" id="submitBtn">Unlock</button>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('gateForm');
+    const input = document.getElementById('codeInput');
+    const btn = document.getElementById('submitBtn');
+    const errorMsg = document.getElementById('errorMsg');
+    const errorText = document.getElementById('errorText');
+
+    // Check for redirect param so we send them to the right place after unlock
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get('next') || '/';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorMsg.classList.remove('visible');
+
+      const code = input.value.trim();
+      if (!code) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Checking...';
+
+      try {
+        const res = await fetch('/api/gate/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+
+        if (res.ok) {
+          window.location.href = next;
+        } else {
+          errorMsg.classList.add('visible');
+          input.focus();
+          input.select();
+        }
+      } catch {
+        errorText.textContent = 'Connection error. Please try again.';
+        errorMsg.classList.add('visible');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Unlock';
+      }
+    });
+
+    // Auto-uppercase input
+    input.addEventListener('input', () => {
+      const pos = input.selectionStart;
+      input.value = input.value.toUpperCase();
+      input.setSelectionRange(pos, pos);
+    });
+
+    input.focus();
+  </script>
+</body>
+</html>
