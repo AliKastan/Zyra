@@ -199,8 +199,8 @@ async function userIdFromCustomer(db, customerId) {
 
 function planFromPriceId(priceId) {
   if (!priceId) return null;
-  if (priceId === process.env.STRIPE_PRICE_ID_PRO) return 'pro';
-  if (priceId === process.env.STRIPE_PRICE_ID_MAX) return 'max';
+  if (priceId === process.env.STRIPE_PRO_PRICE_ID) return 'pro';
+  if (priceId === process.env.STRIPE_MAX_PRICE_ID) return 'max';
   return null;
 }
 

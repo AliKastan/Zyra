@@ -68,28 +68,33 @@ async function init() {
   const user = session.user;
   document.getElementById('header-user').textContent = user.email || '';
 
+  // Render plans immediately — never depend on billing API for this
+  renderPlans('free');
+  document.getElementById('page-content').style.display = '';
+
+  // Load usage + subscription async; update UI if available, fail silently
   try {
     const [usageData, subData] = await Promise.all([
-      apiFetch('/api/billing/usage'),
-      apiFetch('/api/billing/subscription'),
+      apiFetch('/api/billing/usage').catch(() => null),
+      apiFetch('/api/billing/subscription').catch(() => null),
     ]);
 
-    renderUsage(usageData);
-    renderSubscription(subData);
-    renderPlans(subData?.subscription?.plan || 'free');
-    showAlert(usageData, subData);
+    if (usageData) renderUsage(usageData);
+    if (subData)   renderSubscription(subData);
 
-    document.getElementById('page-content').style.display = '';
+    // Re-render plans now that we know the active plan
+    renderPlans(currentPlan);
+    showAlert(usageData, subData);
   } catch (err) {
-    console.error('Billing load error:', err);
-    document.getElementById('page-error').style.display = '';
+    // Billing API unavailable — plans are already visible, nothing to do
+    console.warn('Billing data unavailable:', err.message);
   }
 }
 
 // ── Render helpers ────────────────────────────────────────────────────────────
 
 function renderUsage(data) {
-  if (!data) return;
+  if (!data || data.configured === false) return;
   const used     = data.creditsUsed    ?? 0;
   const included = data.creditsIncluded ?? 0;
   const pct      = included > 0 ? Math.min(100, (used / included) * 100) : 0;
@@ -110,10 +115,11 @@ function renderUsage(data) {
 }
 
 function renderSubscription(data) {
-  if (!data?.subscription) return;
-  const sub = data.subscription;
-  currentPlan   = sub.plan   || 'free';
-  currentStatus = sub.status || 'free';
+  // Backend returns flat: { plan, status, periodEnd, ... } — no .subscription wrapper
+  if (!data || data.configured === false) return;
+
+  currentPlan   = data.plan   || 'free';
+  currentStatus = data.status || 'free';
 
   if (currentPlan === 'free' && currentStatus === 'free') return;
 
@@ -137,9 +143,9 @@ function renderSubscription(data) {
   const planLabel = PLANS.find(p => p.id === currentPlan)?.name || currentPlan;
   text.innerHTML = `<strong>${planLabel}</strong> — ${STATUS_LABELS[currentStatus] || currentStatus}`;
 
-  if (sub.currentPeriodEnd) {
-    const end = new Date(sub.currentPeriodEnd).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
-    const cancelMsg = sub.cancelAtPeriodEnd ? ' — cancels at period end' : '';
+  if (data.periodEnd) {
+    const end = new Date(data.periodEnd).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+    const cancelMsg = data.cancelAtPeriodEnd ? ' — cancels at period end' : '';
     document.getElementById('period-text').textContent = `Renews ${end}${cancelMsg}`;
   }
 }
@@ -183,16 +189,16 @@ function renderPlans(activePlan) {
 }
 
 function showAlert(usageData, subData) {
+  if (!subData || subData.configured === false) return;
   const alertEl = document.getElementById('billing-alert');
-  const sub = subData?.subscription;
   const pct = usageData ? ((usageData.creditsUsed || 0) / (usageData.creditsIncluded || 1)) * 100 : 0;
 
   let alertHtml = '';
 
-  if (sub?.status === 'past_due') {
+  if (subData.status === 'past_due') {
     alertHtml = `<div class="alert error">Payment failed — please update your payment method to keep your subscription active.</div>`;
-  } else if (sub?.cancelAtPeriodEnd) {
-    const end = sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString() : '';
+  } else if (subData.cancelAtPeriodEnd) {
+    const end = subData.periodEnd ? new Date(subData.periodEnd).toLocaleDateString() : '';
     alertHtml = `<div class="alert warning">Your subscription is set to cancel on ${end}. Reactivate anytime in the customer portal.</div>`;
   } else if (pct >= 90) {
     alertHtml = `<div class="alert warning">You have used ${Math.round(pct)}% of your credits this period. Consider upgrading to avoid interruption.</div>`;
@@ -248,7 +254,6 @@ async function openPortal() {
 }
 
 function downgradeFree() {
-  // Users can cancel via the customer portal
   openPortal();
 }
 

@@ -15,8 +15,8 @@ const env = {
   VERCEL_TOKEN: process.env.VERCEL_TOKEN || '',
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
-  STRIPE_PRICE_ID_PRO: process.env.STRIPE_PRICE_ID_PRO || '',
-  STRIPE_PRICE_ID_MAX: process.env.STRIPE_PRICE_ID_MAX || '',
+  STRIPE_PRO_PRICE_ID: process.env.STRIPE_PRO_PRICE_ID || '',
+  STRIPE_MAX_PRICE_ID: process.env.STRIPE_MAX_PRICE_ID || '',
   APP_URL: process.env.APP_URL || 'http://localhost:3001',
 };
 
