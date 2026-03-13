@@ -214,7 +214,7 @@ async function checkout(planId) {
   try {
     const data = await apiFetch('/api/billing/checkout', {
       method: 'POST',
-      body: JSON.stringify({ planId }),
+      body: JSON.stringify({ plan: planId }),
     });
     if (data?.url) {
       window.location.href = data.url;

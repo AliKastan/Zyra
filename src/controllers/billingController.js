@@ -96,6 +96,7 @@ async function createCheckout(req, res) {
   }
 
   const { plan } = req.body;
+  logger.info(`[billing] createCheckout received plan="${plan}"`);
   if (!['pro', 'max'].includes(plan)) {
     return res.status(400).json({ error: 'Invalid plan. Choose "pro" or "max".' });
   }
