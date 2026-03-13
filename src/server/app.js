@@ -36,6 +36,27 @@ app.post(
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
+// ── Security headers ──────────────────────────────────────────────────────────
+app.use((_req, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https:",
+      "font-src 'self'",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+      "frame-src 'self'",
+      "upgrade-insecure-requests",
+    ].join('; ')
+  );
+  next();
+});
+
 app.use((req, _res, next) => {
   logger.debug(`${req.method} ${req.path}`);
   next();

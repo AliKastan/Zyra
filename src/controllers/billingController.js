@@ -105,7 +105,7 @@ async function createCheckout(req, res) {
     return res.status(500).json({ error: `STRIPE_PRICE_ID_${plan.toUpperCase()} is not configured.` });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || 3001}`;
+  const appUrl = process.env.APP_URL || `https://zyra.build`;
 
   try {
     const userId = req.user.id;
@@ -159,7 +159,7 @@ async function createPortal(req, res) {
     return res.status(503).json({ error: 'Stripe is not configured on this instance.' });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || 3001}`;
+  const appUrl = process.env.APP_URL || `https://zyra.build`;
 
   try {
     const userId = req.user.id;
