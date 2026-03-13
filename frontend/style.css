@@ -1546,6 +1546,30 @@ textarea::placeholder { color: var(--text-muted); }
 .error-sub   { font-size: 0.79rem; color: var(--text-muted); max-width: 300px; text-align: center; }
 .preview-error-actions { display: flex; gap: 8px; margin-top: 2px; }
 
+/* ── Toast notifications ───────────────────────────────────────────────────── */
+.zyra-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #fff;
+  background: var(--brown, #8A2E1A);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  max-width: 340px;
+  pointer-events: none;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.25s, transform 0.25s;
+}
+.zyra-toast.hidden { opacity: 0; transform: translateY(8px); pointer-events: none; }
+.zyra-toast--info    { background: #3b6fa0; }
+.zyra-toast--success { background: #2e7d4f; }
+.zyra-toast--warning { background: #8A2E1A; }
+
 /* ── Device wrapper & frames ───────────────────────────────────────────────── */
 #state-frame {
   padding: 1.25rem;

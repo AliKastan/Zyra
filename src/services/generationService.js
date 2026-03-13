@@ -6,7 +6,7 @@ const { classifyComplexity } = require('../utils/complexity');
 const { withTimeout } = require('../utils/withTimeout');
 const { assertProviderAvailable } = require('./orchestrator');
 const { runPlanner } = require('./plannerService');
-const { runCoder, injectBackendSDK } = require('./coderService');
+const { runCoder, injectBackendSDK, injectRuntimeErrorCatcher } = require('./coderService');
 const { runReviewer } = require('./reviewerService');
 const { generateProject } = require('../generators/projectGenerator');
 const { createCostTracker } = require('../utils/costTracker');
@@ -141,6 +141,9 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
       codeOutput = { ...codeOutput, files: injectBackendSDK(codeOutput.files, projectSlug) };
       await updateJob(jobId, { _usedBackend: true });
     }
+
+    // Inject runtime error catcher into all HTML files
+    codeOutput = { ...codeOutput, files: injectRuntimeErrorCatcher(codeOutput.files) };
 
     // ── Writing files ─────────────────────────────────────────────────────────
     await checkpoint('before writing files');

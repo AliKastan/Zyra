@@ -3,7 +3,9 @@ const { callOpenAI } = require('../providers/openaiProvider');
 const {
   buildCoderPrompt,
   buildCoderRetryPrompt,
+  buildAutoFixPrompt,
 } = require('../generators/promptBuilder');
+const { validateGeneratedCode } = require('../utils/codeValidator');
 const {
   buildContentExtractionPrompt,
   detectStyleTag,
@@ -197,9 +199,109 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
     return runTemplateCoder(userPrompt, appType, costTracker);
   }
 
-  const result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, needsBackend);
+  let result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, needsBackend);
   if (needsBackend) result._needsBackend = true;
+
+  // ── Post-generation code validation + single auto-fix attempt ─────────────
+  // Skip validation for fallback output (already a known-good template)
+  if (!result._fallback && !result._template) {
+    const validationErrors = validateGeneratedCode(result.files);
+    if (validationErrors.length > 0) {
+      logger.info(`coderService: validation found ${validationErrors.length} issue(s) — attempting auto-fix`);
+      validationErrors.forEach((e) => logger.debug(`  [${e.type}] ${e.file}: ${e.message}`));
+
+      if (typeof onRetry === 'function') onRetry('autofix', 'Polishing code...');
+
+      try {
+        const fixed = await runAutoFix(userPrompt, result.files, validationErrors, mode, costTracker);
+        if (fixed) {
+          result = { ...result, files: fixed, _autoFixed: true };
+          logger.info(`coderService: auto-fix applied — ${validationErrors.length} issue(s) addressed`);
+        }
+      } catch (fixErr) {
+        // Non-fatal — continue with original output
+        logger.warn(`coderService: auto-fix failed (non-fatal): ${fixErr.message}`);
+      }
+    }
+  }
+
   return result;
+}
+
+// ── Auto-fix ───────────────────────────────────────────────────────────────────
+
+/**
+ * Sends files + validation errors back to the AI for targeted fixing.
+ * Returns fixed files array or null if the attempt failed.
+ */
+async function runAutoFix(userPrompt, files, errors, mode, costTracker) {
+  const modelName = env.DEFAULT_CODER_MODEL;
+  const maxTokens = Math.min(limits.AUTOFIX_TIMEOUT_MS ? 8000 : 8000, limits.MODE_TOKENS[mode]?.coder || 8000);
+
+  const { system, user } = buildAutoFixPrompt(userPrompt, files, errors);
+
+  let raw;
+  try {
+    const call = modelName === 'openai'
+      ? callOpenAI(system, user, { maxTokens })
+      : callClaude(system, user, { maxTokens });
+    raw = await withTimeout(call, limits.AUTOFIX_TIMEOUT_MS || 60_000, 'AutoFix');
+  } catch (err) {
+    throw new Error(`Auto-fix model call failed: ${err.message}`);
+  }
+
+  if (costTracker) costTracker.record('coder-autofix', system, user, raw);
+
+  const { success, data } = safeJsonParse(raw);
+  if (!success || !data) return null;
+
+  // Accept either { files: [...] } or raw array
+  const fixedFiles = Array.isArray(data) ? data : (data.files || null);
+  if (!Array.isArray(fixedFiles) || fixedFiles.length === 0) return null;
+
+  // Validate structure and merge: use fixed version for known files, keep originals for others
+  const fixedMap = new Map();
+  for (const f of fixedFiles) {
+    if (f && typeof f.path === 'string' && typeof f.content === 'string') {
+      fixedMap.set(f.path, f.content);
+    }
+  }
+  if (fixedMap.size === 0) return null;
+
+  return files.map((f) =>
+    fixedMap.has(f.path) ? { ...f, content: fixedMap.get(f.path) } : f,
+  );
+}
+
+// ── Runtime error catcher injection ───────────────────────────────────────────
+
+/**
+ * Injects a minimal error-reporting script into every HTML file.
+ * The script catches JS errors and sends them to the parent window via postMessage,
+ * allowing the Zyra studio to detect and auto-fix runtime errors silently.
+ *
+ * Injected after <head> (or before first script / at file start as fallback).
+ */
+const RUNTIME_ERROR_CATCHER = `<script data-zyra="monitor">(function(){var p=window.parent;if(!p||p===window)return;function s(d){try{p.postMessage(d,'*');}catch(_){}}window.addEventListener('error',function(e){s({type:'ZYRA_RUNTIME_ERROR',error:{message:e.message||'Script error',source:e.filename||'',line:e.lineno||0,col:e.colno||0,stack:e.error&&e.error.stack||''}});});window.addEventListener('unhandledrejection',function(e){var r=e.reason;s({type:'ZYRA_RUNTIME_ERROR',error:{message:r&&r.message||String(r)||'Unhandled rejection',stack:r&&r.stack||''}});});}());</script>`;
+
+function injectRuntimeErrorCatcher(files) {
+  return files.map((f) => {
+    if (!f.path.endsWith('.html')) return f;
+    let content = f.content || '';
+
+    if (content.includes('data-zyra="monitor"')) return f; // already injected
+
+    // Inject as early as possible — right after <head> open tag
+    if (/<head(\s[^>]*)?\s*>/i.test(content)) {
+      content = content.replace(/(<head(\s[^>]*)?\s*>)/i, `$1\n${RUNTIME_ERROR_CATCHER}`);
+    } else if (content.includes('<body')) {
+      content = content.replace('<body', `${RUNTIME_ERROR_CATCHER}\n<body`);
+    } else {
+      content = RUNTIME_ERROR_CATCHER + '\n' + content;
+    }
+
+    return { ...f, content };
+  });
 }
 
 // ── Backend SDK injection ───────────────────────────────────────────────────────
@@ -282,4 +384,4 @@ function enforceOutputLimits(data, maxFiles) {
   return { ...data, files };
 }
 
-module.exports = { runCoder, injectBackendSDK };
+module.exports = { runCoder, injectBackendSDK, injectRuntimeErrorCatcher };

@@ -2027,3 +2027,103 @@ $('delete-confirm-ok')?.addEventListener('click', executeDeleteConversation);
 $('delete-confirm-overlay')?.addEventListener('click', (e) => {
   if (e.target === $('delete-confirm-overlay')) closeDeleteConfirm();
 });
+
+// ── Toast notifications ───────────────────────────────────────────────────────
+
+const toastEl = $('zyra-toast');
+let _toastTimer = null;
+
+function showToast(message, type = 'warning') {
+  if (!toastEl) return;
+  toastEl.textContent = message;
+  toastEl.className = `zyra-toast zyra-toast--${type}`;
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => {
+    toastEl.classList.add('hidden');
+  }, 4000);
+}
+
+// ── Runtime error catching from preview iframe ────────────────────────────────
+
+let _runtimeFixCooldown = 0;   // timestamp — no auto-fix until after this
+let _runtimeFixPending  = false;
+let _runtimeErrTimer    = null;
+
+function isBreakingError(msg) {
+  if (!msg) return false;
+  const m = msg.toLowerCase();
+  // Significant JS runtime errors worth auto-fixing
+  return (
+    m.includes('is not defined') ||
+    m.includes('cannot read prop') ||
+    m.includes('cannot read properties') ||
+    m.includes('is not a function') ||
+    m.includes('unexpected token') ||
+    m.includes('syntaxerror') ||
+    m.includes('referenceerror') ||
+    m.includes('typeerror')
+  );
+}
+
+function canAutoFix() {
+  if (!currentSlug) return false;
+  if (isGenerating) return false;
+  if (_runtimeFixPending) return false;
+  if (Date.now() < _runtimeFixCooldown) return false;
+  return true;
+}
+
+async function triggerRuntimeAutoFix(errorMsg) {
+  if (!canAutoFix()) return;
+  _runtimeFixPending = true;
+  _runtimeFixCooldown = Date.now() + 30_000; // 30s cooldown
+
+  showToast('Polishing code...', 'info');
+
+  const fixPrompt = `Fix this JavaScript runtime error silently: ${errorMsg.slice(0, 200)}`;
+
+  try {
+    const { jobId } = await apiFetch(`/api/edit/${encodeURIComponent(currentSlug)}`, {
+      method: 'POST',
+      body: JSON.stringify({ prompt: fixPrompt, mode: 'fast' }),
+    });
+
+    // Poll for completion
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      if (attempts > 40) { clearInterval(poll); _runtimeFixPending = false; return; }
+      try {
+        const job = await apiFetch(`/api/jobs/${jobId}`);
+        if (job.status === 'completed') {
+          clearInterval(poll);
+          _runtimeFixPending = false;
+          // Refresh iframe silently
+          if (previewIframe.src) {
+            const src = previewIframe.src;
+            previewIframe.src = '';
+            setTimeout(() => { previewIframe.src = src; }, 300);
+          }
+          showToast('Code polished', 'success');
+        } else if (['failed', 'cancelled', 'timed_out'].includes(job.status)) {
+          clearInterval(poll);
+          _runtimeFixPending = false;
+        }
+      } catch (_) { clearInterval(poll); _runtimeFixPending = false; }
+    }, 1500);
+  } catch (_) {
+    _runtimeFixPending = false;
+  }
+}
+
+window.addEventListener('message', (event) => {
+  if (!event.data || event.data.type !== 'ZYRA_RUNTIME_ERROR') return;
+  const msg = event.data.message || '';
+  if (!isBreakingError(msg)) return;
+
+  // Debounce — wait 2.5s for errors to settle before triggering fix
+  if (_runtimeErrTimer) clearTimeout(_runtimeErrTimer);
+  _runtimeErrTimer = setTimeout(() => {
+    triggerRuntimeAutoFix(msg);
+  }, 2500);
+});

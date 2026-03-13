@@ -62,20 +62,26 @@ Data (returns { data, error }):
 
 Rules: NEVER use localStorage for app data. NEVER change '__ZYRA_PROJECT_ID__' — it is auto-replaced. Always check error field and show friendly messages. Show loading state while awaiting data.`;
 
+// ── Code reliability rules (injected into all coder prompts) ──────────────────
+// ~40 tokens — prevents the most common runtime errors in generated code.
+
+const CODE_RELIABILITY = `
+Reliability: use let/var for reassigned vars (never reassign const). Check elements exist before addEventListener. Put DOM scripts at body end or in DOMContentLoaded. Wrap fetch in try/catch. Close all HTML tags.`;
+
 // ── Coder system prompts ───────────────────────────────────────────────────────
 
 const CODER_SYSTEM = {
   fast: `Fast code generator. Output raw JSON only.
 Format: {"projectName":"slug","files":[{"path":"file","content":"..."}]}
-Rules: complete file contents, zero placeholders, 1-3 files preferred, no tests/extra docs.${DESIGN}${JSON_RULES}`,
+Rules: complete file contents, zero placeholders, 1-3 files preferred, no tests/extra docs.${DESIGN}${CODE_RELIABILITY}${JSON_RULES}`,
 
   balanced: `Professional code generator. Output raw JSON only.
 Format: {"projectName":"slug","files":[{"path":"index.html","content":"..."},{"path":"style.css","content":"..."}]}
-Rules: complete files, no placeholders/TODOs, runs as-is, no tests unless asked, include README for Node projects.${DESIGN}${JSON_RULES}`,
+Rules: complete files, no placeholders/TODOs, runs as-is, no tests unless asked, include README for Node projects.${DESIGN}${CODE_RELIABILITY}${JSON_RULES}`,
 
   quality: `Quality code generator. Output raw JSON only.
 Format: {"projectName":"slug","files":[{"path":"file","content":"..."}]}
-Rules: complete files, no placeholders, clean readable code, error handling, production-quality UI, good naming.${DESIGN}${JSON_RULES}`,
+Rules: complete files, no placeholders, clean readable code, error handling, production-quality UI, good naming.${DESIGN}${CODE_RELIABILITY}${JSON_RULES}`,
 };
 
 // ── Retry prompt (no design rules — prioritises valid JSON) ───────────────────
@@ -285,11 +291,56 @@ Escape: \\n for newlines, \\" for quotes.`,
   };
 }
 
+// ── Auto-fix prompt ───────────────────────────────────────────────────────────
+
+/**
+ * Builds a targeted auto-fix prompt for correcting specific code errors.
+ * Used by coderService after post-generation validation finds issues.
+ *
+ * @param {string} userPrompt - original user request (for context)
+ * @param {Array<{path: string, content: string}>} files
+ * @param {Array<{type: string, file: string, message: string}>} errors
+ * @returns {{ system: string, user: string }}
+ */
+function buildAutoFixPrompt(userPrompt, files, errors) {
+  const errorList = errors
+    .slice(0, 8) // cap at 8 errors for prompt size
+    .map((e) => `- ${e.file}: [${e.type}] ${e.message}`)
+    .join('\n');
+
+  // Include only the files that have errors (keep prompt small)
+  const errorFiles = new Set(errors.map((e) => e.file));
+  const targetFiles = files.filter((f) => errorFiles.has(f.path)).slice(0, 5);
+  const otherPaths  = files.filter((f) => !errorFiles.has(f.path)).map((f) => f.path);
+
+  const fileBlock = targetFiles
+    .map((f) => `### ${f.path}\n${(f.content || '').slice(0, 3000)}`)
+    .join('\n\n');
+
+  const system = `Code fixer. Fix ONLY the listed errors — do not change anything else.
+Return ALL files (fixed + unchanged) as JSON: {"projectName":"slug","files":[{"path":"...","content":"..."}]}
+Escape strings: \\n for newlines, \\" for quotes. Output valid JSON only, no markdown.`;
+
+  const user = `Original request: "${userPrompt}"
+
+ERRORS TO FIX:
+${errorList}
+
+FILES WITH ERRORS:
+${fileBlock}
+${otherPaths.length ? `\nUnchanged files (include as-is): ${otherPaths.join(', ')}` : ''}
+
+Fix the errors. Return complete corrected files as JSON.`;
+
+  return { system, user };
+}
+
 module.exports = {
   buildPlannerPrompt,
   buildCoderPrompt,
   buildCoderRetryPrompt,
   buildReviewerPrompt,
   buildEditCoderPrompt,
+  buildAutoFixPrompt,
   FULLSTACK_RULES,
 };

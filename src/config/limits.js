@@ -27,6 +27,9 @@ module.exports = {
   REVIEW_TIMEOUT_MS:   parseInt(process.env.REVIEW_TIMEOUT_MS   || '90000',  10),
   FINALIZE_TIMEOUT_MS: parseInt(process.env.FINALIZE_TIMEOUT_MS || '60000',  10),
 
+  // ── Auto-fix (post-generation self-healing) ──────────────────────────────────
+  AUTOFIX_TIMEOUT_MS: parseInt(process.env.AUTOFIX_TIMEOUT_MS || '60000', 10),
+
   // ── Retry config ─────────────────────────────────────────────────────────────
   CODER_MAX_RETRIES: parseInt(process.env.CODER_MAX_RETRIES || '2', 10),
 
