@@ -106,9 +106,13 @@
       <!-- Input area -->
       <div class="sidebar-input">
         <div class="mode-bar" id="mode-bar">
-          <button class="mode-btn" data-mode="fast" type="button">Fast</button>
-          <button class="mode-btn mode-btn--active" data-mode="balanced" type="button">Standard</button>
-          <button class="mode-btn" data-mode="quality" type="button">Quality</button>
+          <input type="radio" name="generation-mode" id="mode-fast" data-mode="fast" />
+          <label for="mode-fast">Fast</label>
+          <input type="radio" name="generation-mode" id="mode-standard" data-mode="balanced" checked />
+          <label for="mode-standard">Standard</label>
+          <input type="radio" name="generation-mode" id="mode-quality" data-mode="quality" />
+          <label for="mode-quality">Quality</label>
+          <div class="glass-glider"></div>
         </div>
 
         <div class="input-box">

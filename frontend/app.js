@@ -213,12 +213,10 @@ async function checkHealth() {
 }
 
 // ── Mode selection ────────────────────────────────────────────────────────────
-modeBar.addEventListener('click', (e) => {
-  const btn = e.target.closest('.mode-btn');
-  if (!btn) return;
-  currentMode = btn.dataset.mode;
-  modeBar.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('mode-btn--active'));
-  btn.classList.add('mode-btn--active');
+modeBar.addEventListener('change', (e) => {
+  const radio = e.target.closest('input[type="radio"]');
+  if (!radio) return;
+  currentMode = radio.dataset.mode;
 });
 
 // ── Prompt input ──────────────────────────────────────────────────────────────
