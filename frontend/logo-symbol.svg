@@ -1,14 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 185 200" width="185" height="200" role="img" aria-label="Zyra">
   <title>Zyra</title>
-  <defs>
-    <linearGradient id="zGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#6366F1"/>
-      <stop offset="55%" stop-color="#8B5CF6"/>
-      <stop offset="100%" stop-color="#3B82F6"/>
-    </linearGradient>
-  </defs>
   <path
     d="M 0,0 L 150,0 L 185,60 L 150,120 L 96,200 L 50,120 L 85,60 L 35,60 Z"
-    fill="url(#zGrad)"
+    fill="#ffffff"
   />
 </svg>

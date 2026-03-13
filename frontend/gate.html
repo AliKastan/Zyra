@@ -4,47 +4,68 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Zyra Private Beta</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=4" />
-  <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg?v=4" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=5" />
+  <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg?v=5" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --brown:  #8A2E1A;
-      --bg:     #FBFBFB;
-      --surface:#FFFFFF;
-      --border: #E4E4DC;
-      --text:   #1A1A16;
-      --muted:  #9A9A90;
-      --error:  #B91C1C;
+      --bg:     #000000;
+      --border: rgba(255,255,255,0.10);
+      --text:   #ffffff;
+      --muted:  rgba(255,255,255,0.38);
+      --error:  #F87171;
       --radius: 10px;
     }
 
     body {
-      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
       background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -60%);
+      width: 600px;
+      height: 500px;
+      background: radial-gradient(ellipse at center, rgba(200,210,255,0.04) 0%, transparent 70%);
+      pointer-events: none;
     }
 
     .card {
-      background: var(--surface);
+      background: rgba(255,255,255,0.03);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 20px;
       padding: 40px;
       width: 100%;
       max-width: 360px;
-      box-shadow: 0 2px 20px rgba(0,0,0,0.06);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+      position: relative;
+      z-index: 1;
     }
 
     .logo {
-      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.2rem;
       font-weight: 700;
       letter-spacing: -0.04em;
-      color: var(--brown);
+      color: var(--text);
       margin-bottom: 4px;
     }
 
@@ -58,7 +79,7 @@
       display: block;
       font-size: 0.8125rem;
       font-weight: 500;
-      color: #5A5A52;
+      color: rgba(255,255,255,0.55);
       margin-bottom: 6px;
     }
 
@@ -68,16 +89,17 @@
       font-size: 0.9375rem;
       font-family: inherit;
       color: var(--text);
-      background: var(--bg);
+      background: rgba(255,255,255,0.05);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       outline: none;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, background 0.15s;
+      caret-color: #ffffff;
     }
-
+    input::placeholder { color: rgba(255,255,255,0.22); }
     input[type="password"]:focus {
-      border-color: var(--brown);
-      background: #fff;
+      border-color: rgba(255,255,255,0.30);
+      background: rgba(255,255,255,0.07);
     }
 
     button {
@@ -87,16 +109,16 @@
       font-size: 0.9375rem;
       font-weight: 600;
       font-family: inherit;
-      color: #fff;
-      background: var(--brown);
+      color: #000000;
+      background: #ffffff;
       border: none;
       border-radius: var(--radius);
       cursor: pointer;
-      transition: background 0.15s, opacity 0.15s;
+      transition: background 0.15s, transform 0.12s;
     }
-
-    button:hover:not(:disabled) { background: #741F0F; }
-    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    button:hover:not(:disabled) { background: rgba(255,255,255,0.88); transform: translateY(-1px); }
+    button:active { transform: scale(0.98); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
     .error {
       font-size: 0.8125rem;
@@ -104,11 +126,18 @@
       margin-top: 12px;
       min-height: 18px;
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
   </style>
 </head>
 <body>
 <div class="card">
-  <div class="logo">Zyra</div>
+  <div class="logo">
+    <img src="logo-symbol.svg" height="24" alt="Zyra" />
+    Zyra
+  </div>
   <div class="tag">Private Beta</div>
 
   <label for="code">Access code</label>
