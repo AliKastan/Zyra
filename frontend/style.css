@@ -7,9 +7,9 @@
 
 /* ── Design Tokens — Monochrome Edition ─────────────────────────────────── */
 :root {
-  /* Pure black backgrounds */
-  --bg:          #000000;
-  --bg2:         #080808;
+  /* Soft dark backgrounds */
+  --bg:          #1a1a1a;
+  --bg2:         #222222;
   --surface:     rgba(255,255,255,0.025);
   --surface2:    rgba(255,255,255,0.045);
   --surface3:    rgba(255,255,255,0.07);
@@ -62,7 +62,7 @@
   --radius-xl: 22px;
 
   /* Monochrome UI variables (per design spec) */
-  --bg-primary:       #000000;
+  --bg-primary:       #1a1a1a;
   --bg-elevated:      rgba(255,255,255,0.03);
   --bg-glass:         rgba(255,255,255,0.05);
   --bg-glass-hover:   rgba(255,255,255,0.08);
@@ -773,6 +773,15 @@ html, body {
   flex: 1;
 }
 
+.msg-timer {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.35);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  min-width: 2.5ch;
+  text-align: right;
+}
+
 .msg-cancel-btn {
   background: none;
   border: none;
@@ -1361,7 +1370,7 @@ textarea::placeholder { color: var(--text-muted); }
 #state-loading {
   gap: 1.25rem;
   animation: fadeUp 0.3s ease both;
-  background: linear-gradient(0deg, #1a1a1a, #0a0a0a, #000);
+  background: linear-gradient(0deg, #242424, #1a1a1a, #111111);
 }
 
 .loader-wrapper {

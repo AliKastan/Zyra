@@ -157,6 +157,8 @@ let currentMode         = 'balanced';
 let currentJobId        = null;
 let pollInterval        = null;
 let activeMessageId     = null;   // ID of the currently-generating assistant message
+let generationTimer     = null;   // setInterval handle for live elapsed timer
+let generationStartMs   = null;   // Date.now() when generation started
 
 // Preview
 let currentSlug         = null;
@@ -164,6 +166,33 @@ let currentPreviewUrl   = null;
 let previewPollInterval = null;
 let currentDevice       = 'desktop';
 let currentTab          = 'preview';
+
+// ── Generation timer helpers ──────────────────────────────────────────────────
+function formatElapsedMs(ms) {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return `${m}m ${String(rem).padStart(2, '0')}s`;
+}
+
+function startGenerationTimer(msgId) {
+  stopGenerationTimer();
+  generationStartMs = Date.now();
+  generationTimer = setInterval(() => {
+    const el = document.getElementById(`msg-timer-${msgId}`);
+    if (el) el.textContent = formatElapsedMs(Date.now() - generationStartMs);
+  }, 1000);
+}
+
+function stopGenerationTimer() {
+  if (generationTimer) { clearInterval(generationTimer); generationTimer = null; }
+}
+
+function finalElapsed() {
+  if (!generationStartMs) return null;
+  return formatElapsedMs(Date.now() - generationStartMs);
+}
 
 // ── Job states ────────────────────────────────────────────────────────────────
 const ACTIVE_STATES   = new Set(['queued', 'planning', 'coding', 'reviewing', 'finalizing']);
@@ -231,10 +260,11 @@ promptInput.addEventListener('input', () => {
 });
 
 promptInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+  if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     generateBtn.click();
   }
+  // Shift+Enter: default behaviour (new line) — no handler needed
 });
 
 function updateComplexityBadge(text) {
@@ -541,6 +571,7 @@ async function startGeneration(prompt, isPrefill = false) {
     mode: currentMode,
     timestamp: Date.now(),
   });
+  startGenerationTimer(asstMsgId);
 
   // Clear input
   promptInput.value = '';
@@ -556,6 +587,7 @@ async function startGeneration(prompt, isPrefill = false) {
     currentJobId = data.jobId;
     startPolling(currentJobId);
   } catch (err) {
+    stopGenerationTimer();
     setGenerating(false);
     updateMessage(asstMsgId, { status: 'failed', error: err.message });
     setPreviewState('error', 'Generation failed', err.message);
@@ -583,6 +615,7 @@ async function startEdit(prompt, projectSlug) {
     editSlug: projectSlug,
     timestamp: Date.now(),
   });
+  startGenerationTimer(asstMsgId);
 
   // Clear input
   promptInput.value = '';
@@ -598,6 +631,7 @@ async function startEdit(prompt, projectSlug) {
     currentJobId = data.jobId;
     startPolling(currentJobId);
   } catch (err) {
+    stopGenerationTimer();
     setGenerating(false);
     updateMessage(asstMsgId, { status: 'failed', error: err.message });
     setPreviewState('error', 'Edit failed', err.message);
@@ -638,6 +672,8 @@ async function pollJob(jobId) {
     if (isTerminal(job.status)) {
       stopPolling();
       setGenerating(false);
+      const clientElapsed = finalElapsed();
+      stopGenerationTimer();
 
       const msgId = activeMessageId;
       activeMessageId = null;
@@ -649,7 +685,7 @@ async function pollJob(jobId) {
           text: buildSuccessText(job),
           slug,
           filesWritten: job.filesWritten || [],
-          duration: job.duration,
+          duration: clientElapsed || job.duration,
           isEdit: job.isEdit || false,
         });
 
@@ -799,6 +835,7 @@ function buildAssistantEl(msg) {
       <div class="msg-generating">
         <span class="msg-spinner"></span>
         <span class="msg-stage-label" id="msg-stage-${msg.id}">Starting...</span>
+        <span class="msg-timer" id="msg-timer-${msg.id}">0s</span>
         <button class="msg-cancel-btn" data-job-id="${escAttr(currentJobId || '')}">Cancel</button>
       </div>
       <div class="msg-log-line" id="msg-log-${msg.id}"></div>`;
