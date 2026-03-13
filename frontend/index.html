@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Zyra — AI App Builder</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=4" />
+  <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg?v=4" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -12,6 +13,7 @@
 </head>
 <body>
 <canvas id="app-particles" aria-hidden="true"></canvas>
+<div class="studio-spotlight" aria-hidden="true"></div>
 <div class="studio-bg" aria-hidden="true">
   <div class="studio-bg-orb studio-bg-orb--1"></div>
   <div class="studio-bg-orb studio-bg-orb--2"></div>
@@ -214,8 +216,8 @@
             <svg viewBox="0 0 185 200" xmlns="http://www.w3.org/2000/svg" fill="none">
               <defs>
                 <linearGradient id="emptyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#4F9EFF"/>
-                  <stop offset="100%" stop-color="#818CF8"/>
+                  <stop offset="0%" stop-color="rgba(255,255,255,0.85)"/>
+                  <stop offset="100%" stop-color="rgba(200,210,255,0.55)"/>
                 </linearGradient>
               </defs>
               <path d="M 0,0 L 150,0 L 185,60 L 150,120 L 96,200 L 50,120 L 85,60 L 35,60 Z" fill="url(#emptyGrad)"/>
