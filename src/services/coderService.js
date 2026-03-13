@@ -84,7 +84,7 @@ async function runTemplateCoder(userPrompt, appType, costTracker) {
  * @param {object}  [costTracker]
  * @returns {Promise<{projectName, files, _fallback?}>}
  */
-async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTracker) {
+async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTracker, fullstack = false) {
   const modelName  = env.DEFAULT_CODER_MODEL;
   const maxFiles   = limits.MODE_MAX_FILES[mode] || 20;
   const maxTokens  = limits.MODE_TOKENS[mode]?.coder || 12000;
@@ -101,7 +101,7 @@ async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTr
     }
 
     const { system, user } = attempt === 0
-      ? buildCoderPrompt(userPrompt, plan, mode)
+      ? buildCoderPrompt(userPrompt, plan, mode, { fullstack })
       : buildCoderRetryPrompt(userPrompt, plan, mode, attempt);
 
     // Reduce output budget on retries (simpler output expected)
@@ -179,13 +179,17 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
   const appType = complexity?.appType || plan?._appType || 'generic';
   const level   = complexity?.level || 'simple';
 
+  // Detect if this app needs backend (auth, persistence, multi-user)
+  const needsBackend = /\b(save|store|login|sign.?up|sign.?in|auth|user|account|database|todo|task|note|post|comment|cart|order|profile|message|chat|feed|bookmark|follow|like|vote|review|rating)\b/i.test(userPrompt);
+
   // Template-hybrid path: for marketing/landing page types OR prompts that
   // clearly ask for a website/page (not a functional app with custom logic).
   const isWebsitePrompt = /website|web site|landing|homepage|home page|page for|site for/i.test(userPrompt);
   const useTemplate = (
     (TEMPLATE_TYPES.has(appType) || (appType === 'generic' && isWebsitePrompt)) &&
     level === 'simple' &&
-    mode !== 'quality'
+    mode !== 'quality' &&
+    !needsBackend
   );
 
   if (useTemplate) {
@@ -193,7 +197,33 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
     return runTemplateCoder(userPrompt, appType, costTracker);
   }
 
-  return runFullCoder(userPrompt, plan, mode, onRetry, costTracker);
+  const result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, needsBackend);
+  if (needsBackend) result._needsBackend = true;
+  return result;
+}
+
+// ── Backend SDK injection ───────────────────────────────────────────────────────
+
+/**
+ * Injects the ZyraApp SDK script tag into all HTML files and replaces
+ * the __ZYRA_PROJECT_ID__ placeholder with the real project slug.
+ *
+ * @param {Array<{path: string, content: string}>} files
+ * @param {string} projectSlug
+ * @returns {Array<{path: string, content: string}>}
+ */
+function injectBackendSDK(files, projectSlug) {
+  return files.map((f) => {
+    if (!f.path.endsWith('.html')) return f;
+    let content = f.content;
+    // Inject SDK script tag if not already present
+    if (!content.includes('/zyra-sdk.js')) {
+      content = content.replace(/(<head[^>]*>)/i, '$1\n  <script src="/zyra-sdk.js"></script>');
+    }
+    // Replace placeholder with real project ID
+    content = content.replace(/__ZYRA_PROJECT_ID__/g, projectSlug);
+    return { ...f, content };
+  });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -252,4 +282,4 @@ function enforceOutputLimits(data, maxFiles) {
   return { ...data, files };
 }
 
-module.exports = { runCoder };
+module.exports = { runCoder, injectBackendSDK };

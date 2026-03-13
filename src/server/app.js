@@ -11,6 +11,7 @@ const previewRoutes  = require('../routes/previewRoutes');
 const deployRoutes   = require('../routes/deployRoutes');
 const billingRoutes  = require('../routes/billingRoutes');
 const debugRoutes    = require('../routes/debugRoutes');
+const backendRoutes  = require('../routes/backendRoutes');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { stripeWebhook } = require('../controllers/billingController');
 const logger = require('../utils/logger');
@@ -138,6 +139,13 @@ app.use('/api/preview',   requireAuth, previewRoutes);
 app.use('/api/deploy',    requireAuth, deployRoutes);
 app.use('/api/billing',   requireAuth, billingRoutes);
 app.use('/api/debug',     requireAuth, debugRoutes);
+// No requireAuth — called directly from generated apps running in iframes/user browsers
+app.use('/api/backend',  backendRoutes);
+
+// Serve ZyraApp SDK to generated apps
+app.get('/zyra-sdk.js', (_req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../frontend/zyra-sdk.js'));
+});
 
 // ── Fallback: any unmatched route — gate-protected ───────────────────────────
 app.get(/^(?!\/api)(?!\/preview)(?!\/access).*$/, requireGate, (_req, res) => {

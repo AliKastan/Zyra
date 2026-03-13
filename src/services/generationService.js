@@ -6,7 +6,7 @@ const { classifyComplexity } = require('../utils/complexity');
 const { withTimeout } = require('../utils/withTimeout');
 const { assertProviderAvailable } = require('./orchestrator');
 const { runPlanner } = require('./plannerService');
-const { runCoder } = require('./coderService');
+const { runCoder, injectBackendSDK } = require('./coderService');
 const { runReviewer } = require('./reviewerService');
 const { generateProject } = require('../generators/projectGenerator');
 const { createCostTracker } = require('../utils/costTracker');
@@ -134,6 +134,13 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
 
     const rawSlug     = codeOutput.projectName || slugify(userPrompt);
     const projectSlug = slugify(rawSlug) || `project-${jobId.slice(0, 8)}`;
+
+    // Inject ZyraApp SDK into HTML files if backend is needed
+    if (codeOutput._needsBackend) {
+      await log('Injecting backend SDK...');
+      codeOutput = { ...codeOutput, files: injectBackendSDK(codeOutput.files, projectSlug) };
+      await updateJob(jobId, { _usedBackend: true });
+    }
 
     // ── Writing files ─────────────────────────────────────────────────────────
     await checkpoint('before writing files');

@@ -35,6 +35,33 @@ OUTPUT: Pure JSON only. No markdown fences, no text before/after.
 Escape inside strings: \\" for quotes, \\n for newlines, \\\\ for backslashes.
 Must pass JSON.parse() as-is.`;
 
+// ── Full-stack backend rules (~190 tokens) ─────────────────────────────────
+// Injected into coder prompts when the app needs data persistence or auth.
+
+const FULLSTACK_RULES = `
+BACKEND: This app needs data persistence. Use the ZyraApp SDK (already available as a script tag).
+
+Init pattern (put in every HTML file that uses the backend):
+<script src="/zyra-sdk.js"></script>
+<script>
+const app = new ZyraApp('__ZYRA_PROJECT_ID__');
+app.init().then(() => {
+  app.onAuth(user => { if (user) showApp(user); else showAuth(); });
+});
+</script>
+
+Auth (returns { user, error }):
+  app.signUp(email, password)   app.signIn(email, password)   app.signOut()   app.currentUser
+
+Data (returns { data, error }):
+  app.from('items').getAll()              // all rows
+  app.from('items').getAll({ done: 'true' })  // filtered (values must be strings)
+  app.from('items').create({ title: 'x', done: false })
+  app.from('items').update(id, { done: true })
+  app.from('items').delete(id)
+
+Rules: NEVER use localStorage for app data. NEVER change '__ZYRA_PROJECT_ID__' — it is auto-replaced. Always check error field and show friendly messages. Show loading state while awaiting data.`;
+
 // ── Coder system prompts ───────────────────────────────────────────────────────
 
 const CODER_SYSTEM = {
@@ -73,8 +100,10 @@ function buildPlannerPrompt(userPrompt) {
   };
 }
 
-function buildCoderPrompt(userPrompt, plan, mode = 'balanced') {
-  const system = CODER_SYSTEM[mode] || CODER_SYSTEM.balanced;
+function buildCoderPrompt(userPrompt, plan, mode = 'balanced', options = {}) {
+  const { fullstack = false } = options;
+  const base   = CODER_SYSTEM[mode] || CODER_SYSTEM.balanced;
+  const system = fullstack ? base + FULLSTACK_RULES : base;
   const planStr = JSON.stringify({ summary: plan.summary, stack: plan.stack, files: plan.files });
   return {
     system,
@@ -262,4 +291,5 @@ module.exports = {
   buildCoderRetryPrompt,
   buildReviewerPrompt,
   buildEditCoderPrompt,
+  FULLSTACK_RULES,
 };
