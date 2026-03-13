@@ -16,7 +16,7 @@ if (warnings.length > 0) {
   warnings.forEach((w) => logger.warn(`Config: ${w}`));
 }
 
-const server = app.listen(env.PORT, async () => {
+const server = app.listen(env.PORT, '0.0.0.0', async () => {
   logger.success(`Zyra server started on http://localhost:${env.PORT}`);
   logger.info(`Dashboard: http://localhost:${env.PORT}`);
   logger.info(`Health:    http://localhost:${env.PORT}/api/health`);
