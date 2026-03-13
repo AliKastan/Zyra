@@ -101,13 +101,13 @@ async function createCheckout(req, res) {
     return res.status(400).json({ error: 'Invalid plan. Choose "pro" or "max".' });
   }
 
-  const priceId = plan === 'pro' ? process.env.STRIPE_PRO_PRICE_ID : process.env.STRIPE_MAX_PRICE_ID;
+  const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_ID_PRO : process.env.STRIPE_PRICE_ID_MAX;
 
   // Log env var presence so Railway logs show what's missing
   logger.info(`[billing] env check — STRIPE_SECRET_KEY=${process.env.STRIPE_SECRET_KEY ? 'set' : 'MISSING'}, APP_URL=${process.env.APP_URL || 'MISSING'}, priceId=${priceId || 'MISSING'}`);
 
   if (!priceId) {
-    return res.status(500).json({ error: `STRIPE_${plan.toUpperCase()}_PRICE_ID is not configured.` });
+    return res.status(500).json({ error: `STRIPE_PRICE_ID_${plan.toUpperCase()} is not configured.` });
   }
 
   const appUrl = process.env.APP_URL || `https://zyra.build`;
