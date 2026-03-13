@@ -207,10 +207,11 @@ function generateTitle(msgs) {
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let currentMode         = 'balanced';
-let currentJobId        = null;
-let pollInterval        = null;
-let activeMessageId     = null;   // ID of the currently-generating assistant message
+let currentMode              = 'balanced';
+let currentJobId             = null;
+let pollInterval             = null;
+let activeMessageId          = null;   // ID of the currently-generating assistant message
+let _lastGenerationPrompt    = null;   // stored so Retry can re-submit after a generation failure
 let generationTimer     = null;   // setInterval handle for live elapsed timer
 let generationStartMs   = null;   // Date.now() when generation started
 
@@ -619,8 +620,33 @@ async function startGeneration(prompt, isPrefill = false) {
       body: JSON.stringify({ prompt, mode: currentMode }),
     });
     currentJobId = data.jobId;
+    _lastGenerationPrompt = prompt;
     startPolling(currentJobId);
   } catch (err) {
+    // "Already in progress" — cancel the stuck job then auto-retry
+    if (err.message?.toLowerCase().includes('already in progress')) {
+      try {
+        updateLoadingMessage('Cancelling previous job...', '');
+        await cancelAnyActiveJob();
+        await new Promise(r => setTimeout(r, 1200));
+        updateLoadingMessage('Retrying...', '');
+        const data = await apiFetch('/api/generate', {
+          method: 'POST',
+          body: JSON.stringify({ prompt, mode: currentMode }),
+        });
+        currentJobId = data.jobId;
+        _lastGenerationPrompt = prompt;
+        startPolling(currentJobId);
+        return;
+      } catch (retryErr) {
+        stopGenerationTimer();
+        setGenerating(false);
+        updateMessage(asstMsgId, { status: 'failed', error: retryErr.message });
+        setPreviewState('error', 'Generation failed', retryErr.message);
+        activeMessageId = null;
+        return;
+      }
+    }
     stopGenerationTimer();
     setGenerating(false);
     updateMessage(asstMsgId, { status: 'failed', error: err.message });
@@ -665,6 +691,30 @@ async function startEdit(prompt, projectSlug) {
     currentJobId = data.jobId;
     startPolling(currentJobId);
   } catch (err) {
+    // "Already in progress" — cancel the stuck job then auto-retry
+    if (err.message?.toLowerCase().includes('already in progress')) {
+      try {
+        updateLoadingMessage('Cancelling previous job...', '');
+        await cancelAnyActiveJob();
+        await new Promise(r => setTimeout(r, 1200));
+        updateLoadingMessage('Retrying edit...', '');
+        const data = await apiFetch(`/api/edit/${encodeURIComponent(projectSlug)}`, {
+          method: 'POST',
+          body: JSON.stringify({ prompt, mode: currentMode }),
+        });
+        currentJobId = data.jobId;
+        startPolling(currentJobId);
+        return;
+      } catch (retryErr) {
+        stopGenerationTimer();
+        setGenerating(false);
+        updateMessage(asstMsgId, { status: 'failed', error: retryErr.message });
+        const isExpired = retryErr.expired || retryErr.message?.toLowerCase().includes('not found');
+        setPreviewState('error', 'Edit failed', retryErr.message, { showRegenerate: isExpired });
+        activeMessageId = null;
+        return;
+      }
+    }
     stopGenerationTimer();
     setGenerating(false);
     updateMessage(asstMsgId, { status: 'failed', error: err.message });
@@ -677,6 +727,27 @@ async function startEdit(prompt, projectSlug) {
 function setGenerating(on) {
   generateBtn.disabled = on;
   generateBtn.classList.toggle('sending', on);
+}
+
+// ── Cancel stuck job helper ───────────────────────────────────────────────────
+// Finds any in-progress job via the jobs list and cancels it.
+// Used when "already in progress" blocks a new generation or edit.
+async function cancelAnyActiveJob() {
+  // If we already know the job ID, cancel it directly
+  if (currentJobId) {
+    try { await apiFetch(`/api/jobs/${currentJobId}/cancel`, { method: 'POST' }); } catch (_) {}
+    currentJobId = null;
+    return;
+  }
+  // Otherwise fetch the jobs list and cancel any active one
+  try {
+    const { jobs } = await apiFetch('/api/jobs');
+    const activeStatuses = new Set(['queued', 'planning', 'coding', 'reviewing', 'finalizing']);
+    const stuck = (jobs || []).find(j => activeStatuses.has(j.status));
+    if (stuck) {
+      await apiFetch(`/api/jobs/${stuck.id}/cancel`, { method: 'POST' });
+    }
+  } catch (_) {}
 }
 
 // ── Polling ───────────────────────────────────────────────────────────────────
@@ -1162,7 +1233,13 @@ openTabBtn.addEventListener('click', () => {
   window.open(url, '_blank');
 });
 retryPreviewBtn.addEventListener('click', () => {
-  if (currentSlug) initiatePreview(currentSlug);
+  if (currentSlug) {
+    // Preview failure — re-initiate the preview
+    initiatePreview(currentSlug);
+  } else if (_lastGenerationPrompt) {
+    // Generation failure (no project yet) — re-submit the last prompt
+    startGeneration(_lastGenerationPrompt);
+  }
 });
 
 regenerateProjectBtn.addEventListener('click', () => {
