@@ -115,13 +115,33 @@ function renderUsage(data) {
 }
 
 function renderSubscription(data) {
-  // Backend returns flat: { plan, status, periodEnd, ... } — no .subscription wrapper
+  // Backend returns flat: { plan, status, paidAccess, rawPlan, ... }
+  // plan = effectivePlan (server-enforced, safe for entitlements)
+  // paidAccess = explicit boolean: true only for active/trialing
   if (!data || data.configured === false) return;
 
-  currentPlan   = data.plan   || 'free';
+  currentPlan   = data.plan   || 'free';   // already the effective plan
   currentStatus = data.status || 'free';
 
-  if (currentPlan === 'free' && currentStatus === 'free') return;
+  // If there's a non-active paid subscription, show an error alert and stop
+  if (!data.paidAccess && data.rawPlan && data.rawPlan !== 'free') {
+    const STATUS_ALERTS = {
+      incomplete:         'Payment incomplete — your subscription was not activated. Please try upgrading again.',
+      incomplete_expired: 'Payment window expired — please start a new checkout.',
+      past_due:           'Payment failed — please update your payment method to restore access.',
+      unpaid:             'Invoice unpaid — please update your payment method.',
+      canceled:           'Subscription canceled — you are now on the free plan.',
+    };
+    const msg = STATUS_ALERTS[currentStatus];
+    if (msg) {
+      const alertEl = document.getElementById('billing-alert');
+      alertEl.innerHTML = `<div class="alert error">${msg}</div>`;
+      alertEl.style.display = '';
+    }
+    return;  // do not show subscription card or mark any paid plan as current
+  }
+
+  if (!data.paidAccess) return;  // free user — nothing to show
 
   const card = document.getElementById('subscription-card');
   card.style.display = '';

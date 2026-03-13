@@ -13,6 +13,7 @@
 
 const { getSupabaseAdmin } = require('../lib/supabaseAdmin');
 const { PLAN_CREDITS }     = require('../config/billing');
+const { effectivePlan }    = require('./accessControl');
 const logger               = require('../utils/logger');
 
 /**
@@ -31,8 +32,9 @@ async function getCurrentBillingPeriod(userId) {
 
   if (error) throw new Error(`Failed to load subscription: ${error.message}`);
 
-  const plan   = sub?.plan   || 'free';
-  const status = sub?.status || 'free';
+  const rawPlan = sub?.plan   || 'free';
+  const status  = sub?.status || 'free';
+  const plan    = effectivePlan(rawPlan, status);   // downgrade if not truly paid
 
   let periodStart, periodEnd;
 

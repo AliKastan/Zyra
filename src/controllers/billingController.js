@@ -15,6 +15,7 @@ const { ensureProfile }                         = require('../billing/meter');
 const { handleWebhookEvent }                    = require('../billing/webhookHandler');
 const { getStripe, isStripeConfigured }         = require('../billing/stripeClient');
 const { PLAN_META, WARNING_THRESHOLDS }         = require('../config/billing');
+const { effectivePlan, hasPaidAccess }          = require('../billing/accessControl');
 const logger = require('../utils/logger');
 
 // ── GET /api/billing/usage ────────────────────────────────────────────────────
@@ -69,16 +70,25 @@ async function getSubscription(req, res) {
 
     if (error) throw new Error(error.message);
 
-    const plan = sub?.plan || 'free';
+    const rawPlan = sub?.plan   || 'free';
+    const status  = sub?.status || 'free';
+    const plan    = effectivePlan(rawPlan, status); // 'free' unless active/trialing
+    const paid    = hasPaidAccess(rawPlan, status);
+
+    if (rawPlan !== 'free' && !paid) {
+      logger.info(`[billing] getSubscription: user ${userId} has plan=${rawPlan} status=${status} — effective=free (not active)`);
+    }
 
     res.json({
       configured:          true,
-      plan,
-      status:              sub?.status              || 'free',
+      plan,                        // effective plan (safe for UI + entitlements)
+      rawPlan,                     // actual DB plan (for display only)
+      status,
+      paidAccess:          paid,   // explicit boolean the UI can trust
       periodEnd:           sub?.current_period_end  || null,
       cancelAtPeriodEnd:   sub?.cancel_at_period_end || false,
       hasStripeCustomer:   !!sub?.stripe_customer_id,
-      hasActiveSubscription: !!(sub?.stripe_subscription_id),
+      hasActiveSubscription: paid,
       planMeta:            PLAN_META[plan] || PLAN_META.free,
       allPlans:            PLAN_META,
     });

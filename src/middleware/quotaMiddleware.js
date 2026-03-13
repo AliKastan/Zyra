@@ -8,6 +8,7 @@
 const { isBillingConfigured, getSupabaseAdmin } = require('../lib/supabaseAdmin');
 const { checkCredits, ensureProfile }            = require('../billing/meter');
 const { PLAN_FEATURES, RATE_LIMITS }             = require('../config/billing');
+const { effectivePlan }                          = require('../billing/accessControl');
 const logger = require('../utils/logger');
 
 // ── In-memory rate limiter (per userId) ──────────────────────────────────────
@@ -65,7 +66,7 @@ async function enforceQuota(req, res, next) {
       .eq('user_id', userId)
       .maybeSingle();
 
-    const plan = sub?.plan || 'free';
+    const plan = effectivePlan(sub?.plan, sub?.status);
     req.userPlan = plan;
 
     // Per-minute rate limit
@@ -125,7 +126,7 @@ function requireFeature(featureKey) {
         .eq('user_id', userId)
         .maybeSingle();
 
-      const plan     = sub?.plan || 'free';
+      const plan     = effectivePlan(sub?.plan, sub?.status);
       const features = PLAN_FEATURES[plan] ?? PLAN_FEATURES.free;
 
       if (!features[featureKey]) {

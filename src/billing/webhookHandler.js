@@ -7,9 +7,10 @@
  * Source of truth for subscription state: Stripe webhooks, NOT frontend redirects.
  */
 
-const { getStripe }        = require('./stripeClient');
-const { getSupabaseAdmin } = require('../lib/supabaseAdmin');
-const logger               = require('../utils/logger');
+const { getStripe }          = require('./stripeClient');
+const { getSupabaseAdmin }   = require('../lib/supabaseAdmin');
+const { hasPaidAccess }      = require('./accessControl');
+const logger                 = require('../utils/logger');
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
@@ -109,9 +110,10 @@ async function onCheckoutCompleted(db, stripe, session) {
     return;
   }
 
+  const mappedStatus = mapStatus(sub.status);
   await upsertSub(db, userId, {
     plan,
-    status:                  mapStatus(sub.status),
+    status:                  mappedStatus,
     stripe_customer_id:      custId,
     stripe_subscription_id:  subId,
     stripe_price_id:         priceId,
@@ -120,24 +122,35 @@ async function onCheckoutCompleted(db, stripe, session) {
     cancel_at_period_end:    sub.cancel_at_period_end,
   });
 
-  logger.info(`[webhook] Checkout completed — user ${userId} now on ${plan}`);
+  if (hasPaidAccess(plan, mappedStatus)) {
+    logger.info(`[webhook] Subscription ACTIVATED — user ${userId} on ${plan} (${mappedStatus})`);
+  } else {
+    logger.warn(`[webhook] Checkout completed but access NOT granted — user ${userId} plan=${plan} status=${mappedStatus} (payment not confirmed)`);
+  }
 }
 
 async function onSubscriptionUpsert(db, sub) {
-  const priceId = sub.items.data[0]?.price?.id;
-  const plan    = planFromPriceId(priceId) || 'free';
-  const userId  = await userIdFromCustomer(db, sub.customer);
+  const priceId      = sub.items.data[0]?.price?.id;
+  const plan         = planFromPriceId(priceId) || 'free';
+  const mappedStatus = mapStatus(sub.status);
+  const userId       = await userIdFromCustomer(db, sub.customer);
   if (!userId) return;
 
   await upsertSub(db, userId, {
     plan,
-    status:                 mapStatus(sub.status),
+    status:                 mappedStatus,
     stripe_subscription_id: sub.id,
     stripe_price_id:        priceId,
     current_period_start:   toIso(sub.current_period_start),
     current_period_end:     toIso(sub.current_period_end),
     cancel_at_period_end:   sub.cancel_at_period_end,
   });
+
+  if (hasPaidAccess(plan, mappedStatus)) {
+    logger.info(`[webhook] Subscription upsert — user ${userId} access GRANTED: ${plan} (${mappedStatus})`);
+  } else {
+    logger.info(`[webhook] Subscription upsert — user ${userId} access NOT granted: plan=${plan} status=${mappedStatus}`);
+  }
 }
 
 async function onSubscriptionDeleted(db, sub) {
@@ -174,7 +187,7 @@ async function onInvoicePaymentFailed(db, invoice) {
   const userId = await userIdFromCustomer(db, invoice.customer);
   if (!userId) return;
   await upsertSub(db, userId, { status: 'past_due' });
-  logger.warn(`[webhook] Payment failed for user ${userId}`);
+  logger.warn(`[webhook] Payment FAILED for user ${userId} — access revoked (status=past_due)`);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
