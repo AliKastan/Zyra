@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zyra Private Beta</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:  #DAE697;
+      --brown:  #8A2E1A;
+      --bg:     #FBFBFB;
+      --surface:#FFFFFF;
+      --border: #E4E4DC;
+      --text:   #1A1A16;
+      --muted:  #9A9A90;
+      --error:  #B91C1C;
+      --radius: 10px;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.06);
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: var(--brown);
+      margin-bottom: 4px;
+    }
+
+    .tag {
+      font-size: 0.8125rem;
+      color: var(--muted);
+      margin-bottom: 32px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: #5A5A52;
+      margin-bottom: 6px;
+    }
+
+    input[type="password"] {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 0.9375rem;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="password"]:focus {
+      border-color: var(--brown);
+      background: #fff;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 14px;
+      padding: 11px 16px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      font-family: inherit;
+      color: #fff;
+      background: var(--brown);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button:hover { background: #741F0F; }
+
+    .error {
+      font-size: 0.8125rem;
+      color: var(--error);
+      margin-top: 12px;
+      min-height: 18px;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">Zyra</div>
+  <div class="tag">Private Beta</div>
+
+  <label for="code">Access code</label>
+  <input type="password" id="code" placeholder="Enter access code" autocomplete="off" />
+  <button onclick="submit()">Continue</button>
+  <div class="error" id="err"></div>
+</div>
+
+<script>
+  // Already has access — skip gate
+  if (localStorage.getItem('zyra_access') === 'true') {
+    window.location.replace('/app');
+  }
+
+  document.getElementById('code').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') submit();
+  });
+
+  function submit() {
+    const val = document.getElementById('code').value.trim();
+    if (val === 'zyra2026') {
+      localStorage.setItem('zyra_access', 'true');
+      window.location.replace('/app');
+    } else {
+      document.getElementById('err').textContent = 'Invalid code';
+      document.getElementById('code').focus();
+    }
+  }
+</script>
+</body>
+</html>

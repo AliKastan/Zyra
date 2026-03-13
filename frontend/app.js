@@ -1,5 +1,10 @@
 /* Zyra — app.js */
 
+// ── Access gate guard ─────────────────────────────────────────────────────────
+if (localStorage.getItem('zyra_access') !== 'true') {
+  window.location.replace('/');
+}
+
 // ── Multi-conversation storage ────────────────────────────────────────────────
 const CONVS_KEY = 'zyra_convs_v2';
 const OLD_CONV_KEY = 'zyra_conv_v1';

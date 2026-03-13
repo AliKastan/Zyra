@@ -55,6 +55,14 @@ app.use('/api/billing',   requireAuth, billingRoutes);
 app.use('/api/debug',     requireAuth, debugRoutes);
 
 // ── Page routes ───────────────────────────────────────────────────────────────
+app.get('/', (_req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../frontend/gate.html'));
+});
+
+app.get('/app', (_req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../frontend/index.html'));
+});
+
 app.get('/login', (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/login.html'));
 });
@@ -64,7 +72,7 @@ app.get('/billing', (_req, res) => {
 });
 
 // Fallback: all other non-API routes serve the main dashboard
-app.get(/^(?!\/api)(?!\/preview)(?!\/login)(?!\/billing).*$/, (_req, res) => {
+app.get(/^(?!\/api)(?!\/preview)(?!\/login)(?!\/billing)(?!\/).*$/, (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/index.html'));
 });
 

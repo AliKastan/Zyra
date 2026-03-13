@@ -227,13 +227,13 @@
 
   // ── Check if already logged in ───────────────────────────────────────────────
   sb.auth.getSession().then(({ data }) => {
-    if (data.session) window.location.replace('/');
+    if (data.session) window.location.replace('/app');
   });
 
   // Handle OAuth redirect (Google)
   sb.auth.onAuthStateChange((event, session) => {
     if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
-      window.location.replace('/');
+      window.location.replace('/app');
     }
   });
 
