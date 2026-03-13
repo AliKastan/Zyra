@@ -431,9 +431,14 @@ $('auth-google-btn').addEventListener('click', async () => {
   $('auth-google-btn').disabled = true;
   $('auth-modal-error').textContent = '';
   try {
+    // Save pending prompt to sessionStorage — OAuth causes a full page reload
+    // so in-memory _pendingPrompt would be lost without this.
+    if (_pendingPrompt) sessionStorage.setItem('zyra_pending_prompt', _pendingPrompt);
     const { error } = await window._zyraAuth._sb.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin + '/' },
+      // Must point to /app (not /) — /app loads auth.js which processes the OAuth callback.
+      // Pointing to / served landing.html which has no Supabase client, breaking the session.
+      options: { redirectTo: window.location.origin + '/app' },
     });
     if (error) throw error;
   } catch (err) {
@@ -458,6 +463,12 @@ document.addEventListener('zyra:auth-changed', (e) => {
   updateAccountMenu(user);
   if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && user) {
     closeAuthModal();
+    // Restore pending prompt that may have been saved before a Google OAuth redirect
+    // (OAuth causes a full page reload, so in-memory _pendingPrompt is lost).
+    if (!_pendingPrompt) {
+      const saved = sessionStorage.getItem('zyra_pending_prompt');
+      if (saved) { _pendingPrompt = saved; sessionStorage.removeItem('zyra_pending_prompt'); }
+    }
     if (_pendingPrompt) {
       const p = _pendingPrompt;
       _pendingPrompt = null;

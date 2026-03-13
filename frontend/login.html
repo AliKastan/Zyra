@@ -327,7 +327,8 @@
     try {
       const { error } = await sb.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: window.location.origin + '/' },
+        // Must be /app — it loads auth.js (Supabase client) which processes the OAuth callback.
+        options: { redirectTo: window.location.origin + '/app' },
       });
       if (error) throw error;
     } catch (err) {
