@@ -1736,3 +1736,283 @@ textarea::placeholder { color: var(--text-muted); }
 }
 .deploy-action-link:hover { color: var(--brown); }
 .debug-error-state p { font-size: 0.84rem; line-height: 1.5; }
+.debug-modal-intro {
+  font-size: 0.83rem;
+  color: var(--text-dim);
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+.debug-desc-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.83rem;
+  resize: vertical;
+  min-height: 72px;
+  transition: border-color 0.14s;
+  outline: none;
+}
+.debug-desc-input:focus { border-color: var(--brown); }
+
+/* ── Debug mode selector bar ─────────────────────────────────────────────── */
+.debug-mode-bar {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 9px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.debug-mode-btn {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  font-family: var(--font);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.13s;
+  white-space: nowrap;
+}
+.debug-mode-btn:hover { background: var(--surface); color: var(--text-dim); }
+.debug-mode-btn.active {
+  background: var(--surface);
+  color: var(--brown);
+  box-shadow: var(--shadow-xs);
+}
+
+/* ── Running state header ────────────────────────────────────────────────── */
+.debug-running-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.debug-mode-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--brown);
+  background: color-mix(in srgb, var(--brown) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brown) 25%, transparent);
+  border-radius: 5px;
+  padding: 2px 8px;
+}
+.debug-running-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* ── Rule findings row ───────────────────────────────────────────────────── */
+.debug-rule-findings {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* ── Low-confidence badge ────────────────────────────────────────────────── */
+.debug-badge--low-conf {
+  background: color-mix(in srgb, #f59e0b 10%, transparent);
+  color: #92400e;
+  border-color: color-mix(in srgb, #f59e0b 30%, transparent);
+}
+
+/* ── Screenshot field ────────────────────────────────────────────────────── */
+.debug-screenshot-field { margin-top: 10px; }
+.debug-field-label {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.debug-screenshot-input {
+  width: 100%;
+  padding: 8px 11px;
+  border-radius: 7px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.81rem;
+  outline: none;
+  transition: border-color 0.14s;
+}
+.debug-screenshot-input:focus { border-color: var(--brown); }
+
+/* ── Self-Heal results ───────────────────────────────────────────────────── */
+.heal-result { display: flex; flex-direction: column; gap: 14px; }
+.heal-strategy {
+  padding: 12px 14px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--brown) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brown) 20%, transparent);
+}
+.heal-strategy-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brown);
+  margin-bottom: 5px;
+}
+.heal-strategy-text {
+  font-size: 0.85rem;
+  color: var(--text);
+  line-height: 1.45;
+}
+.heal-iterations-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.heal-iterations { display: flex; flex-direction: column; gap: 10px; }
+.heal-iteration {
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.heal-iter-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.heal-iter-number {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--brown);
+  background: color-mix(in srgb, var(--brown) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brown) 25%, transparent);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+.heal-iter-cause {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+.heal-iter-impact {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+/* ── Incident report ─────────────────────────────────────────────────────── */
+.incident-report { display: flex; flex-direction: column; gap: 16px; }
+.incident-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.incident-severity-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.incident-summary {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
+  margin-bottom: 6px;
+}
+.incident-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+.incident-rollback-warn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #dc2626 8%, transparent);
+  border: 1px solid color-mix(in srgb, #dc2626 25%, transparent);
+  font-size: 0.8rem;
+  color: #dc2626;
+  font-weight: 500;
+}
+.incident-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.incident-field {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.incident-field-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.incident-field-value {
+  font-size: 0.82rem;
+  color: var(--text);
+  line-height: 1.4;
+}
+.incident-section { display: flex; flex-direction: column; gap: 6px; }
+.incident-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+.incident-root-cause {
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #dc2626 5%, transparent);
+  border: 1px solid color-mix(in srgb, #dc2626 18%, transparent);
+  font-size: 0.84rem;
+  color: var(--text);
+  line-height: 1.5;
+}
+.incident-steps {
+  padding-left: 18px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.incident-steps li {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* ── Visual bug result ───────────────────────────────────────────────────── */
+.visual-result { display: flex; flex-direction: column; gap: 14px; }
+.visual-finding-header { display: flex; gap: 6px; flex-wrap: wrap; }
+.visual-suggestion {
+  padding: 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--green) 50%, transparent);
+}
+.visual-fix-text {
+  font-size: 0.83rem;
+  color: var(--text-dim);
+  line-height: 1.55;
+  margin-top: 6px;
+}

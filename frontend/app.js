@@ -199,6 +199,7 @@ const browserUrlDisplay  = $('browser-url-display');
 const refreshPreviewBtn  = $('refresh-preview-btn');
 const openTabBtn         = $('open-tab-btn');
 const retryPreviewBtn    = $('retry-preview-btn');
+const fixBtn             = $('fix-my-app-btn');
 
 // Code
 const codeArea     = $('code-area');
@@ -1093,8 +1094,10 @@ let currentDeploySlug  = null;
 function updateDeployButton(slug) {
   if (slug) {
     deployBtn.classList.remove('hidden');
+    fixBtn.classList.remove('hidden');
   } else {
     deployBtn.classList.add('hidden');
+    fixBtn.classList.add('hidden');
     closeDeployPanel();
   }
 }
@@ -1292,6 +1295,610 @@ async function apiFetch(path, opts = {}) {
 
 function escHtml(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escAttr(s)  { return String(s).replace(/"/g,'&quot;'); }
+
+// ── Fix My App — Debugger System ─────────────────────────────────────────────
+
+const debugOverlay = $('debug-overlay');
+const debugBody    = $('debug-modal-body');
+
+// debugMode: 'standard' | 'heal' | 'incident' | 'visual'
+const debugState = {
+  jobId:        null,
+  slug:         null,
+  pollInterval: null,
+  result:       null,
+  backup:       null,
+  mode:         'standard',
+  healPlan:     null,
+  incidentReport: null,
+  visualFinding:  null,
+};
+
+const DEBUG_STAGES = [
+  { key: 'loading',    label: 'Loading project files' },
+  { key: 'analyzing',  label: 'Running analysis' },
+  { key: 'diagnosing', label: 'AI diagnosis' },
+];
+
+fixBtn.addEventListener('click', () => {
+  if (!currentSlug) return;
+  debugState.slug         = currentSlug;
+  debugState.jobId        = null;
+  debugState.result       = null;
+  debugState.backup       = null;
+  debugState.mode         = 'standard';
+  debugState.healPlan     = null;
+  debugState.incidentReport = null;
+  debugState.visualFinding  = null;
+  openDebugModal();
+});
+
+$('debug-modal-close').addEventListener('click', closeDebugModal);
+debugOverlay.addEventListener('click', (e) => { if (e.target === debugOverlay) closeDebugModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !debugOverlay.classList.contains('hidden')) closeDebugModal();
+});
+
+function openDebugModal() {
+  debugOverlay.classList.remove('hidden');
+  renderDebugIdle();
+}
+
+function closeDebugModal() {
+  stopDebugPoll();
+  debugOverlay.classList.add('hidden');
+}
+
+function stopDebugPoll() {
+  if (debugState.pollInterval) { clearInterval(debugState.pollInterval); debugState.pollInterval = null; }
+}
+
+// ── Idle — mode selector + description input ──────────────────────────────────
+
+function renderDebugIdle() {
+  const mode = debugState.mode || 'standard';
+
+  const modeDescriptions = {
+    standard: 'Zyra will inspect your project, identify the root cause, and propose a targeted fix.',
+    heal:     'Zyra generates a multi-step repair plan (up to 3 iterations) for you to review and apply.',
+    incident: 'Investigate a post-deploy production outage. Zyra acts as an SRE copilot.',
+    visual:   'Diagnose UI/layout bugs. Optionally paste a screenshot URL for visual analysis.',
+  };
+
+  const placeholders = {
+    standard: 'e.g. Preview is blank, buttons don\'t work, console shows errors...',
+    heal:     'e.g. App crashes on load, imports broken, CSS not loading...',
+    incident: 'e.g. Deploy just went out and the app stopped working...',
+    visual:   'e.g. The header is overlapping content, modal is off-screen...',
+  };
+
+  const showScreenshotField = mode === 'visual';
+
+  debugBody.innerHTML = `
+    <div class="debug-mode-bar">
+      <button class="debug-mode-btn${mode === 'standard' ? ' active' : ''}" data-dmode="standard" type="button">Fix My App</button>
+      <button class="debug-mode-btn${mode === 'heal' ? ' active' : ''}" data-dmode="heal" type="button">Self-Heal</button>
+      <button class="debug-mode-btn${mode === 'incident' ? ' active' : ''}" data-dmode="incident" type="button">Incident</button>
+      <button class="debug-mode-btn${mode === 'visual' ? ' active' : ''}" data-dmode="visual" type="button">Visual</button>
+    </div>
+    <p class="debug-modal-intro">${escHtml(modeDescriptions[mode])}</p>
+    <textarea class="debug-desc-input" id="debug-desc" rows="3" maxlength="800"
+      placeholder="${escAttr(placeholders[mode])}"></textarea>
+    ${showScreenshotField ? `
+    <div class="debug-screenshot-field">
+      <label class="debug-field-label">Screenshot URL (optional)</label>
+      <input type="url" class="debug-screenshot-input" id="debug-screenshot-url"
+        placeholder="https://... or leave blank for code analysis" />
+    </div>` : ''}
+    <div class="debug-actions" style="margin-top:14px;">
+      <button class="debug-action-btn debug-action-btn--primary" id="debug-start-btn" type="button">${modeLabel(mode)}</button>
+      <button class="debug-action-btn" id="debug-dismiss-btn" type="button">Cancel</button>
+    </div>
+  `;
+
+  // Wire mode buttons
+  debugBody.querySelectorAll('.debug-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      debugState.mode = btn.dataset.dmode;
+      renderDebugIdle();
+    });
+  });
+
+  $('debug-start-btn').addEventListener('click', startDebugAnalysis);
+  $('debug-dismiss-btn').addEventListener('click', closeDebugModal);
+  setTimeout(() => $('debug-desc')?.focus(), 50);
+}
+
+function modeLabel(mode) {
+  return { standard: 'Analyze My App', heal: 'Generate Repair Plan', incident: 'Investigate Incident', visual: 'Analyze Visually' }[mode] || 'Analyze';
+}
+
+// ── Running state — shared step progress ──────────────────────────────────────
+
+function renderDebugRunning(currentStageKey) {
+  const stageLabels = {
+    standard: ['Loading project files', 'Running rule engine', 'AI diagnosis'],
+    heal:     ['Loading project files', 'Running analysis', 'Building repair plan'],
+    incident: ['Loading incident data', 'Normalizing signals', 'SRE AI analysis'],
+    visual:   ['Loading project files', 'Scanning layout', 'Visual AI analysis'],
+  };
+  const labels = stageLabels[debugState.mode] || stageLabels.standard;
+  const stageKeys = ['loading', 'analyzing', 'diagnosing'];
+  const stageIdx  = stageKeys.indexOf(currentStageKey);
+
+  const stepsHtml = stageKeys.map((key, i) => {
+    let iconHtml;
+    if (i < stageIdx)        iconHtml = `<span class="debug-step-check">&#10003;</span>`;
+    else if (i === stageIdx) iconHtml = `<span class="debug-step-spinner"></span>`;
+    else                     iconHtml = `<span class="debug-step-wait">&#9679;</span>`;
+    const cls = i < stageIdx ? 'debug-step--done' : i === stageIdx ? 'debug-step--active' : '';
+    return `<div class="debug-step ${cls}"><div class="debug-step-icon">${iconHtml}</div><span>${escHtml(labels[i] || key)}</span></div>`;
+  }).join('');
+
+  debugBody.innerHTML = `
+    <div class="debug-running-header">
+      <span class="debug-mode-label">${modeLabelShort(debugState.mode)}</span>
+      <span class="debug-running-sub">Analyzing your project...</span>
+    </div>
+    <div class="debug-steps">${stepsHtml}</div>
+  `;
+}
+
+function modeLabelShort(mode) {
+  return { standard: 'Fix My App', heal: 'Self-Healing', incident: 'Incident Response', visual: 'Visual Debugger' }[mode] || mode;
+}
+
+// ── Start analysis — dispatch by mode ─────────────────────────────────────────
+
+async function startDebugAnalysis() {
+  const desc = ($('debug-desc')?.value || '').trim();
+  const screenshotUrl = ($('debug-screenshot-url')?.value || '').trim() || null;
+  const slug = debugState.slug;
+  if (!slug) return;
+
+  renderDebugRunning('loading');
+
+  const baseSignals = {
+    consoleErrors:   [],
+    previewState:    currentPreviewUrl ? 'loaded' : 'unknown',
+    userDescription: desc || null,
+    previewUrl:      currentPreviewUrl || null,
+    mode:            currentMode,
+  };
+
+  try {
+    let data;
+    const mode = debugState.mode;
+
+    if (mode === 'heal') {
+      data = await apiFetch(`/api/debug/${encodeURIComponent(slug)}/heal`, { method: 'POST', body: JSON.stringify(baseSignals) });
+    } else if (mode === 'incident') {
+      data = await apiFetch(`/api/debug/${encodeURIComponent(slug)}/incident`, { method: 'POST', body: JSON.stringify(baseSignals) });
+    } else if (mode === 'visual') {
+      data = await apiFetch(`/api/debug/${encodeURIComponent(slug)}/visual`, {
+        method: 'POST',
+        body: JSON.stringify({ ...baseSignals, screenshotUrl }),
+      });
+    } else {
+      data = await apiFetch(`/api/debug/${encodeURIComponent(slug)}`, { method: 'POST', body: JSON.stringify(baseSignals) });
+    }
+
+    debugState.jobId = data.jobId;
+    pollDebugJob();
+  } catch (err) {
+    renderDebugError(err.message);
+  }
+}
+
+// ── Poll loop — dispatches to mode-specific render ────────────────────────────
+
+function pollDebugJob() {
+  stopDebugPoll();
+  debugState.pollInterval = setInterval(async () => {
+    try {
+      const { job } = await apiFetch(
+        `/api/debug/${encodeURIComponent(debugState.slug)}/session/${debugState.jobId}`
+      );
+
+      if (job.status && !['completed', 'failed'].includes(job.status)) {
+        renderDebugRunning(job.status);
+      }
+
+      if (job.status === 'completed') {
+        stopDebugPoll();
+        const mode = job.debugMode || debugState.mode;
+        if (mode === 'heal')     renderHealResult(job.healPlan, job.ruleFindings);
+        else if (mode === 'incident') renderIncidentResult(job.incidentReport);
+        else if (mode === 'visual')   renderVisualResult(job.visualFinding);
+        else                     renderDebugResult(job.debugResult);
+      } else if (job.status === 'failed') {
+        stopDebugPoll();
+        renderDebugError(job.error || 'Analysis failed. Please try again.');
+      }
+    } catch (_) {}
+  }, 1500);
+}
+
+// ── STANDARD: Fix My App result ───────────────────────────────────────────────
+
+function renderDebugResult(result) {
+  if (!result) { renderDebugError('No result returned.'); return; }
+
+  const sev      = result.severity || 'medium';
+  const confPct  = Math.round((result.confidence || 0) * 100);
+  const low      = confPct < 60;
+
+  const sevBadge  = `<span class="debug-badge debug-badge--${sev}">${sev.charAt(0).toUpperCase() + sev.slice(1)} severity</span>`;
+  const diagBadge = `<span class="debug-badge debug-badge--${result.diagnosedBy === 'ai' ? 'ai' : 'local'}">${result.diagnosedBy === 'ai' ? 'AI Diagnosed' : 'Rule Detected'}</span>`;
+  const confBadge = `<span class="debug-badge${low ? ' debug-badge--low-conf' : ''}">${confPct}% confidence${low ? ' — uncertain' : ''}</span>`;
+
+  const filesHtml = result.affectedFiles?.length
+    ? `<div class="debug-affected-files"><strong>Affected files:</strong> ${result.affectedFiles.map(f => `<span class="debug-file-tag">${escHtml(f)}</span>`).join('')}</div>`
+    : '';
+
+  const patchHtml = result.patch?.length
+    ? `<details class="debug-patch-toggle">
+        <summary>View fix — ${result.patch.length} file${result.patch.length !== 1 ? 's' : ''} modified</summary>
+        <div class="debug-patch-code"><pre>${escHtml(result.patch.map(p => `// ── ${p.path} ──\n${p.content}`).join('\n\n'))}</pre></div>
+      </details>`
+    : '';
+
+  const ruleHtml = result.ruleFindings?.length
+    ? `<div class="debug-rule-findings"><strong>Rule matches:</strong> ${result.ruleFindings.map(r => `<span class="debug-file-tag">${escHtml(r.title || r.type)}</span>`).join('')}</div>`
+    : '';
+
+  const noSuggestion = result.suggestion || 'Review the affected files manually.';
+
+  const actionsHtml = result.patch?.length ? `
+    <div class="debug-actions">
+      <button class="debug-action-btn debug-action-btn--primary" id="debug-apply-btn" type="button">Apply Fix</button>
+      <button class="debug-action-btn" onclick="copyDebugDiagnosis('${escAttr(result.rootCause || '')}')">Copy Diagnosis</button>
+      <button class="debug-action-btn" id="debug-cancel-btn" type="button">Dismiss</button>
+    </div>` : `
+    <div class="debug-no-patch"><strong>No automatic fix available.</strong><p>${escHtml(noSuggestion)}</p></div>
+    <div class="debug-actions">
+      <button class="debug-action-btn" onclick="copyDebugDiagnosis('${escAttr(result.rootCause || '')}')">Copy Diagnosis</button>
+      <button class="debug-action-btn" id="debug-cancel-btn" type="button">Close</button>
+    </div>`;
+
+  debugBody.innerHTML = `
+    <div class="debug-result">
+      <div class="debug-result-issue">
+        <div class="debug-result-issue-label">Root cause identified</div>
+        <div class="debug-result-issue-text">${escHtml(result.rootCause || 'Unknown issue')}</div>
+      </div>
+      ${result.explanation ? `<div class="debug-result-explanation">${escHtml(result.explanation)}</div>` : ''}
+      <div class="debug-result-meta">${sevBadge} ${diagBadge} ${confBadge}</div>
+      ${filesHtml}
+      ${ruleHtml}
+      ${patchHtml}
+    </div>
+    ${actionsHtml}
+  `;
+
+  $('debug-apply-btn')?.addEventListener('click', () => {
+    if (!result.canAutoApply) {
+      const confirmed = confirm('This patch modifies your project files. A backup will be created for rollback. Apply?');
+      if (!confirmed) return;
+    }
+    applyDebugFixPatch(result.patch);
+  });
+  $('debug-cancel-btn')?.addEventListener('click', closeDebugModal);
+}
+
+// ── HEAL: Self-Healing Plan result ────────────────────────────────────────────
+
+function renderHealResult(healPlan, ruleFindings) {
+  if (!healPlan) { renderDebugError('Heal plan generation failed.'); return; }
+
+  const iterations = Array.isArray(healPlan.iterations) ? healPlan.iterations : [];
+  const strategy   = healPlan.strategy || 'Multi-step repair approach';
+
+  const ruleHtml = ruleFindings?.length
+    ? `<div class="debug-rule-findings" style="margin-bottom:14px;"><strong>Detected issues:</strong> ${ruleFindings.map(r => `<span class="debug-file-tag">${escHtml(r.title || r.type)}</span>`).join('')}</div>`
+    : '';
+
+  const itersHtml = iterations.length ? iterations.map((iter, idx) => {
+    const confPct = Math.round((iter.confidence || 0) * 100);
+    const filesHtml = iter.affectedFiles?.length
+      ? iter.affectedFiles.map(f => `<span class="debug-file-tag">${escHtml(f)}</span>`).join('')
+      : '<span class="debug-file-tag">unknown</span>';
+
+    const patchHtml = iter.patch?.length
+      ? `<details class="debug-patch-toggle" style="margin-top:8px;">
+          <summary>View patch (${iter.patch.length} file${iter.patch.length !== 1 ? 's' : ''})</summary>
+          <div class="debug-patch-code"><pre>${escHtml(iter.patch.map(p => `// ── ${p.path} ──\n${p.content}`).join('\n\n'))}</pre></div>
+        </details>`
+      : `<p style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;">No patch generated for this iteration.</p>`;
+
+    return `
+      <div class="heal-iteration" id="heal-iter-${idx}">
+        <div class="heal-iter-header">
+          <span class="heal-iter-number">Iteration ${iter.number || idx + 1}</span>
+          <span class="debug-badge">${confPct}% confidence</span>
+          <span class="debug-badge debug-badge--${iter.issueType === 'other' ? 'low' : 'medium'}">${escHtml(iter.issueType || 'repair')}</span>
+        </div>
+        <div class="heal-iter-cause">${escHtml(iter.rootCause || 'Issue identified')}</div>
+        <div class="heal-iter-impact">${escHtml(iter.estimatedImpact || iter.reasoning || '')}</div>
+        <div class="debug-affected-files" style="margin-top:6px;"><strong>Files:</strong> ${filesHtml}</div>
+        ${patchHtml}
+        ${iter.patch?.length ? `
+        <div class="debug-actions" style="margin-top:10px;">
+          <button class="debug-action-btn debug-action-btn--primary" data-iter-idx="${idx}" id="heal-apply-${idx}" type="button">Apply Iteration ${iter.number || idx + 1}</button>
+        </div>` : ''}
+      </div>`;
+  }).join('') : `<div class="debug-no-patch"><strong>No repair iterations generated.</strong><p>The AI could not generate a safe repair plan. Try running Fix My App instead.</p></div>`;
+
+  debugBody.innerHTML = `
+    <div class="heal-result">
+      <div class="heal-strategy">
+        <div class="heal-strategy-label">Repair strategy</div>
+        <div class="heal-strategy-text">${escHtml(strategy)}</div>
+      </div>
+      ${ruleHtml}
+      <div class="heal-iterations-title">Repair iterations (${iterations.length})</div>
+      <div class="heal-iterations">${itersHtml}</div>
+    </div>
+    <div class="debug-actions" style="margin-top:14px;">
+      <button class="debug-action-btn" id="debug-cancel-btn" type="button">Close</button>
+    </div>
+  `;
+
+  // Wire apply buttons
+  iterations.forEach((iter, idx) => {
+    const applyBtn = $(`heal-apply-${idx}`);
+    if (applyBtn && iter.patch?.length) {
+      applyBtn.addEventListener('click', () => {
+        const confirmed = confirm(`Apply iteration ${iter.number || idx + 1}? This modifies ${iter.patch.length} file(s). A backup will be created.`);
+        if (confirmed) applyDebugFixPatch(iter.patch);
+      });
+    }
+  });
+
+  $('debug-cancel-btn')?.addEventListener('click', closeDebugModal);
+}
+
+// ── INCIDENT: Production Incident Report ──────────────────────────────────────
+
+function renderIncidentResult(report) {
+  if (!report) { renderDebugError('Incident analysis failed.'); return; }
+
+  const confPct    = Math.round((report.confidence || 0) * 100);
+  const sevColor   = { critical: '#dc2626', high: '#d97706', medium: '#ca8a04', low: '#16a34a' }[report.severity] || '#6b7280';
+  const startTime  = report.startTimeEstimate ? new Date(report.startTimeEstimate).toLocaleString() : 'Unknown';
+
+  const areasHtml  = report.affectedAreas?.length
+    ? report.affectedAreas.map(a => `<span class="debug-file-tag">${escHtml(a)}</span>`).join('')
+    : '<span class="debug-file-tag">Unknown</span>';
+
+  const stepsHtml  = report.remediationSteps?.length
+    ? `<ol class="incident-steps">${report.remediationSteps.map(s => `<li>${escHtml(s)}</li>`).join('')}</ol>`
+    : '<p style="color:var(--text-muted);font-size:0.82rem;">No specific steps identified.</p>';
+
+  const rollbackBanner = report.rollbackRecommended
+    ? `<div class="incident-rollback-warn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><triangle points="10.29 3.86 1.82 18 22.18 18"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Rollback recommended — ${escHtml(report.rollbackReason || 'this incident may be deploy-related')}
+      </div>`
+    : '';
+
+  debugBody.innerHTML = `
+    <div class="incident-report">
+      <div class="incident-header">
+        <div class="incident-severity-dot" style="background:${sevColor};"></div>
+        <div>
+          <div class="incident-summary">${escHtml(report.summary || 'Production incident detected')}</div>
+          <div class="incident-meta">
+            <span class="debug-badge debug-badge--${report.severity || 'medium'}">${(report.severity || 'medium').toUpperCase()}</span>
+            <span class="debug-badge">${confPct}% confidence</span>
+            <span class="debug-badge">${escHtml(report.incidentType || 'unknown')}</span>
+          </div>
+        </div>
+      </div>
+
+      ${rollbackBanner}
+
+      <div class="incident-grid">
+        <div class="incident-field">
+          <div class="incident-field-label">Estimated start</div>
+          <div class="incident-field-value">${escHtml(startTime)}</div>
+        </div>
+        <div class="incident-field">
+          <div class="incident-field-label">Probable trigger</div>
+          <div class="incident-field-value">${escHtml(report.probableTrigger || 'Unknown')}</div>
+        </div>
+      </div>
+
+      <div class="incident-section">
+        <div class="incident-section-title">Root cause</div>
+        <div class="incident-root-cause">${escHtml(report.rootCause || 'Could not determine root cause')}</div>
+      </div>
+
+      <div class="incident-section">
+        <div class="incident-section-title">Affected areas</div>
+        <div style="margin-top:4px;">${areasHtml}</div>
+      </div>
+
+      <div class="incident-section">
+        <div class="incident-section-title">Remediation steps</div>
+        ${stepsHtml}
+      </div>
+    </div>
+    <div class="debug-actions">
+      <button class="debug-action-btn" onclick="copyIncidentReport()">Copy Report</button>
+      <button class="debug-action-btn" id="debug-cancel-btn" type="button">Close</button>
+    </div>
+  `;
+
+  debugState.incidentReport = report;
+  $('debug-cancel-btn')?.addEventListener('click', closeDebugModal);
+}
+
+// ── VISUAL: Visual Bug Analysis result ───────────────────────────────────────
+
+function renderVisualResult(finding) {
+  if (!finding) { renderDebugError('Visual analysis failed.'); return; }
+
+  const confPct = Math.round((finding.confidence || 0) * 100);
+  const analyzed = finding.screenshotAnalyzed ? 'Vision AI (screenshot)' : 'Code analysis';
+
+  const componentHtml = finding.affectedComponent
+    ? `<span class="debug-file-tag">${escHtml(finding.affectedComponent)}</span>`
+    : '';
+  const fileHtml = finding.probableFile
+    ? `<span class="debug-file-tag">${escHtml(finding.probableFile)}</span>`
+    : '';
+
+  const cssHtml = finding.cssSnippet
+    ? `<details class="debug-patch-toggle" style="margin-top:12px;">
+        <summary>Suggested CSS</summary>
+        <div class="debug-patch-code"><pre>${escHtml(finding.cssSnippet)}</pre></div>
+      </details>`
+    : '';
+
+  debugBody.innerHTML = `
+    <div class="visual-result">
+      <div class="visual-finding-header">
+        <span class="debug-badge debug-badge--${finding.issueClass === 'general_ui' ? 'medium' : 'high'}">${escHtml((finding.issueClass || 'ui_issue').replace(/_/g, ' '))}</span>
+        <span class="debug-badge">${confPct}% confidence</span>
+        <span class="debug-badge debug-badge--ai">${escHtml(analyzed)}</span>
+      </div>
+
+      <div class="debug-result-issue" style="margin-top:12px;">
+        <div class="debug-result-issue-label">Visual issue found</div>
+        <div class="debug-result-issue-text">${escHtml(finding.summary || 'Visual issue detected')}</div>
+      </div>
+
+      <div class="debug-result-explanation">${escHtml(finding.rootCause || '')}</div>
+
+      ${componentHtml || fileHtml ? `
+      <div class="debug-affected-files">
+        ${componentHtml ? `<strong>Component:</strong> ${componentHtml}` : ''}
+        ${fileHtml ? `<strong>File:</strong> ${fileHtml}` : ''}
+      </div>` : ''}
+
+      ${finding.suggestedFix ? `
+      <div class="visual-suggestion">
+        <div class="incident-section-title">Suggested fix</div>
+        <p class="visual-fix-text">${escHtml(finding.suggestedFix)}</p>
+      </div>` : ''}
+
+      ${cssHtml}
+    </div>
+    <div class="debug-actions" style="margin-top:14px;">
+      <button class="debug-action-btn" onclick="copyDebugDiagnosis('${escAttr(finding.summary || '')}')">Copy Finding</button>
+      <button class="debug-action-btn" id="debug-cancel-btn" type="button">Close</button>
+    </div>
+  `;
+
+  $('debug-cancel-btn')?.addEventListener('click', closeDebugModal);
+}
+
+// ── Apply fix (standard + heal iterations) ────────────────────────────────────
+
+async function applyDebugFixPatch(patch) {
+  if (!patch?.length || !debugState.slug) return;
+
+  const btn = document.querySelector('#debug-apply-btn, [id^="heal-apply-"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Applying...'; }
+
+  try {
+    const result = await apiFetch(`/api/debug/${encodeURIComponent(debugState.slug)}/apply`, {
+      method: 'POST',
+      body: JSON.stringify({ patch }),
+    });
+    debugState.backup = result.backup;
+    renderDebugApplied(result.written || []);
+
+    if (previewIframe.src) {
+      const src = previewIframe.src;
+      previewIframe.src = '';
+      setTimeout(() => { previewIframe.src = src; }, 350);
+    }
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = btn.id?.startsWith('heal-apply') ? 'Apply Iteration' : 'Apply Fix'; }
+    alert('Failed to apply fix: ' + err.message);
+  }
+}
+
+function renderDebugApplied(written) {
+  const fileList = written.map(f => `<span class="debug-file-tag">${escHtml(f)}</span>`).join('');
+  debugBody.innerHTML = `
+    <div class="debug-applied-banner">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4a7c3f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      Fix applied — preview refreshed.
+    </div>
+    ${written.length ? `<div class="debug-affected-files" style="margin-top:12px;"><strong>Updated:</strong> ${fileList}</div>` : ''}
+    <div class="debug-actions" style="margin-top:16px;">
+      <button class="debug-action-btn debug-action-btn--danger" id="debug-rollback-btn" type="button">Undo Fix</button>
+      <button class="debug-action-btn debug-action-btn--primary" id="debug-done-btn" type="button">Done</button>
+    </div>
+  `;
+  $('debug-rollback-btn')?.addEventListener('click', rollbackDebugFixPatch);
+  $('debug-done-btn')?.addEventListener('click', closeDebugModal);
+}
+
+async function rollbackDebugFixPatch() {
+  const backup = debugState.backup;
+  if (!backup?.length || !debugState.slug) return;
+
+  const btn = $('debug-rollback-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Undoing...'; }
+
+  try {
+    await apiFetch(`/api/debug/${encodeURIComponent(debugState.slug)}/rollback`, {
+      method: 'POST',
+      body: JSON.stringify({ backup }),
+    });
+    debugState.backup = null;
+    if (previewIframe.src) {
+      const src = previewIframe.src;
+      previewIframe.src = '';
+      setTimeout(() => { previewIframe.src = src; }, 350);
+    }
+    closeDebugModal();
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Undo Fix'; }
+    alert('Rollback failed: ' + err.message);
+  }
+}
+
+// ── Utility actions ───────────────────────────────────────────────────────────
+
+function copyDebugDiagnosis(text) {
+  navigator.clipboard.writeText(text).catch(() => {});
+}
+
+function copyIncidentReport() {
+  const r = debugState.incidentReport;
+  if (!r) return;
+  const text = [
+    `Incident Report — ${new Date().toISOString()}`,
+    `Summary: ${r.summary}`,
+    `Severity: ${r.severity}`,
+    `Root cause: ${r.rootCause}`,
+    `Probable trigger: ${r.probableTrigger}`,
+    `Remediation: ${(r.remediationSteps || []).join('; ')}`,
+  ].join('\n');
+  navigator.clipboard.writeText(text).catch(() => {});
+}
+
+// ── Error state ───────────────────────────────────────────────────────────────
+
+function renderDebugError(message) {
+  debugBody.innerHTML = `
+    <div class="debug-error-state">
+      <div class="debug-error-icon">!</div>
+      <p>${escHtml(message || 'Analysis failed.')}</p>
+      <div class="debug-actions">
+        <button class="debug-action-btn debug-action-btn--primary" id="debug-retry-btn" type="button">Try Again</button>
+        <button class="debug-action-btn" id="debug-cancel-btn" type="button">Close</button>
+      </div>
+    </div>
+  `;
+  $('debug-retry-btn')?.addEventListener('click', renderDebugIdle);
+  $('debug-cancel-btn')?.addEventListener('click', closeDebugModal);
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 // Account avatar button starts hidden — shown once session resolves
