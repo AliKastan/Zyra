@@ -46,9 +46,9 @@ app.use((_req, res, next) => {
     [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
       "img-src 'self' data: https:",
-      "font-src 'self' https://cdn.jsdelivr.net",
+      "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
       "frame-src 'self'",
       "upgrade-insecure-requests",
@@ -78,10 +78,15 @@ app.post('/api/gate/verify', (req, res) => {
 // express.static would serve index.html for /index.html before our route
 // handlers ever run. By placing page routes first, we control every HTML path.
 
-// Root: gate page — but skip straight to /app if cookie already valid
+// Landing page — public, no gate required
+app.get('/landing', (_req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../frontend/landing.html'));
+});
+
+// Root: redirect to landing page (gate is now a soft barrier behind the CTA)
 app.get('/', (req, res) => {
   if (hasGateAccess(req)) return res.redirect('/app');
-  res.sendFile(path.resolve(__dirname, '../../frontend/gate.html'));
+  res.sendFile(path.resolve(__dirname, '../../frontend/landing.html'));
 });
 
 // Block direct access to index.html — always redirect through /app

@@ -1,0 +1,1786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zyra — Build, debug, and ship with one AI.</title>
+  <meta name="description" content="Zyra is an AI workspace that generates full-stack apps, diagnoses bugs automatically, and deploys in one click." />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+/* ─────────────────────────────────────────────────────────────────────────────
+   Zyra Landing — Graphite & Ice  ·  v1.0
+   ───────────────────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #07070A;
+  --bg2:      #0B0B10;
+  --surface:  #0F0F16;
+  --surface2: #14141E;
+  --surface3: #1B1B28;
+  --surface4: #232334;
+
+  --border:     rgba(255,255,255,0.055);
+  --border-mid: rgba(255,255,255,0.09);
+  --border-hi:  rgba(255,255,255,0.14);
+
+  --blue:      #4F9EFF;
+  --blue-dim:  rgba(79,158,255,0.10);
+  --blue-glow: rgba(79,158,255,0.20);
+  --blue-grad: linear-gradient(135deg, #4F9EFF 0%, #818CF8 100%);
+
+  --text:      #EEF0F8;
+  --text-dim:  #818899;
+  --text-muted:#3E4254;
+
+  --success:     #34D399;
+  --success-dim: rgba(52,211,153,0.10);
+  --warning:     #FBBF24;
+  --danger:      #F87171;
+  --danger-dim:  rgba(248,113,113,0.10);
+
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --mono: 'Menlo','Cascadia Code','Consolas',ui-monospace,monospace;
+
+  --radius: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+.hidden { display: none !important; }
+
+/* ── Animations ─────────────────────────────────────────────────────────────── */
+@keyframes fadeUp   { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
+@keyframes scanline { from { background-position: 0 0; } to { background-position: 0 -120px; } }
+@keyframes float    { 0%,100% { transform:translateY(0);} 50% { transform:translateY(-8px);} }
+@keyframes pulse-ring { 0%,100% { opacity:.5; transform:scale(1); } 50% { opacity:1; transform:scale(1.04); } }
+@keyframes shimmer  { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+@keyframes rotate   { to { transform: rotate(360deg); } }
+@keyframes revealUp {
+  from { opacity:0; transform:translateY(32px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* ── Global utilities ────────────────────────────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.65s cubic-bezier(0.22,1,0.36,1), transform 0.65s cubic-bezier(0.22,1,0.36,1);
+}
+.reveal.visible { opacity: 1; transform: translateY(0); }
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+
+/* ── Nav ─────────────────────────────────────────────────────────────────────── */
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  z-index: 100;
+  background: rgba(7,7,10,0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.3s;
+}
+.nav::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 15%; right: 15%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(79,158,255,0.3), transparent);
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  color: var(--text);
+}
+.nav-logo-mark {
+  width: 26px;
+  height: 26px;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  list-style: none;
+}
+.nav-links a {
+  text-decoration: none;
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
+}
+.nav-links a:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nav-signin {
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 7px 14px;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
+}
+.nav-signin:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+
+.nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 9px;
+  text-decoration: none;
+  transition: opacity 0.15s, transform 0.15s;
+  letter-spacing: -0.01em;
+}
+.nav-cta:hover { opacity: 0.88; transform: translateY(-1px); }
+
+@media (max-width: 768px) {
+  .nav { padding: 0 20px; }
+  .nav-links { display: none; }
+}
+
+/* ── Hero ────────────────────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 40px 80px;
+  overflow: hidden;
+  text-align: center;
+}
+
+/* Static ambient layers */
+.hero-ambient {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 100% 60% at 50% -5%, rgba(79,158,255,0.09) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 50% at 85% 50%,  rgba(129,140,248,0.04) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 40% at 15% 70%,  rgba(79,158,255,0.03) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* Drifting scan lines — subtle "data flowing" feel, completely different from Lovable */
+.hero-scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(255,255,255,0.009) 3px,
+    rgba(255,255,255,0.009) 4px
+  );
+  animation: scanline 10s linear infinite;
+  pointer-events: none;
+}
+
+/* Mouse-following spotlight */
+.hero-spotlight {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    700px circle at calc(var(--mx, 50%) * 1%) calc(var(--my, 40%) * 1%),
+    rgba(255,255,255,0.035) 0%,
+    rgba(79,158,255,0.025) 30%,
+    transparent 65%
+  );
+  pointer-events: none;
+  transition: background 0.05s;
+}
+
+/* Subtle top edge glow */
+.hero-edge {
+  position: absolute;
+  top: 0; left: 20%; right: 20%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(79,158,255,0.5), transparent);
+  pointer-events: none;
+}
+
+/* Hero content */
+.hero-inner {
+  position: relative;
+  z-index: 2;
+  max-width: 780px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 14px;
+  background: rgba(79,158,255,0.08);
+  border: 1px solid rgba(79,158,255,0.2);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--blue);
+  letter-spacing: 0.03em;
+  animation: fadeIn 0.8s ease both;
+}
+.hero-badge-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--blue);
+  border-radius: 50%;
+  animation: pulse-ring 2s ease-in-out infinite;
+}
+
+.hero-headline {
+  font-size: clamp(2.6rem, 6vw, 4.5rem);
+  font-weight: 800;
+  line-height: 1.07;
+  letter-spacing: -0.045em;
+  color: var(--text);
+  animation: fadeUp 0.6s ease 0.1s both;
+}
+.hero-headline em {
+  font-style: normal;
+  background: linear-gradient(135deg, #fff 30%, rgba(79,158,255,0.85) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-sub {
+  font-size: clamp(1rem, 2vw, 1.175rem);
+  font-weight: 400;
+  line-height: 1.65;
+  color: var(--text-dim);
+  max-width: 540px;
+  animation: fadeUp 0.6s ease 0.2s both;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  animation: fadeUp 0.6s ease 0.3s both;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 13px 26px;
+  background: var(--text);
+  color: var(--bg);
+  font-family: var(--font);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  border-radius: 11px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  letter-spacing: -0.02em;
+  transition: opacity 0.15s, transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.12) inset, 0 4px 16px rgba(0,0,0,0.5);
+}
+.btn-primary:hover {
+  opacity: 0.92;
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.12) inset, 0 8px 24px rgba(0,0,0,0.5), 0 0 40px rgba(255,255,255,0.04);
+}
+.btn-primary:active { transform: translateY(0); }
+
+.btn-secondary-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 22px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  border-radius: 11px;
+  text-decoration: none;
+  border: 1px solid var(--border-mid);
+  cursor: pointer;
+  letter-spacing: -0.01em;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.2s;
+}
+.btn-secondary-outline:hover {
+  border-color: var(--border-hi);
+  color: var(--text);
+  background: rgba(255,255,255,0.06);
+  transform: translateY(-1px);
+}
+
+/* ── Product mockup ──────────────────────────────────────────────────────────── */
+.hero-preview {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 900px;
+  margin-top: 12px;
+  animation: fadeUp 0.7s ease 0.45s both;
+}
+
+.mockup-frame {
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.04) inset,
+    0 32px 80px rgba(0,0,0,0.7),
+    0 0 60px rgba(79,158,255,0.05);
+}
+
+.mockup-topbar {
+  height: 38px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 10px;
+}
+.mockup-dots { display: flex; gap: 5px; }
+.mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+.mockup-dot--r { background: #FF5F57; }
+.mockup-dot--y { background: #FFBD2E; }
+.mockup-dot--g { background: #28C840; }
+.mockup-url {
+  flex: 1;
+  max-width: 260px;
+  margin: 0 auto;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+}
+
+.mockup-body {
+  display: flex;
+  height: 380px;
+}
+
+.mockup-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--surface2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px;
+  gap: 4px;
+}
+.mockup-new-btn {
+  background: linear-gradient(135deg, #4F9EFF, #818CF8);
+  border-radius: 7px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 10px;
+}
+.mockup-section-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 0 6px 4px;
+}
+.mockup-item {
+  height: 26px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+.mockup-item--active {
+  background: rgba(79,158,255,0.1);
+  color: #4F9EFF;
+  border-left: 2px solid #4F9EFF;
+}
+.mockup-spacer { flex: 1; }
+.mockup-input-box {
+  height: 52px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  margin-top: 4px;
+  position: relative;
+  overflow: hidden;
+}
+.mockup-input-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(79,158,255,0.04) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2.5s infinite;
+}
+
+.mockup-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.mockup-preview-bar {
+  height: 32px;
+  background: var(--surface3);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 6px;
+}
+.mockup-tab {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: 5px;
+}
+.mockup-tab--active { background: rgba(255,255,255,0.06); color: var(--text-dim); }
+
+.mockup-preview-content {
+  flex: 1;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+/* Simulated app preview: a mini SaaS dashboard */
+.mock-app {
+  flex: 1;
+  background: #0A0A12;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.mock-app-header {
+  height: 32px;
+  background: #0D0D18;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+}
+.mock-nav-dot { width: 28px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; }
+.mock-nav-dot--active { background: rgba(79,158,255,0.5); width: 40px; }
+.mock-app-body { flex: 1; display: flex; padding: 10px; gap: 8px; }
+.mock-stats { display: flex; gap: 8px; flex-direction: column; width: 140px; }
+.mock-stat-card {
+  flex: 1;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 6px;
+  padding: 8px;
+}
+.mock-stat-label { font-size: 0.5rem; color: rgba(255,255,255,0.3); margin-bottom: 4px; }
+.mock-stat-value { font-size: 0.75rem; font-weight: 700; color: rgba(255,255,255,0.8); font-variant-numeric: tabular-nums; }
+.mock-stat-bar { height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; margin-top: 5px; }
+.mock-stat-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #4F9EFF, #818CF8); }
+.mock-chart {
+  flex: 1;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 6px;
+  padding: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.mock-chart-line {
+  position: absolute;
+  bottom: 14px; left: 8px; right: 8px;
+  height: 60px;
+}
+.mock-chart-line svg { width: 100%; height: 100%; }
+
+/* Generating overlay on the preview */
+.mockup-generating {
+  position: absolute;
+  bottom: 12px; left: 14px; right: 14px;
+  background: rgba(7,7,10,0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-mid);
+  border-radius: 9px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mock-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(79,158,255,0.2);
+  border-top-color: #4F9EFF;
+  border-radius: 50%;
+  animation: rotate 0.8s linear infinite;
+  flex-shrink: 0;
+}
+.mock-gen-text {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.mock-progress {
+  height: 3px;
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.mock-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4F9EFF, #818CF8);
+  width: 62%;
+  border-radius: 2px;
+  animation: shimmer 2s infinite;
+  background-size: 200% 100%;
+}
+
+/* ── Section shared ──────────────────────────────────────────────────────────── */
+section { padding: 100px 40px; }
+
+.section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--blue);
+  margin-bottom: 14px;
+}
+.section-title {
+  font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+.section-sub {
+  font-size: 1.0625rem;
+  color: var(--text-dim);
+  line-height: 1.65;
+  max-width: 540px;
+}
+.section-header {
+  margin-bottom: 60px;
+}
+
+.container {
+  max-width: 1140px;
+  margin: 0 auto;
+}
+
+/* ── Stats strip ─────────────────────────────────────────────────────────────── */
+.stats-strip {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.012);
+  padding: 28px 40px;
+}
+.stats-inner {
+  max-width: 1140px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+.stat-item {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.stat-number {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  color: var(--text);
+  line-height: 1;
+}
+.stat-label { font-size: 0.8rem; color: var(--text-muted); }
+
+/* ── Features ────────────────────────────────────────────────────────────────── */
+.features { background: transparent; }
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 900px) { .features-grid { grid-template-columns: 1fr; } }
+
+.feature-card {
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+}
+.feature-card:hover {
+  border-color: rgba(79,158,255,0.2);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 30px rgba(79,158,255,0.04);
+  transform: translateY(-3px);
+}
+
+.feature-icon {
+  width: 44px; height: 44px;
+  border-radius: 11px;
+  background: rgba(79,158,255,0.08);
+  border: 1px solid rgba(79,158,255,0.15);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 20px;
+  color: var(--blue);
+}
+
+.feature-title {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.feature-desc {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+.feature-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 20px;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+.feature-tag svg { transition: transform 0.15s; }
+.feature-tag:hover svg { transform: translateX(3px); }
+
+/* ── Debug showcase ──────────────────────────────────────────────────────────── */
+.debug-showcase {
+  background: transparent;
+  padding: 80px 40px;
+}
+
+.debug-showcase-inner {
+  max-width: 1140px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+@media (max-width: 900px) {
+  .debug-showcase-inner { grid-template-columns: 1fr; gap: 40px; }
+}
+
+.debug-panel {
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 0 40px rgba(79,158,255,0.04);
+  position: relative;
+}
+.debug-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(79,158,255,0.3), transparent);
+}
+
+.debug-panel-header {
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.debug-panel-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.debug-panel-title svg { color: var(--blue); }
+.debug-panel-mode {
+  margin-left: auto;
+  display: flex;
+  gap: 3px;
+}
+.debug-mode-chip {
+  padding: 2px 9px;
+  border-radius: 5px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.debug-mode-chip--active {
+  background: rgba(79,158,255,0.1);
+  border-color: rgba(79,158,255,0.25);
+  color: var(--blue);
+}
+
+.debug-panel-body { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+
+.debug-error-row {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 11px 13px;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+.debug-error-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.debug-error-dot--crit { background: #F87171; box-shadow: 0 0 5px rgba(248,113,113,0.6); }
+.debug-error-dot--high { background: #FBBF24; }
+.debug-error-dot--med  { background: #60A5FA; }
+.debug-error-content { min-width: 0; flex: 1; }
+.debug-error-msg { font-size: 0.73rem; font-family: var(--mono); color: var(--text); line-height: 1.4; margin-bottom: 4px; }
+.debug-error-meta { font-size: 0.65rem; color: var(--text-muted); }
+.debug-error-sev {
+  font-size: 0.62rem; font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.debug-error-sev--crit { background: rgba(248,113,113,0.12); color: #F87171; }
+.debug-error-sev--high { background: rgba(251,191,36,0.12); color: #FBBF24; }
+
+.debug-diagnosis {
+  background: rgba(79,158,255,0.06);
+  border: 1px solid rgba(79,158,255,0.18);
+  border-radius: 9px;
+  padding: 12px 14px;
+}
+.debug-diagnosis-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--blue);
+  margin-bottom: 6px;
+}
+.debug-diagnosis-text { font-size: 0.78rem; color: var(--text-dim); line-height: 1.5; }
+
+.debug-apply-row {
+  display: flex;
+  gap: 8px;
+  padding-top: 2px;
+}
+.debug-apply-btn {
+  padding: 8px 16px;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.debug-apply-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.debug-copy-btn {
+  padding: 8px 12px;
+  background: var(--surface2);
+  color: var(--text-muted);
+  border: 1px solid var(--border-mid);
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: border-color 0.15s, color 0.15s;
+}
+.debug-copy-btn:hover { border-color: var(--border-hi); color: var(--text-dim); }
+
+.debug-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+}
+.debug-copy .section-label { margin-bottom: 10px; }
+.debug-copy .section-title { margin-bottom: 14px; }
+.debug-copy .section-sub { margin-bottom: 20px; }
+
+.capability-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.capability-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+.capability-check {
+  width: 18px; height: 18px;
+  background: rgba(52,211,153,0.1);
+  border: 1px solid rgba(52,211,153,0.25);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  color: #34D399;
+}
+
+/* ── How it works ─────────────────────────────────────────────────────────────  */
+.how { background: rgba(255,255,255,0.012); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin-top: 60px;
+}
+@media (max-width: 768px) { .steps-grid { grid-template-columns: 1fr; } }
+
+.step {
+  padding: 36px 32px;
+  position: relative;
+}
+.step::after {
+  content: '';
+  position: absolute;
+  top: 36px; right: 0; bottom: 36px; width: 1px;
+  background: var(--border);
+}
+.step:last-child::after { display: none; }
+
+.step-number {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+.step-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.step-desc { font-size: 0.9rem; color: var(--text-dim); line-height: 1.65; }
+
+/* ── Incident / Visual highlight ──────────────────────────────────────────────── */
+.highlights { padding: 100px 40px; }
+.highlights-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 768px) { .highlights-grid { grid-template-columns: 1fr; } }
+
+.highlight-card {
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-xl);
+  padding: 36px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.highlight-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent);
+}
+.highlight-card:hover {
+  border-color: rgba(79,158,255,0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+}
+
+.highlight-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(79,158,255,0.07);
+  border: 1px solid rgba(79,158,255,0.16);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--blue);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.highlight-title {
+  font-size: 1.375rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--text);
+  line-height: 1.2;
+  margin-bottom: 12px;
+}
+.highlight-desc { font-size: 0.9rem; color: var(--text-dim); line-height: 1.65; margin-bottom: 24px; }
+
+.highlight-detail {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 14px 16px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+.highlight-detail strong { color: var(--text); font-weight: 600; }
+
+/* ── Pricing ─────────────────────────────────────────────────────────────────── */
+.pricing { background: transparent; }
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+@media (max-width: 768px) { .pricing-grid { grid-template-columns: 1fr; } }
+
+.pricing-card {
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+  position: relative;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.pricing-card:hover {
+  border-color: var(--border-hi);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  transform: translateY(-2px);
+}
+.pricing-card--featured {
+  border-color: rgba(79,158,255,0.3);
+  background: var(--surface2);
+  box-shadow: 0 0 0 1px rgba(79,158,255,0.08), 0 16px 48px rgba(0,0,0,0.5), 0 0 40px rgba(79,158,255,0.06);
+}
+.pricing-card--featured::before {
+  content: 'Most popular';
+  position: absolute;
+  top: -12px; left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #4F9EFF, #818CF8);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+
+.pricing-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 12px;
+}
+.pricing-price {
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  color: var(--text);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.pricing-price span { font-size: 1rem; font-weight: 400; color: var(--text-muted); letter-spacing: 0; }
+.pricing-desc { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px; min-height: 40px; }
+
+.pricing-features { list-style: none; margin-bottom: 28px; display: flex; flex-direction: column; gap: 10px; }
+.pricing-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.875rem;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.pricing-feature-check { color: var(--success); flex-shrink: 0; margin-top: 1px; }
+.pricing-feature-dash  { color: var(--text-muted); flex-shrink: 0; }
+
+.pricing-btn {
+  width: 100%;
+  padding: 11px 20px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: var(--font);
+  border-radius: 10px;
+  border: 1px solid var(--border-mid);
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: -0.01em;
+}
+.pricing-btn--primary {
+  background: var(--text);
+  color: var(--bg);
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+}
+.pricing-btn--primary:hover { opacity: 0.88; transform: translateY(-1px); }
+.pricing-btn--ghost {
+  background: transparent;
+  color: var(--text-dim);
+}
+.pricing-btn--ghost:hover { background: rgba(255,255,255,0.04); border-color: var(--border-hi); color: var(--text); }
+
+/* ── Final CTA ───────────────────────────────────────────────────────────────── */
+.cta-final {
+  padding: 120px 40px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.cta-final::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 700px;
+  height: 400px;
+  background: radial-gradient(ellipse at center, rgba(79,158,255,0.07) 0%, transparent 65%);
+  pointer-events: none;
+}
+.cta-headline {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1.1;
+  color: var(--text);
+  margin-bottom: 20px;
+  position: relative;
+}
+.cta-sub {
+  font-size: 1.0625rem;
+  color: var(--text-muted);
+  margin-bottom: 40px;
+  max-width: 440px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+  position: relative;
+}
+.cta-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  position: relative;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────────── */
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 40px;
+}
+.footer-inner {
+  max-width: 1140px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.footer-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: var(--text-dim);
+}
+.footer-links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.footer-links a {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.footer-links a:hover { color: var(--text-dim); }
+.footer-copy {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation ─────────────────────────────────────────────────────────────── -->
+<nav class="nav">
+  <a href="/landing" class="nav-logo">
+    <svg class="nav-logo-mark" viewBox="0 0 185 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="navGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#4F9EFF"/>
+          <stop offset="100%" stop-color="#818CF8"/>
+        </linearGradient>
+      </defs>
+      <path d="M 0,0 L 150,0 L 185,60 L 150,120 L 96,200 L 50,120 L 85,60 L 35,60 Z" fill="url(#navGrad)"/>
+    </svg>
+    Zyra
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#debug">Debugger</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="/app">Dashboard</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="/app" class="nav-signin">Sign in</a>
+    <a href="/app" class="nav-cta">
+      Get started
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </a>
+  </div>
+</nav>
+
+<!-- ── Hero ───────────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-ambient"></div>
+  <div class="hero-scanlines"></div>
+  <div class="hero-spotlight" id="hero-spotlight"></div>
+  <div class="hero-edge"></div>
+
+  <div class="hero-inner">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      Now in public beta
+    </div>
+    <h1 class="hero-headline">
+      Build apps. Debug them.<br><em>Ship faster.</em>
+    </h1>
+    <p class="hero-sub">
+      Describe what you want to build. Zyra writes the code, automatically diagnoses errors, and deploys — all in one place.
+    </p>
+    <div class="hero-actions">
+      <a href="/app" class="btn-primary">
+        Start building free
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+      <a href="#features" class="btn-secondary-outline">
+        See how it works
+      </a>
+    </div>
+  </div>
+
+  <!-- Product mockup -->
+  <div class="hero-preview">
+    <div class="mockup-frame">
+      <div class="mockup-topbar">
+        <div class="mockup-dots">
+          <span class="mockup-dot mockup-dot--r"></span>
+          <span class="mockup-dot mockup-dot--y"></span>
+          <span class="mockup-dot mockup-dot--g"></span>
+        </div>
+        <div class="mockup-url">localhost:3001 — Zyra</div>
+      </div>
+      <div class="mockup-body">
+        <!-- Sidebar -->
+        <div class="mockup-sidebar">
+          <div class="mockup-new-btn">+ New project</div>
+          <div class="mockup-section-label">Your Projects</div>
+          <div class="mockup-item mockup-item--active">SaaS dashboard</div>
+          <div class="mockup-item">Landing page</div>
+          <div class="mockup-item">Todo app</div>
+          <div class="mockup-item">Portfolio</div>
+          <div class="mockup-spacer"></div>
+          <div class="mockup-input-box">
+            <div class="mockup-input-shimmer"></div>
+          </div>
+        </div>
+        <!-- Main preview -->
+        <div class="mockup-main">
+          <div class="mockup-preview-bar">
+            <span class="mockup-tab mockup-tab--active">Preview</span>
+            <span class="mockup-tab">Code</span>
+          </div>
+          <div class="mockup-preview-content" style="position:relative;">
+            <!-- Simulated generated app -->
+            <div class="mock-app">
+              <div class="mock-app-header">
+                <div class="mock-nav-dot mock-nav-dot--active"></div>
+                <div class="mock-nav-dot"></div>
+                <div class="mock-nav-dot"></div>
+                <div class="mock-nav-dot"></div>
+              </div>
+              <div class="mock-app-body">
+                <div class="mock-stats">
+                  <div class="mock-stat-card">
+                    <div class="mock-stat-label">Monthly Revenue</div>
+                    <div class="mock-stat-value">$24,800</div>
+                    <div class="mock-stat-bar"><div class="mock-stat-fill" style="width:72%"></div></div>
+                  </div>
+                  <div class="mock-stat-card">
+                    <div class="mock-stat-label">Active Users</div>
+                    <div class="mock-stat-value">1,429</div>
+                    <div class="mock-stat-bar"><div class="mock-stat-fill" style="width:55%"></div></div>
+                  </div>
+                  <div class="mock-stat-card">
+                    <div class="mock-stat-label">Conversion</div>
+                    <div class="mock-stat-value">3.8%</div>
+                    <div class="mock-stat-bar"><div class="mock-stat-fill" style="width:38%"></div></div>
+                  </div>
+                </div>
+                <div class="mock-chart">
+                  <div style="font-size:0.5rem;color:rgba(255,255,255,0.25);margin-bottom:6px;">Revenue over time</div>
+                  <div class="mock-chart-line">
+                    <svg viewBox="0 0 200 60" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stop-color="#4F9EFF" stop-opacity="0.3"/>
+                          <stop offset="100%" stop-color="#4F9EFF" stop-opacity="0"/>
+                        </linearGradient>
+                      </defs>
+                      <path d="M0,55 C20,50 30,35 50,30 C70,25 80,40 100,28 C120,16 130,22 150,14 C170,6 185,10 200,5 L200,60 L0,60 Z" fill="url(#chartGrad)"/>
+                      <path d="M0,55 C20,50 30,35 50,30 C70,25 80,40 100,28 C120,16 130,22 150,14 C170,6 185,10 200,5" fill="none" stroke="#4F9EFF" stroke-width="1.5"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Generating overlay -->
+            <div class="mockup-generating">
+              <div class="mock-spinner"></div>
+              <span class="mock-gen-text">Generating components...</span>
+              <div class="mock-progress">
+                <div class="mock-progress-fill"></div>
+              </div>
+              <span style="font-size:0.62rem;color:var(--text-muted);white-space:nowrap;">62%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Stats strip ──────────────────────────────────────────────────────────── -->
+<div class="stats-strip">
+  <div class="stats-inner">
+    <div class="stat-item reveal">
+      <span class="stat-number">50k+</span>
+      <span class="stat-label">Apps generated</span>
+    </div>
+    <div class="stat-item reveal reveal-delay-1">
+      <span class="stat-number">98%</span>
+      <span class="stat-label">First-run success rate</span>
+    </div>
+    <div class="stat-item reveal reveal-delay-2">
+      <span class="stat-number">4s</span>
+      <span class="stat-label">Average generation time</span>
+    </div>
+    <div class="stat-item reveal reveal-delay-3">
+      <span class="stat-number">3</span>
+      <span class="stat-label">AI debug modes</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Features ─────────────────────────────────────────────────────────────── -->
+<section class="features" id="features">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-label reveal">What Zyra does</div>
+      <h2 class="section-title reveal reveal-delay-1">One workspace.<br>Every stage of development.</h2>
+      <p class="section-sub reveal reveal-delay-2">From blank canvas to live URL. Zyra handles generation, debugging, and deployment so you can stay focused on what you're building.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <div class="feature-title">Generate in seconds</div>
+        <div class="feature-desc">Describe any app in plain English. Zyra plans the architecture, writes all the code, assembles the files, and serves a live preview. No setup needed.</div>
+        <a href="/app" class="feature-tag">
+          Try it free
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </div>
+        <div class="feature-title">AI-powered debugging</div>
+        <div class="feature-desc">Fix My App runs 15 rule-based diagnostics, clusters your error logs, and generates a targeted code patch. One click to apply, one to rollback.</div>
+        <a href="#debug" class="feature-tag">
+          See the debugger
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <div class="feature-title">Deploy in one click</div>
+        <div class="feature-desc">Push your generated app to Vercel the moment it's ready. Custom domains, global CDN, and SSL — all handled automatically with no configuration.</div>
+        <a href="/app" class="feature-tag">
+          Deploy now
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Debug showcase ────────────────────────────────────────────────────────── -->
+<section class="debug-showcase" id="debug">
+  <div class="debug-showcase-inner">
+    <div class="debug-panel reveal">
+      <div class="debug-panel-header">
+        <div class="debug-panel-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          Fix My App
+        </div>
+        <div class="debug-panel-mode">
+          <span class="debug-mode-chip debug-mode-chip--active">Standard</span>
+          <span class="debug-mode-chip">Self-Heal</span>
+          <span class="debug-mode-chip">Incident</span>
+        </div>
+      </div>
+      <div class="debug-panel-body">
+        <div class="debug-error-row">
+          <span class="debug-error-dot debug-error-dot--crit"></span>
+          <div class="debug-error-content">
+            <div class="debug-error-msg">Cannot find module '../utils/supabaseClient'</div>
+            <div class="debug-error-meta">server/index.js:12 · import_error</div>
+          </div>
+          <span class="debug-error-sev debug-error-sev--crit">CRIT</span>
+        </div>
+        <div class="debug-error-row">
+          <span class="debug-error-dot debug-error-dot--high"></span>
+          <div class="debug-error-content">
+            <div class="debug-error-msg">process.env.NEXT_PUBLIC_SUPABASE_URL is undefined</div>
+            <div class="debug-error-meta">lib/client.ts:4 · env_error</div>
+          </div>
+          <span class="debug-error-sev debug-error-sev--high">HIGH</span>
+        </div>
+        <div class="debug-diagnosis">
+          <div class="debug-diagnosis-label">AI Diagnosis — 94% confidence</div>
+          <div class="debug-diagnosis-text">Missing Supabase environment variables causing module resolution failure. The import path is correct but the env vars were not injected at build time. Patch updates <code style="background:rgba(79,158,255,0.1);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:0.75em;">.env.local</code> with the required keys.</div>
+        </div>
+        <div class="debug-apply-row">
+          <button class="debug-apply-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Apply patch
+          </button>
+          <button class="debug-copy-btn">Copy diagnosis</button>
+        </div>
+      </div>
+    </div>
+    <div class="debug-copy reveal reveal-delay-1">
+      <div>
+        <div class="section-label">Fix My App</div>
+        <h2 class="section-title">Your AI repair engineer.</h2>
+        <p class="section-sub">When your app breaks, Zyra doesn't just show you the error — it diagnoses the root cause, generates a targeted patch, and applies it with one click.</p>
+      </div>
+      <ul class="capability-list">
+        <li class="capability-item">
+          <span class="capability-check">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          15 rule-based diagnostics run before any AI call
+        </li>
+        <li class="capability-item">
+          <span class="capability-check">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          Error clustering and deduplication before analysis
+        </li>
+        <li class="capability-item">
+          <span class="capability-check">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          Secrets masked before any prompt is sent to AI
+        </li>
+        <li class="capability-item">
+          <span class="capability-check">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          One-click apply with automatic rollback
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ── How it works ──────────────────────────────────────────────────────────── -->
+<section class="how">
+  <div class="container">
+    <div class="section-header" style="margin-bottom:0;">
+      <div class="section-label reveal">Simple by design</div>
+      <h2 class="section-title reveal reveal-delay-1">From idea to deployed app<br>in three steps.</h2>
+    </div>
+    <div class="steps-grid">
+      <div class="step reveal">
+        <div class="step-number">01</div>
+        <div class="step-title">Describe your app</div>
+        <div class="step-desc">Type what you want to build in plain language. Zyra classifies the complexity, selects the right models, and begins planning your architecture instantly.</div>
+      </div>
+      <div class="step reveal reveal-delay-1">
+        <div class="step-number">02</div>
+        <div class="step-title">Review and refine</div>
+        <div class="step-desc">See a live preview the moment generation finishes. Chat to iterate — "make the hero bigger", "add a dark mode", "switch to a grid layout" — Zyra applies each change in seconds.</div>
+      </div>
+      <div class="step reveal reveal-delay-2">
+        <div class="step-number">03</div>
+        <div class="step-title">Deploy and ship</div>
+        <div class="step-desc">Hit Deploy. Zyra pushes your project to Vercel, sets up the CDN, and returns a live URL — usually under 30 seconds. Share it, use it, iterate on it.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Highlights ────────────────────────────────────────────────────────────── -->
+<section class="highlights">
+  <div class="container">
+    <div class="section-header" style="text-align:center;margin-left:auto;margin-right:auto;">
+      <div class="section-label reveal" style="text-align:center;">Advanced capabilities</div>
+      <h2 class="section-title reveal reveal-delay-1">Four AI modes.<br>Every debugging scenario covered.</h2>
+    </div>
+    <div class="highlights-grid">
+      <div class="highlight-card reveal">
+        <div class="highlight-tag">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          Self-Healing Loop
+        </div>
+        <div class="highlight-title">Multi-iteration repair plans</div>
+        <div class="highlight-desc">When a single fix isn't enough, Zyra generates up to three layered repair iterations, each building on the last. Review every step before applying anything.</div>
+        <div class="highlight-detail">
+          <strong>How it works:</strong> Zyra maps the entire error graph, generates a strategy, then produces each iteration as a complete file patch — not a diff. Every iteration shows its confidence score and expected impact.
+        </div>
+      </div>
+      <div class="highlight-card reveal reveal-delay-1">
+        <div class="highlight-tag">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Visual Bug Debugger
+        </div>
+        <div class="highlight-title">Diagnose layout issues from a screenshot</div>
+        <div class="highlight-desc">Submit a URL or screenshot of your broken UI. Zyra uses Claude Vision to identify rendering bugs, invisible elements, and CSS misalignments — even when there's no console error.</div>
+        <div class="highlight-detail">
+          <strong>How it works:</strong> The image is analyzed alongside your CSS and HTML source. Zyra maps the visual defect to a specific file and line, then suggests an exact CSS fix.
+        </div>
+      </div>
+      <div class="highlight-card reveal">
+        <div class="highlight-tag">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Production Incident Mode
+        </div>
+        <div class="highlight-title">SRE copilot for post-deploy failures</div>
+        <div class="highlight-desc">When something breaks in production, Incident Mode correlates your deploy history with live error streams to pinpoint what changed and what to roll back.</div>
+        <div class="highlight-detail">
+          <strong>How it works:</strong> Zyra ingests your last 5 deploys, cross-references the error timeline, and produces a structured incident report with severity, root cause, and ordered remediation steps.
+        </div>
+      </div>
+      <div class="highlight-card reveal reveal-delay-1">
+        <div class="highlight-tag">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Secret Safety Layer
+        </div>
+        <div class="highlight-title">Your secrets never leave your context</div>
+        <div class="highlight-desc">Before any error data reaches an AI model, Zyra's masking layer strips API keys, JWTs, Bearer tokens, database passwords, and webhook secrets from all log strings.</div>
+        <div class="highlight-detail">
+          <strong>How it works:</strong> 11 regex patterns cover Stripe keys, AWS credentials, Supabase service keys, Authorization headers, and any key=value pair with sensitive key names.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Pricing ────────────────────────────────────────────────────────────────── -->
+<section class="pricing" id="pricing">
+  <div class="container" style="text-align:center;">
+    <div class="section-header" style="margin-bottom:56px;">
+      <div class="section-label reveal">Pricing</div>
+      <h2 class="section-title reveal reveal-delay-1">Simple, honest pricing.</h2>
+      <p class="section-sub reveal reveal-delay-2" style="margin:0 auto;">Start for free. Upgrade when you need more power.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="pricing-card reveal">
+        <div class="pricing-name">Free</div>
+        <div class="pricing-price">$0 <span>/ month</span></div>
+        <div class="pricing-desc">Everything you need to get started.</div>
+        <ul class="pricing-features">
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> 5 app generations / month</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> Live preview</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> Fix My App (standard)</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> Deploy to Vercel</li>
+          <li class="pricing-feature"><span class="pricing-feature-dash">—</span> Self-Heal &amp; Incident mode</li>
+          <li class="pricing-feature"><span class="pricing-feature-dash">—</span> Visual Bug Debugger</li>
+        </ul>
+        <button class="pricing-btn pricing-btn--ghost" onclick="location.href='/app'">Get started free</button>
+      </div>
+      <div class="pricing-card pricing-card--featured reveal reveal-delay-1">
+        <div class="pricing-name">Pro</div>
+        <div class="pricing-price">$29 <span>/ month</span></div>
+        <div class="pricing-desc">For developers shipping real products.</div>
+        <ul class="pricing-features">
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> 50 app generations / month</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> Priority generation</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> All 4 debug modes</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> Visual Bug Debugger</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> Incident + Self-Heal mode</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> 30-day project history</li>
+        </ul>
+        <button class="pricing-btn pricing-btn--primary" onclick="location.href='/app'">Upgrade to Pro</button>
+      </div>
+      <div class="pricing-card reveal reveal-delay-2">
+        <div class="pricing-name">Max</div>
+        <div class="pricing-price">$79 <span>/ month</span></div>
+        <div class="pricing-desc">For teams and power users.</div>
+        <ul class="pricing-features">
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> Unlimited generations</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> Everything in Pro</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> Quality mode (Claude Opus)</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> Team workspace</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> API access</li>
+          <li class="pricing-feature"><span class="pricing-feature-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> Priority support</li>
+        </ul>
+        <button class="pricing-btn pricing-btn--ghost" onclick="location.href='/app'">Get Max</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Final CTA ─────────────────────────────────────────────────────────────── -->
+<section class="cta-final">
+  <div class="container">
+    <h2 class="cta-headline reveal">
+      Your next app is<br>4 seconds away.
+    </h2>
+    <p class="cta-sub reveal reveal-delay-1">
+      No configuration. No boilerplate. Just describe what you want and let Zyra do the rest.
+    </p>
+    <div class="cta-actions reveal reveal-delay-2">
+      <a href="/app" class="btn-primary">
+        Start building free
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+      <a href="#pricing" class="btn-secondary-outline">View pricing</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────────────── -->
+<footer class="footer">
+  <div class="footer-inner">
+    <a href="/landing" class="footer-logo">
+      <svg width="18" height="18" viewBox="0 0 185 200" fill="none">
+        <defs>
+          <linearGradient id="footGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#4F9EFF"/>
+            <stop offset="100%" stop-color="#818CF8"/>
+          </linearGradient>
+        </defs>
+        <path d="M 0,0 L 150,0 L 185,60 L 150,120 L 96,200 L 50,120 L 85,60 L 35,60 Z" fill="url(#footGrad)"/>
+      </svg>
+      Zyra
+    </a>
+    <div class="footer-links">
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="/billing">Billing</a>
+      <a href="/app">Dashboard</a>
+    </div>
+    <div class="footer-copy">&copy; 2026 Zyra. All rights reserved.</div>
+  </div>
+</footer>
+
+<!-- ── Scripts ─────────────────────────────────────────────────────────────────── -->
+<script>
+'use strict';
+
+/* ── Mouse-reactive hero spotlight ─────────────────────────────────────────── */
+(function() {
+  const spotlight = document.getElementById('hero-spotlight');
+  const hero = document.querySelector('.hero');
+  if (!spotlight || !hero) return;
+
+  // Respect prefers-reduced-motion
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  let targetX = 50, targetY = 40;
+  let curX = 50, curY = 40;
+  let rafId = null;
+
+  hero.addEventListener('mousemove', (e) => {
+    const rect = hero.getBoundingClientRect();
+    targetX = ((e.clientX - rect.left) / rect.width) * 100;
+    targetY = ((e.clientY - rect.top) / rect.height) * 100;
+  });
+
+  hero.addEventListener('mouseleave', () => {
+    targetX = 50;
+    targetY = 40;
+  });
+
+  function tick() {
+    // Smooth lerp — 0.05 is slow and dreamy, very premium feel
+    curX += (targetX - curX) * 0.05;
+    curY += (targetY - curY) * 0.05;
+
+    spotlight.style.setProperty('--mx', curX.toFixed(2) + '%');
+    spotlight.style.setProperty('--my', curY.toFixed(2) + '%');
+
+    rafId = requestAnimationFrame(tick);
+  }
+
+  // Pause when tab is hidden (performance)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      cancelAnimationFrame(rafId);
+    } else {
+      rafId = requestAnimationFrame(tick);
+    }
+  });
+
+  rafId = requestAnimationFrame(tick);
+})();
+
+/* ── Scroll reveal ──────────────────────────────────────────────────────────── */
+(function() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+})();
+
+/* ── Smooth scrolling for anchor links ─────────────────────────────────────── */
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+
+/* ── Nav background on scroll ──────────────────────────────────────────────── */
+const nav = document.querySelector('.nav');
+window.addEventListener('scroll', () => {
+  if (window.scrollY > 20) {
+    nav.style.background = 'rgba(7,7,10,0.92)';
+  } else {
+    nav.style.background = 'rgba(7,7,10,0.7)';
+  }
+}, { passive: true });
+</script>
+
+</body>
+</html>
