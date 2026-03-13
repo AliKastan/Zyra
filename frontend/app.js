@@ -143,6 +143,61 @@ function toggleStar(convId) {
   renderHistory();
 }
 
+// ── Delete conversation ───────────────────────────────────────────────────────
+
+let _pendingDeleteConvId = null;
+
+function confirmDeleteConversation(convId) {
+  _pendingDeleteConvId = convId;
+  $('delete-confirm-overlay').classList.remove('hidden');
+}
+
+function closeDeleteConfirm() {
+  _pendingDeleteConvId = null;
+  $('delete-confirm-overlay').classList.add('hidden');
+}
+
+async function executeDeleteConversation() {
+  const convId = _pendingDeleteConvId;
+  closeDeleteConfirm();
+  if (!convId) return;
+
+  const conv = conversations.find(c => c.id === convId);
+  if (!conv) return;
+
+  // Delete project files from server if this conv has a project
+  if (conv.projectSlug) {
+    try { await apiFetch(`/api/projects/${conv.projectSlug}`, { method: 'DELETE' }); } catch (_) {}
+  }
+
+  // Remove from conversations array
+  conversations = conversations.filter(c => c.id !== convId);
+  saveAllData();
+
+  // If the deleted conv was active, reset UI
+  if (convId === activeConvId) {
+    stopPolling();
+    stopPreviewPoll();
+    activeConvId = null; // clear so switchToConversation won't skip
+    currentSlug = null;
+    currentPreviewUrl = null;
+    currentJobId = null;
+    if (conversations.length > 0) {
+      switchToConversation(conversations[0].id);
+    } else {
+      createNewConversation();
+      renderAllMessages();
+      renderHistory();
+      setPreviewState('empty');
+      previewUrlBar.style.display = 'none';
+      updateDeployButton(null);
+    }
+  } else {
+    renderHistory();
+  }
+}
+
+
 function generateTitle(msgs) {
   const firstUser = msgs.find(m => m.type === 'user' && m.text);
   if (!firstUser) return 'Untitled project';
@@ -913,6 +968,10 @@ function renderHistory() {
       e.stopPropagation();
       toggleStar(convId);
     });
+    item.querySelector('.history-delete-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      confirmDeleteConversation(convId);
+    });
   });
 }
 
@@ -924,11 +983,18 @@ function buildHistoryItemHtml(conv) {
       <span class="history-item-title">${escHtml(conv.title || 'Untitled project')}</span>
       <span class="history-item-time">${escHtml(time)}</span>
     </button>
-    <button class="history-star-btn${conv.starred ? ' history-star-btn--active' : ''}" type="button" title="${conv.starred ? 'Unstar' : 'Star'}">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="${conv.starred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-      </svg>
-    </button>
+    <div class="history-item-actions">
+      <button class="history-star-btn${conv.starred ? ' history-star-btn--active' : ''}" type="button" title="${conv.starred ? 'Unstar' : 'Star'}">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="${conv.starred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+      </button>
+      <button class="history-delete-btn" type="button" title="Delete project">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+        </svg>
+      </button>
+    </div>
   </div>`;
 }
 
@@ -991,7 +1057,11 @@ async function initiatePreview(slug) {
       pollPreviewUntilReady(slug, preview.status);
     }
   } catch (err) {
-    setPreviewState('error', 'Preview failed', err.message);
+    if (err.message && (err.message.toLowerCase().includes('not found') || err.message.toLowerCase().includes('expired'))) {
+      setPreviewState('error', 'Project not found', 'Project files expired. Click Regenerate to rebuild.');
+    } else {
+      setPreviewState('error', 'Preview failed', err.message);
+    }
   }
 }
 
@@ -1337,7 +1407,10 @@ fixBtn.addEventListener('click', () => {
 $('debug-modal-close').addEventListener('click', closeDebugModal);
 debugOverlay.addEventListener('click', (e) => { if (e.target === debugOverlay) closeDebugModal(); });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !debugOverlay.classList.contains('hidden')) closeDebugModal();
+  if (e.key === 'Escape') {
+    if (!debugOverlay.classList.contains('hidden')) closeDebugModal();
+    if (!$('delete-confirm-overlay').classList.contains('hidden')) closeDeleteConfirm();
+  }
 });
 
 function openDebugModal() {
@@ -1912,3 +1985,10 @@ renderHistory();
 checkHealth();
 setInterval(checkHealth, 30_000);
 setPreviewState('empty');
+
+// Delete confirm dialog
+$('delete-confirm-cancel')?.addEventListener('click', closeDeleteConfirm);
+$('delete-confirm-ok')?.addEventListener('click', executeDeleteConversation);
+$('delete-confirm-overlay')?.addEventListener('click', (e) => {
+  if (e.target === $('delete-confirm-overlay')) closeDeleteConfirm();
+});

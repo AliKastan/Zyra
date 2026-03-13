@@ -58,4 +58,13 @@ async function updateProject(slug, updates) {
   return record;
 }
 
-module.exports = { saveProject, getProject, listProjects, updateProject };
+/**
+ * Deletes project metadata file.
+ */
+async function deleteProject(slug) {
+  await ensureProjectsDir();
+  const filePath = path.join(PROJECTS_DIR, `${slug}.json`);
+  if (await fse.pathExists(filePath)) await fse.remove(filePath);
+}
+
+module.exports = { saveProject, getProject, listProjects, updateProject, deleteProject };

@@ -356,6 +356,18 @@
   </div>
 </div>
 
+<!-- Delete Project Confirmation Dialog -->
+<div class="delete-confirm-overlay hidden" id="delete-confirm-overlay" role="dialog" aria-modal="true">
+  <div class="delete-confirm-modal">
+    <h3 class="delete-confirm-title">Delete project?</h3>
+    <p class="delete-confirm-body">This will permanently delete the project and all generated files. This cannot be undone.</p>
+    <div class="delete-confirm-actions">
+      <button class="delete-confirm-cancel" id="delete-confirm-cancel" type="button">Cancel</button>
+      <button class="delete-confirm-ok" id="delete-confirm-ok" type="button">Delete</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="auth.js"></script>
 <script src="app.js"></script>

@@ -11,6 +11,9 @@ async function startPreview(req, res) {
     const preview = await previewService.startPreview(slug);
     res.json({ success: true, preview });
   } catch (err) {
+    if (err.message && err.message.includes('not found')) {
+      return res.status(404).json({ error: 'Project files not found', expired: true });
+    }
     res.status(500).json({ error: err.message });
   }
 }

@@ -541,9 +541,16 @@ html, body {
   margin-top: 1px;
 }
 
-.history-star-btn {
-  width: 28px;
-  height: 28px;
+.history-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.history-star-btn, .history-delete-btn {
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
   background: none;
   border: none;
@@ -556,9 +563,74 @@ html, body {
   transition: var(--ease);
   opacity: 0;
 }
-.history-item:hover .history-star-btn { opacity: 1; }
+.history-item:hover .history-star-btn,
+.history-item:hover .history-delete-btn { opacity: 1; }
 .history-star-btn--active { opacity: 1 !important; color: var(--accent); }
 .history-star-btn:hover { background: var(--surface3); color: var(--accent); }
+.history-delete-btn:hover { background: rgba(220,60,60,0.12); color: #e05555; }
+
+/* ── Delete confirm dialog ───────────────────────────────────────────────── */
+.delete-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+}
+.delete-confirm-overlay.hidden { display: none; }
+.delete-confirm-modal {
+  background: var(--surface2, #2a2a2a);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 28px 28px 24px;
+  max-width: 360px;
+  width: 90%;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+}
+.delete-confirm-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text, #f5f5f5);
+  margin: 0 0 10px;
+}
+.delete-confirm-body {
+  font-size: 0.85rem;
+  color: var(--text-dim, #aaa);
+  margin: 0 0 22px;
+  line-height: 1.5;
+}
+.delete-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.delete-confirm-cancel {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent;
+  color: var(--text-dim, #aaa);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--ease);
+}
+.delete-confirm-cancel:hover { background: rgba(255,255,255,0.06); }
+.delete-confirm-ok {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #c0392b;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--ease);
+}
+.delete-confirm-ok:hover { background: #e74c3c; }
 
 .history-empty {
   font-size: 0.75rem;
