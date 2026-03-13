@@ -17,8 +17,15 @@ const logger = require('../utils/logger');
 
 const app = express();
 
+// ── Private beta gate ─────────────────────────────────────────────────────────
+const GATE_CODE = 'zyra2026';
+
+function hasGateAccess(req) {
+  const cookie = req.headers.cookie || '';
+  return /zyra_gate=granted/.test(cookie);
+}
+
 // ── Stripe webhook — MUST come before express.json() to get raw body ──────────
-// Stripe requires the raw unparsed body for signature verification.
 app.post(
   '/api/stripe/webhook',
   express.raw({ type: 'application/json' }),
@@ -34,8 +41,21 @@ app.use((req, _res, next) => {
   next();
 });
 
-// ── Static: dashboard ─────────────────────────────────────────────────────────
-app.use(express.static(path.resolve(__dirname, '../../frontend')));
+// ── Gate verify endpoint (no auth required) ───────────────────────────────────
+app.post('/api/gate/verify', (req, res) => {
+  if (req.body?.code === GATE_CODE) {
+    const maxAge = 30 * 24 * 60 * 60; // 30 days
+    res.setHeader('Set-Cookie', `zyra_gate=granted; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax`);
+    return res.json({ ok: true });
+  }
+  res.status(401).json({ ok: false });
+});
+
+// ── Static: dashboard assets (index:false stops auto-serving index.html at /) ──
+app.use(express.static(path.resolve(__dirname, '../../frontend'), { index: false }));
+
+// Block direct URL access to index.html — redirect through the gate
+app.get('/index.html', (_req, res) => res.redirect('/app'));
 
 // ── Static: live preview of generated projects ────────────────────────────────
 app.use('/preview', express.static(path.resolve(__dirname, '../../generated-projects'), {
@@ -55,11 +75,15 @@ app.use('/api/billing',   requireAuth, billingRoutes);
 app.use('/api/debug',     requireAuth, debugRoutes);
 
 // ── Page routes ───────────────────────────────────────────────────────────────
+
+// Root: always show the gate
 app.get('/', (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/gate.html'));
 });
 
-app.get('/app', (_req, res) => {
+// Main app: server checks cookie before serving
+app.get('/app', (req, res) => {
+  if (!hasGateAccess(req)) return res.redirect('/');
   res.sendFile(path.resolve(__dirname, '../../frontend/index.html'));
 });
 
@@ -67,12 +91,14 @@ app.get('/login', (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/login.html'));
 });
 
-app.get('/billing', (_req, res) => {
+app.get('/billing', (req, res) => {
+  if (!hasGateAccess(req)) return res.redirect('/');
   res.sendFile(path.resolve(__dirname, '../../frontend/billing.html'));
 });
 
-// Fallback: all other non-API routes serve the main dashboard
-app.get(/^(?!\/api)(?!\/preview)(?!\/login)(?!\/billing)(?!\/).*$/, (_req, res) => {
+// Fallback: gate-protect everything else
+app.get(/^(?!\/api)(?!\/preview).*$/, (req, res) => {
+  if (!hasGateAccess(req)) return res.redirect('/');
   res.sendFile(path.resolve(__dirname, '../../frontend/index.html'));
 });
 

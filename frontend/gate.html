@@ -9,7 +9,6 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --green:  #DAE697;
       --brown:  #8A2E1A;
       --bg:     #FBFBFB;
       --surface:#FFFFFF;
@@ -92,10 +91,11 @@
       border: none;
       border-radius: var(--radius);
       cursor: pointer;
-      transition: background 0.15s;
+      transition: background 0.15s, opacity 0.15s;
     }
 
-    button:hover { background: #741F0F; }
+    button:hover:not(:disabled) { background: #741F0F; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
 
     .error {
       font-size: 0.8125rem;
@@ -112,28 +112,45 @@
 
   <label for="code">Access code</label>
   <input type="password" id="code" placeholder="Enter access code" autocomplete="off" />
-  <button onclick="submit()">Continue</button>
+  <button id="btn" onclick="submit()">Continue</button>
   <div class="error" id="err"></div>
 </div>
 
 <script>
-  // Already has access — skip gate
-  if (localStorage.getItem('zyra_access') === 'true') {
-    window.location.replace('/app');
-  }
-
   document.getElementById('code').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') submit();
   });
 
-  function submit() {
-    const val = document.getElementById('code').value.trim();
-    if (val === 'zyra2026') {
-      localStorage.setItem('zyra_access', 'true');
-      window.location.replace('/app');
-    } else {
-      document.getElementById('err').textContent = 'Invalid code';
-      document.getElementById('code').focus();
+  async function submit() {
+    const code = document.getElementById('code').value.trim();
+    const btn  = document.getElementById('btn');
+    const err  = document.getElementById('err');
+
+    if (!code) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Checking...';
+    err.textContent = '';
+
+    try {
+      const res = await fetch('/api/gate/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+
+      if (res.ok) {
+        window.location.replace('/app');
+      } else {
+        err.textContent = 'Invalid code';
+        btn.disabled = false;
+        btn.textContent = 'Continue';
+        document.getElementById('code').focus();
+      }
+    } catch (_) {
+      err.textContent = 'Connection error — try again';
+      btn.disabled = false;
+      btn.textContent = 'Continue';
     }
   }
 </script>
