@@ -102,6 +102,10 @@ async function createCheckout(req, res) {
   }
 
   const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_ID_PRO : process.env.STRIPE_PRICE_ID_MAX;
+
+  // Log env var presence so Railway logs show what's missing
+  logger.info(`[billing] env check — STRIPE_SECRET_KEY=${process.env.STRIPE_SECRET_KEY ? 'set' : 'MISSING'}, APP_URL=${process.env.APP_URL || 'MISSING'}, priceId=${priceId || 'MISSING'}`);
+
   if (!priceId) {
     return res.status(500).json({ error: `STRIPE_PRICE_ID_${plan.toUpperCase()} is not configured.` });
   }
@@ -115,11 +119,16 @@ async function createCheckout(req, res) {
     const db     = getSupabaseAdmin();
 
     // Get or create Stripe customer
-    const { data: sub } = await db
+    const { data: sub, error: dbError } = await db
       .from('subscription_accounts')
       .select('stripe_customer_id')
       .eq('user_id', userId)
       .maybeSingle();
+
+    if (dbError) {
+      logger.error(`[billing] Supabase lookup error: ${dbError.message}`);
+      return res.status(500).json({ error: `Database error: ${dbError.message}` });
+    }
 
     let customerId = sub?.stripe_customer_id;
     if (!customerId) {
@@ -135,6 +144,7 @@ async function createCheckout(req, res) {
 
     const session = await stripe.checkout.sessions.create({
       mode:                 'subscription',
+      payment_method_types: ['card'],
       customer:             customerId,
       client_reference_id:  userId,
       line_items:           [{ price: priceId, quantity: 1 }],
@@ -148,8 +158,14 @@ async function createCheckout(req, res) {
 
     res.json({ url: session.url });
   } catch (err) {
-    logger.error(`[billing] createCheckout error: ${err.message}`);
-    res.status(500).json({ error: 'Failed to create checkout session.' });
+    logger.error(`[billing] createCheckout error: ${err.message}`, {
+      type: err.type, code: err.code, param: err.param,
+    });
+    res.status(500).json({
+      error: err.message,
+      type:  err.type  || null,
+      code:  err.code  || null,
+    });
   }
 }
 
