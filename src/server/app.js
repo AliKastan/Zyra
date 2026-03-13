@@ -41,21 +41,51 @@ app.use((req, _res, next) => {
   next();
 });
 
-// ── Gate verify endpoint (no auth required) ───────────────────────────────────
+// ── Gate verify endpoint ──────────────────────────────────────────────────────
 app.post('/api/gate/verify', (req, res) => {
   if (req.body?.code === GATE_CODE) {
     const maxAge = 30 * 24 * 60 * 60; // 30 days
-    res.setHeader('Set-Cookie', `zyra_gate=granted; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax`);
+    res.setHeader('Set-Cookie', `zyra_gate=granted; Path=/; Max-Age=${maxAge}; SameSite=Lax`);
     return res.json({ ok: true });
   }
   res.status(401).json({ ok: false });
 });
 
-// ── Static: dashboard assets (index:false stops auto-serving index.html at /) ──
-app.use(express.static(path.resolve(__dirname, '../../frontend'), { index: false }));
+// ── Page routes — registered BEFORE express.static so they win ───────────────
+//
+// Rule: express processes middleware top-to-bottom.
+// express.static would serve index.html for /index.html before our route
+// handlers ever run. By placing page routes first, we control every HTML path.
 
-// Block direct URL access to index.html — redirect through the gate
-app.get('/index.html', (_req, res) => res.redirect('/app'));
+// Root: gate page — but skip straight to /app if cookie already valid
+app.get('/', (req, res) => {
+  if (hasGateAccess(req)) return res.redirect('/app');
+  res.sendFile(path.resolve(__dirname, '../../frontend/gate.html'));
+});
+
+// Block direct access to index.html — always redirect through /app
+app.get('/index.html', (_req, res) => res.redirect(301, '/app'));
+
+// Main app: gate-protected
+app.get('/app', (req, res) => {
+  if (!hasGateAccess(req)) return res.redirect('/');
+  res.sendFile(path.resolve(__dirname, '../../frontend/index.html'));
+});
+
+// Login page (no gate — users need to reach login without gate access)
+app.get('/login', (_req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../frontend/login.html'));
+});
+
+// Billing page: gate-protected
+app.get('/billing', (req, res) => {
+  if (!hasGateAccess(req)) return res.redirect('/');
+  res.sendFile(path.resolve(__dirname, '../../frontend/billing.html'));
+});
+
+// ── Static assets (CSS, JS, images) — index:false prevents serving index.html ─
+// Registered AFTER page routes so it only handles actual asset files.
+app.use(express.static(path.resolve(__dirname, '../../frontend'), { index: false }));
 
 // ── Static: live preview of generated projects ────────────────────────────────
 app.use('/preview', express.static(path.resolve(__dirname, '../../generated-projects'), {
@@ -74,29 +104,7 @@ app.use('/api/deploy',    requireAuth, deployRoutes);
 app.use('/api/billing',   requireAuth, billingRoutes);
 app.use('/api/debug',     requireAuth, debugRoutes);
 
-// ── Page routes ───────────────────────────────────────────────────────────────
-
-// Root: always show the gate
-app.get('/', (_req, res) => {
-  res.sendFile(path.resolve(__dirname, '../../frontend/gate.html'));
-});
-
-// Main app: server checks cookie before serving
-app.get('/app', (req, res) => {
-  if (!hasGateAccess(req)) return res.redirect('/');
-  res.sendFile(path.resolve(__dirname, '../../frontend/index.html'));
-});
-
-app.get('/login', (_req, res) => {
-  res.sendFile(path.resolve(__dirname, '../../frontend/login.html'));
-});
-
-app.get('/billing', (req, res) => {
-  if (!hasGateAccess(req)) return res.redirect('/');
-  res.sendFile(path.resolve(__dirname, '../../frontend/billing.html'));
-});
-
-// Fallback: gate-protect everything else
+// ── Fallback: any unmatched route — gate-protected ───────────────────────────
 app.get(/^(?!\/api)(?!\/preview).*$/, (req, res) => {
   if (!hasGateAccess(req)) return res.redirect('/');
   res.sendFile(path.resolve(__dirname, '../../frontend/index.html'));

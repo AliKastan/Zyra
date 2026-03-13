@@ -117,6 +117,11 @@
 </div>
 
 <script>
+  // If cookie already valid, skip straight to app
+  if (document.cookie.split(';').some(c => c.trim() === 'zyra_gate=granted')) {
+    window.location.replace('/app');
+  }
+
   document.getElementById('code').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') submit();
   });
