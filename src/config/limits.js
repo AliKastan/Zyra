@@ -7,12 +7,12 @@ module.exports = {
   MAX_PROMPT_WORDS: parseInt(process.env.MAX_PROMPT_WORDS || '500',  10),
 
   // ── Per-job output limits ────────────────────────────────────────────────────
-  MAX_FILES_PER_JOB:        parseInt(process.env.MAX_FILES_PER_JOB        || '40',      10),
+  MAX_FILES_PER_JOB:        parseInt(process.env.MAX_FILES_PER_JOB        || '60',      10),
   MAX_FILE_SIZE_BYTES:      parseInt(process.env.MAX_FILE_SIZE_BYTES      || '200000',  10),
-  MAX_TOTAL_OUTPUT_BYTES:   parseInt(process.env.MAX_TOTAL_OUTPUT_BYTES   || '2097152', 10), // 2MB
-  MAX_TOTAL_TOKENS_PER_JOB: parseInt(process.env.MAX_TOTAL_TOKENS_PER_JOB || '400000',  10),
-  SIMPLE_MAX_FILES:         parseInt(process.env.SIMPLE_MAX_FILES         || '8',       10),
-  MEDIUM_MAX_FILES:         parseInt(process.env.MEDIUM_MAX_FILES         || '20',      10),
+  MAX_TOTAL_OUTPUT_BYTES:   parseInt(process.env.MAX_TOTAL_OUTPUT_BYTES   || '4194304', 10), // 4MB
+  MAX_TOTAL_TOKENS_PER_JOB: parseInt(process.env.MAX_TOTAL_TOKENS_PER_JOB || '600000',  10),
+  SIMPLE_MAX_FILES:         parseInt(process.env.SIMPLE_MAX_FILES         || '10',      10),
+  MEDIUM_MAX_FILES:         parseInt(process.env.MEDIUM_MAX_FILES         || '25',      10),
 
   // ── Global job timeout ───────────────────────────────────────────────────────
   MAX_JOB_DURATION_MS: parseInt(process.env.MAX_JOB_DURATION_MS || '900000', 10),
@@ -46,19 +46,19 @@ module.exports = {
   // Note: these apply to full-generation calls only.
   // Template-hybrid uses CONTENT_EXTRACTION_TOKENS (600) instead.
   //
-  // Fast (Haiku):    3-8 files,  8K output  — cheap & quick
-  // Balanced (Sonnet): 8-20 files, 20K output — solid full-stack apps
-  // Quality (Sonnet):  15-40 files, 28K output — production-grade
+  // Fast (Haiku):    5-10 files, 10K output  — cheap & quick
+  // Balanced (Sonnet): 12-30 files, 32K output — solid full-stack apps
+  // Quality (Sonnet):  20-60 files, 48K output — production-grade
   MODE_TOKENS: {
-    fast:     { planner: 300,  coder: 8000,  reviewer: 0     },
-    balanced: { planner: 500,  coder: 20000, reviewer: 1000  },
-    quality:  { planner: 800,  coder: 28000, reviewer: 1500  },
+    fast:     { planner: 300,  coder: 10000, reviewer: 0     },
+    balanced: { planner: 600,  coder: 32000, reviewer: 1000  },
+    quality:  { planner: 900,  coder: 48000, reviewer: 2000  },
   },
 
   MODE_MAX_FILES: {
-    fast:     8,
-    balanced: 20,
-    quality:  40,
+    fast:     10,
+    balanced: 30,
+    quality:  60,
   },
 
   // ── Edit pipeline token budgets (per tier) ──────────────────────────────────

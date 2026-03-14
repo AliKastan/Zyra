@@ -1711,6 +1711,34 @@ if ($('env-close-btn')) $('env-close-btn').addEventListener('click', closeEnvPan
 if (envOverlay) envOverlay.addEventListener('click', (e) => { if (e.target === envOverlay) closeEnvPanel(); });
 if (envBtn) envBtn.addEventListener('click', openEnvPanel);
 
+// Guide toggle
+const envGuideToggle = $('env-guide-toggle');
+const envGuideBody   = $('env-guide-body');
+if (envGuideToggle && envGuideBody) {
+  envGuideToggle.addEventListener('click', () => {
+    const open = envGuideBody.classList.toggle('hidden');
+    envGuideToggle.classList.toggle('open', !open);
+  });
+}
+
+// Preset buttons — add rows for common service key sets
+document.querySelectorAll('.env-preset-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const keys = (btn.dataset.keys || '').split(',').map((k) => k.trim()).filter(Boolean);
+    let added = 0;
+    for (const key of keys) {
+      if (!isKeyAlreadyAdded(key)) {
+        addEnvRow(key, '', false);
+        added++;
+      }
+    }
+    if (added > 0) {
+      if (envVarsLabel) envVarsLabel.style.display = '';
+      markEnvDirty();
+    }
+  });
+});
+
 async function loadEnvVars() {
   if (!currentSlug || !envVarRows) return;
   envVarRows.innerHTML = '';

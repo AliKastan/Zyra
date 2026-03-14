@@ -2041,6 +2041,39 @@ textarea::placeholder { color: var(--text-muted); }
 }
 .env-add-btn:hover { color: var(--text-dim); }
 
+/* Guide section */
+.env-guide {
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.env-guide-header {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.6rem 1.1rem; font-size: 0.72rem; font-weight: 600;
+  color: var(--text-dim); cursor: pointer; user-select: none;
+  transition: color var(--ease);
+}
+.env-guide-header:hover { color: var(--text); }
+.env-guide-header svg:first-child { color: var(--accent); flex-shrink: 0; }
+.env-guide-header span { flex: 1; }
+.env-guide-chevron { flex-shrink: 0; transition: transform 0.2s ease; }
+.env-guide-header.open .env-guide-chevron { transform: rotate(180deg); }
+.env-guide-body { padding: 0 1.1rem 0.75rem; }
+.env-guide-steps {
+  margin: 0 0 0.75rem; padding: 0 0 0 1.2rem;
+  font-size: 0.71rem; color: var(--text-dim); line-height: 1.75;
+}
+.env-guide-steps li + li { margin-top: 0.1rem; }
+.env-guide-steps strong { color: var(--text); font-weight: 600; }
+.env-guide-steps code { font-size: 0.68rem; color: var(--accent); font-family: var(--font-mono, monospace); }
+.env-presets { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.env-presets-label { font-size: 0.68rem; color: var(--text-muted); margin-right: 0.1rem; }
+.env-preset-btn {
+  font-size: 0.68rem; font-weight: 500; padding: 0.22rem 0.6rem;
+  border: 1px solid var(--border); border-radius: 5px;
+  background: var(--surface2); color: var(--text-dim);
+  cursor: pointer; transition: border-color var(--ease), color var(--ease);
+}
+.env-preset-btn:hover { border-color: var(--accent); color: var(--text); }
+
 .env-footer {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.75rem 1.1rem; border-top: 1px solid var(--border); flex-shrink: 0; gap: 0.75rem;

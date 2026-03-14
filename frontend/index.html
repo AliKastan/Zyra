@@ -313,7 +313,7 @@
       </button>
     </div>
 
-    <p class="env-desc">Add API keys and config your app needs. Read them with <code>window.__ENV__.KEY_NAME</code>.</p>
+    <p class="env-desc">Add API keys and config your app needs. Values are injected as <code>window.__ENV__.KEY_NAME</code> at runtime.</p>
 
     <!-- Suggested vars (shown when auto-detected) -->
     <div class="env-suggestions hidden" id="env-suggestions">
@@ -335,6 +335,32 @@
     <div id="env-var-rows"></div>
 
     <button class="env-add-btn" id="env-add-btn" type="button">+ Add Variable</button>
+
+    <!-- Supabase quick-setup guide (always visible) -->
+    <div class="env-guide">
+      <div class="env-guide-header" id="env-guide-toggle">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Supabase Quick Setup</span>
+        <svg class="env-guide-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="env-guide-body hidden" id="env-guide-body">
+        <ol class="env-guide-steps">
+          <li>Go to <strong>supabase.com</strong> → New Project</li>
+          <li>Open <strong>SQL Editor</strong> → paste <code>sql/setup.sql</code> from your app's Code tab → Run</li>
+          <li>Go to <strong>Settings → API</strong></li>
+          <li>Copy <strong>Project URL</strong> → paste as <code>SUPABASE_URL</code> below</li>
+          <li>Copy <strong>anon / public key</strong> → paste as <code>SUPABASE_ANON_KEY</code> below</li>
+          <li>Click <strong>Save &amp; Reload Preview</strong></li>
+        </ol>
+        <div class="env-presets">
+          <div class="env-presets-label">Quick add:</div>
+          <button class="env-preset-btn" data-keys="SUPABASE_URL,SUPABASE_ANON_KEY" type="button">Supabase</button>
+          <button class="env-preset-btn" data-keys="STRIPE_KEY" type="button">Stripe</button>
+          <button class="env-preset-btn" data-keys="OPENAI_API_KEY" type="button">OpenAI</button>
+          <button class="env-preset-btn" data-keys="GOOGLE_MAPS_KEY" type="button">Maps</button>
+        </div>
+      </div>
+    </div>
 
     <div class="env-footer">
       <div class="env-privacy-note">
