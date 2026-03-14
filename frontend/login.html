@@ -243,12 +243,12 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
 <script>
-  const SUPABASE_URL = 'https://ymjeysnubuehjoghkkmv.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_qvy0Ppcn7_JRFMUXaS343w_1IDZjDf2';
+  const { supabaseUrl, supabaseKey } = window.ZYRA_CONFIG;
 
   const { createClient } = supabase;
-  const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const sb = createClient(supabaseUrl, supabaseKey);
 
   // ── Check if already logged in ───────────────────────────────────────────────
   sb.auth.getSession().then(({ data }) => {

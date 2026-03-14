@@ -4,11 +4,10 @@
  */
 
 (function () {
-  const SUPABASE_URL = 'https://ymjeysnubuehjoghkkmv.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_qvy0Ppcn7_JRFMUXaS343w_1IDZjDf2';
+  const { supabaseUrl, supabaseKey } = window.ZYRA_CONFIG;
 
   const { createClient } = supabase;
-  const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const sb = createClient(supabaseUrl, supabaseKey);
 
   // Stub so app.js can safely call these before session resolves
   window._zyraAuth = {

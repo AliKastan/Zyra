@@ -1,10 +1,9 @@
 /* billing.js — Zyra billing page */
 
-const SUPABASE_URL = 'https://ymjeysnubuehjoghkkmv.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_qvy0Ppcn7_JRFMUXaS343w_1IDZjDf2';
+const { supabaseUrl, supabaseKey } = window.ZYRA_CONFIG;
 
 const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = createClient(supabaseUrl, supabaseKey);
 
 const PLANS = [
   {
@@ -186,7 +185,7 @@ function renderPlans(activePlan) {
     } else if (plan.price === 0) {
       btnHtml = `<button class="btn-plan secondary" onclick="downgradeFree()">Downgrade to Free</button>`;
     } else {
-      btnHtml = `<button class="btn-plan primary" onclick="checkout('${plan.id}')">Upgrade to ${plan.name}</button>`;
+      btnHtml = `<button class="btn-plan primary" onclick="checkout('${plan.id}', this)">Upgrade to ${plan.name}</button>`;
     }
 
     const priceHtml = plan.price === 0
@@ -232,8 +231,9 @@ function showAlert(usageData, subData) {
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
-async function checkout(planId) {
-  const btn = event.target;
+async function checkout(planId, btn) {
+  const plan = PLANS.find(p => p.id === planId);
+  const originalText = plan ? `Upgrade to ${plan.name}` : 'Upgrade';
   btn.disabled = true;
   btn.textContent = 'Redirecting...';
 
@@ -249,7 +249,7 @@ async function checkout(planId) {
     }
   } catch (err) {
     btn.disabled = false;
-    btn.textContent = 'Upgrade';
+    btn.textContent = originalText;
     alert('Could not start checkout: ' + err.message);
   }
 }
