@@ -7,23 +7,23 @@ module.exports = {
   MAX_PROMPT_WORDS: parseInt(process.env.MAX_PROMPT_WORDS || '500',  10),
 
   // ── Per-job output limits ────────────────────────────────────────────────────
-  MAX_FILES_PER_JOB:        parseInt(process.env.MAX_FILES_PER_JOB        || '20',     10),
-  MAX_FILE_SIZE_BYTES:      parseInt(process.env.MAX_FILE_SIZE_BYTES      || '200000', 10),
-  MAX_TOTAL_OUTPUT_BYTES:   parseInt(process.env.MAX_TOTAL_OUTPUT_BYTES   || '768000', 10),
-  MAX_TOTAL_TOKENS_PER_JOB: parseInt(process.env.MAX_TOTAL_TOKENS_PER_JOB || '200000', 10),
-  SIMPLE_MAX_FILES:         parseInt(process.env.SIMPLE_MAX_FILES         || '6',      10),
-  MEDIUM_MAX_FILES:         parseInt(process.env.MEDIUM_MAX_FILES         || '12',     10),
+  MAX_FILES_PER_JOB:        parseInt(process.env.MAX_FILES_PER_JOB        || '40',      10),
+  MAX_FILE_SIZE_BYTES:      parseInt(process.env.MAX_FILE_SIZE_BYTES      || '200000',  10),
+  MAX_TOTAL_OUTPUT_BYTES:   parseInt(process.env.MAX_TOTAL_OUTPUT_BYTES   || '2097152', 10), // 2MB
+  MAX_TOTAL_TOKENS_PER_JOB: parseInt(process.env.MAX_TOTAL_TOKENS_PER_JOB || '400000',  10),
+  SIMPLE_MAX_FILES:         parseInt(process.env.SIMPLE_MAX_FILES         || '8',       10),
+  MEDIUM_MAX_FILES:         parseInt(process.env.MEDIUM_MAX_FILES         || '20',      10),
 
   // ── Global job timeout ───────────────────────────────────────────────────────
   MAX_JOB_DURATION_MS: parseInt(process.env.MAX_JOB_DURATION_MS || '900000', 10),
 
   // ── Planner timeouts ─────────────────────────────────────────────────────────
   SIMPLE_PLANNER_TIMEOUT_MS:   parseInt(process.env.SIMPLE_PLANNER_TIMEOUT_MS   || '5000',  10),
-  BALANCED_PLANNER_TIMEOUT_MS: parseInt(process.env.BALANCED_PLANNER_TIMEOUT_MS || '15000', 10),
-  QUALITY_PLANNER_TIMEOUT_MS:  parseInt(process.env.QUALITY_PLANNER_TIMEOUT_MS  || '25000', 10),
+  BALANCED_PLANNER_TIMEOUT_MS: parseInt(process.env.BALANCED_PLANNER_TIMEOUT_MS || '20000', 10),
+  QUALITY_PLANNER_TIMEOUT_MS:  parseInt(process.env.QUALITY_PLANNER_TIMEOUT_MS  || '35000', 10),
 
   // ── Stage timeouts ───────────────────────────────────────────────────────────
-  CODER_TIMEOUT_MS:    parseInt(process.env.CODER_TIMEOUT_MS    || '480000', 10),
+  CODER_TIMEOUT_MS:    parseInt(process.env.CODER_TIMEOUT_MS    || '600000', 10), // 10 min for large multi-file outputs
   REVIEW_TIMEOUT_MS:   parseInt(process.env.REVIEW_TIMEOUT_MS   || '90000',  10),
   FINALIZE_TIMEOUT_MS: parseInt(process.env.FINALIZE_TIMEOUT_MS || '60000',  10),
 
@@ -46,15 +46,15 @@ module.exports = {
   // Note: these apply to full-generation calls only.
   // Template-hybrid uses CONTENT_EXTRACTION_TOKENS (600) instead.
   MODE_TOKENS: {
-    fast:     { planner: 300, coder: 10000, reviewer: 0     },
-    balanced: { planner: 400, coder: 14000, reviewer: 1200  },
-    quality:  { planner: 600, coder: 22000, reviewer: 2000  },
+    fast:     { planner: 400,  coder: 16000, reviewer: 0     },
+    balanced: { planner: 600,  coder: 28000, reviewer: 1500  },
+    quality:  { planner: 1000, coder: 32000, reviewer: 2000  },
   },
 
   MODE_MAX_FILES: {
-    fast:     6,
-    balanced: 12,
-    quality:  20,
+    fast:     8,
+    balanced: 20,
+    quality:  40,
   },
 
   // ── Edit pipeline token budgets (per tier) ──────────────────────────────────

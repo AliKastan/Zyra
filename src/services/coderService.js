@@ -13,7 +13,9 @@ const {
   TEMPLATE_TYPES,
 } = require('../generators/templateSystem');
 const { generateFallback } = require('../generators/fallbackGenerator');
+const { parseFileDelimited } = require('../utils/parseFileDelimited');
 const { safeJsonParse } = require('../utils/safeJsonParse');
+const { slugify } = require('../utils/slugify');
 const { withTimeout } = require('../utils/withTimeout');
 const { env } = require('../config/env');
 const limits = require('../config/limits');
@@ -86,13 +88,13 @@ async function runTemplateCoder(userPrompt, appType, costTracker) {
  * @param {object}  [costTracker]
  * @returns {Promise<{projectName, files, _fallback?}>}
  */
-async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTracker, fullstack = false) {
+async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTracker) {
   const modelName  = env.DEFAULT_CODER_MODEL;
   const maxFiles   = limits.MODE_MAX_FILES[mode] || 20;
-  const maxTokens  = limits.MODE_TOKENS[mode]?.coder || 12000;
+  const maxTokens  = limits.MODE_TOKENS[mode]?.coder || 16000;
   const maxRetries = limits.CODER_MAX_RETRIES || 2;
 
-  logger.info(`coderService: full-gen model="${modelName}" mode="${mode}" maxTokens=${maxTokens}`);
+  logger.info(`coderService: full-gen model="${modelName}" mode="${mode}" maxTokens=${maxTokens} maxFiles=${maxFiles}`);
 
   let lastError = null;
 
@@ -103,11 +105,11 @@ async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTr
     }
 
     const { system, user } = attempt === 0
-      ? buildCoderPrompt(userPrompt, plan, mode, { fullstack })
+      ? buildCoderPrompt(userPrompt, plan, mode)
       : buildCoderRetryPrompt(userPrompt, plan, mode, attempt);
 
     // Reduce output budget on retries (simpler output expected)
-    const attemptTokens = attempt === 0 ? maxTokens : Math.max(6000, Math.round(maxTokens * 0.65));
+    const attemptTokens = attempt === 0 ? maxTokens : Math.max(8000, Math.round(maxTokens * 0.6));
 
     let raw;
     try {
@@ -128,29 +130,21 @@ async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTr
 
     if (costTracker) costTracker.record(attempt === 0 ? 'coder' : `coder-retry-${attempt}`, system, user, raw);
 
-    logger.debug(`coderService: raw response length=${raw.length} tail="${raw.slice(-100)}"`);
+    logger.debug(`coderService: raw response length=${raw.length}`);
 
-    const { success, data, error, tier } = safeJsonParse(raw);
-    if (!success) {
-      lastError = Object.assign(new Error(`Coder returned invalid JSON: ${error}`), {
+    // Parse using file-delimiter format (---FILE: path--- ... ---END FILE---)
+    const { success, files, error } = parseFileDelimited(raw);
+
+    if (!success || files.length === 0) {
+      lastError = Object.assign(new Error(`Coder returned no file blocks: ${error}`), {
         errorType: ERROR_TYPES.PARSE,
       });
-      logger.warn(`coderService: parse failed on attempt ${attempt} tier=${tier}`, { parseError: error });
+      logger.warn(`coderService: file parse failed on attempt ${attempt}`, { parseError: error });
       continue;
     }
 
-    logger.debug(`coderService: parsed via tier ${tier}`);
-
-    const validated = validateAndRepairOutput(data, userPrompt);
-    if (!validated) {
-      lastError = Object.assign(new Error('Coder response missing required "files" array'), {
-        errorType: ERROR_TYPES.SCHEMA,
-      });
-      logger.warn(`coderService: schema invalid on attempt ${attempt}`);
-      continue;
-    }
-
-    const result = enforceOutputLimits(validated, maxFiles);
+    const projectName = slugify(userPrompt) || 'generated-app';
+    const result = enforceOutputLimits({ projectName, files }, maxFiles);
     logger.info(`coderService: full-gen success on attempt ${attempt} — ${result.files.length} files`);
     return result;
   }
@@ -199,8 +193,9 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
     return runTemplateCoder(userPrompt, appType, costTracker);
   }
 
-  let result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, needsBackend);
-  if (needsBackend) result._needsBackend = true;
+  // Full generation: AI handles Supabase directly via config/supabase.js pattern.
+  // ZyraApp SDK injection is not used for full-generation output.
+  const result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker);
 
   // ── Post-generation code validation + multi-round auto-fix ────────────────
   // Skip for fallback/template output (already known-good)
@@ -330,6 +325,33 @@ function injectRuntimeErrorCatcher(files) {
   });
 }
 
+// ── Env loader injection ───────────────────────────────────────────────────────
+
+/**
+ * Injects <script src="/zyra-env/{slug}.js"></script> into the <head> of every HTML file.
+ * This script runs before any app code and sets window.__ENV__ with user-configured vars.
+ * The endpoint /zyra-env/:slug.js is served by envController.serveEnvScript.
+ *
+ * @param {Array<{path: string, content: string}>} files
+ * @param {string} projectSlug
+ * @returns {Array<{path: string, content: string}>}
+ */
+function injectEnvLoader(files, projectSlug) {
+  const tag = `  <script src="/zyra-env/${projectSlug}.js"></script>`;
+  return files.map((f) => {
+    if (!f.path.endsWith('.html')) return f;
+    let content = f.content || '';
+    if (content.includes('/zyra-env/')) return f; // already injected
+    // Inject as the very first child of <head>
+    if (/<head(\s[^>]*)?\s*>/i.test(content)) {
+      content = content.replace(/(<head(\s[^>]*)?\s*>)/i, `$1\n${tag}`);
+    } else {
+      content = `${tag}\n` + content;
+    }
+    return { ...f, content };
+  });
+}
+
 // ── Backend SDK injection ───────────────────────────────────────────────────────
 
 /**
@@ -369,7 +391,6 @@ function validateAndRepairOutput(data, userPrompt) {
   }
 
   if (!data.projectName || typeof data.projectName !== 'string') {
-    const { slugify } = require('../utils/slugify');
     data = { ...data, projectName: slugify(userPrompt) || 'generated-app' };
   }
 
@@ -410,4 +431,4 @@ function enforceOutputLimits(data, maxFiles) {
   return { ...data, files };
 }
 
-module.exports = { runCoder, injectBackendSDK, injectRuntimeErrorCatcher };
+module.exports = { runCoder, injectBackendSDK, injectEnvLoader, injectRuntimeErrorCatcher };

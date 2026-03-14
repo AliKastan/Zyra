@@ -6,7 +6,7 @@ const { classifyComplexity } = require('../utils/complexity');
 const { withTimeout } = require('../utils/withTimeout');
 const { assertProviderAvailable } = require('./orchestrator');
 const { runPlanner } = require('./plannerService');
-const { runCoder, injectBackendSDK, injectRuntimeErrorCatcher } = require('./coderService');
+const { runCoder, injectBackendSDK, injectEnvLoader, injectRuntimeErrorCatcher } = require('./coderService');
 const { runReviewer } = require('./reviewerService');
 const { generateProject } = require('../generators/projectGenerator');
 const { createCostTracker } = require('../utils/costTracker');
@@ -141,6 +141,9 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
       codeOutput = { ...codeOutput, files: injectBackendSDK(codeOutput.files, projectSlug) };
       await updateJob(jobId, { _usedBackend: true });
     }
+
+    // Inject env vars loader into all HTML files (window.__ENV__ pattern)
+    codeOutput = { ...codeOutput, files: injectEnvLoader(codeOutput.files, projectSlug) };
 
     // Inject runtime error catcher into all HTML files
     codeOutput = { ...codeOutput, files: injectRuntimeErrorCatcher(codeOutput.files) };

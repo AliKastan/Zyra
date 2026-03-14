@@ -122,6 +122,7 @@ function switchToConversation(convId) {
   renderAllMessages();
   renderHistory();
   updateDeployButton(currentSlug);
+  syncEnvButton(currentSlug);
 
   if (currentSlug && currentPreviewUrl) {
     activatePreview({ url: currentPreviewUrl });
@@ -798,6 +799,7 @@ async function pollJob(jobId) {
         if (slug) {
           currentSlug = slug;
           updateDeployButton(slug);
+          syncEnvButton(slug);
           loadCodeFileList(slug);
 
           if (job.isEdit) {
@@ -1412,11 +1414,17 @@ async function loadCodeFileList(slug) {
   codeFileList.innerHTML = '<div class="empty-state">Loading...</div>';
   try {
     const data = await apiFetch(`/api/projects/${slug}/files`);
-    const files = flattenFiles(data.files || []);
-    if (!files.length) { codeFileList.innerHTML = '<div class="empty-state">No files.</div>'; return; }
-    codeFileList.innerHTML = files.map((f) =>
-      `<div class="code-file-item" data-slug="${escAttr(slug)}" data-path="${escAttr(f.path)}">${escHtml(f.path)}</div>`
-    ).join('');
+    const nodes = data.files || [];
+    const fileCount = countFiles(nodes);
+    if (!fileCount) { codeFileList.innerHTML = '<div class="empty-state">No files.</div>'; return; }
+
+    // Update sidebar title with file count
+    const titleEl = codeFileList.closest('.code-file-sidebar')?.querySelector('.code-sidebar-title');
+    if (titleEl) titleEl.textContent = `Files (${fileCount})`;
+
+    codeFileList.innerHTML = renderFileTree(nodes, slug, 0);
+
+    // File click handlers
     codeFileList.querySelectorAll('.code-file-item').forEach((item) => {
       item.addEventListener('click', () => {
         codeFileList.querySelectorAll('.code-file-item').forEach((i) => i.classList.remove('active'));
@@ -1424,18 +1432,79 @@ async function loadCodeFileList(slug) {
         loadFileContent(item.dataset.slug, item.dataset.path);
       });
     });
+
+    // Folder toggle handlers
+    codeFileList.querySelectorAll('.code-dir-item').forEach((dir) => {
+      dir.addEventListener('click', () => {
+        const key = dir.dataset.dirKey;
+        const children = codeFileList.querySelector(`.code-dir-children[data-dir-key="${key}"]`);
+        if (!children) return;
+        const collapsed = children.classList.toggle('collapsed');
+        dir.classList.toggle('collapsed', collapsed);
+      });
+    });
+
+    // Auto-select first file
+    const firstFile = codeFileList.querySelector('.code-file-item');
+    if (firstFile) firstFile.click();
   } catch (err) {
     codeFileList.innerHTML = `<div class="empty-state">${escHtml(err.message)}</div>`;
   }
 }
 
-function flattenFiles(nodes) {
-  const result = [];
-  (nodes || []).forEach((n) => {
-    if (n.type === 'file') result.push({ path: n.path });
-    else if (n.children) result.push(...flattenFiles(n.children));
-  });
-  return result;
+function countFiles(nodes) {
+  let n = 0;
+  for (const node of (nodes || [])) {
+    if (node.type === 'file') n++;
+    else if (node.children) n += countFiles(node.children);
+  }
+  return n;
+}
+
+function getFileIcon(filename) {
+  const ext = (filename.split('.').pop() || '').toLowerCase();
+  const icons = {
+    html: '<span class="fi fi-html">H</span>',
+    css:  '<span class="fi fi-css">C</span>',
+    js:   '<span class="fi fi-js">J</span>',
+    ts:   '<span class="fi fi-ts">T</span>',
+    json: '<span class="fi fi-json">{}</span>',
+    sql:  '<span class="fi fi-sql">S</span>',
+    md:   '<span class="fi fi-md">M</span>',
+    svg:  '<span class="fi fi-svg">V</span>',
+    jsx:  '<span class="fi fi-js">J</span>',
+    tsx:  '<span class="fi fi-ts">T</span>',
+    txt:  '<span class="fi fi-txt">T</span>',
+  };
+  return icons[ext] || '<span class="fi fi-default">F</span>';
+}
+
+function renderFileTree(nodes, slug, depth) {
+  if (!nodes || !nodes.length) return '';
+  const indent = depth * 12; // px per level
+  let html = '';
+
+  for (const node of nodes) {
+    if (node.type === 'dir') {
+      const dirName = node.path.split('/').pop() || node.path;
+      const key = escAttr(node.path);
+      html += `<div class="code-dir-item" data-dir-key="${key}" style="padding-left:calc(0.5rem + ${indent}px)">
+        <span class="dir-arrow">▶</span>
+        <span class="dir-icon">◻</span>
+        <span class="dir-name">${escHtml(dirName)}/</span>
+      </div>
+      <div class="code-dir-children" data-dir-key="${key}">
+        ${renderFileTree(node.children || [], slug, depth + 1)}
+      </div>`;
+    } else {
+      const filename = node.path.split('/').pop() || node.path;
+      html += `<div class="code-file-item" data-slug="${escAttr(slug)}" data-path="${escAttr(node.path)}" style="padding-left:calc(0.5rem + ${indent}px)">
+        ${getFileIcon(filename)}
+        <span class="file-name">${escHtml(filename)}</span>
+      </div>`;
+    }
+  }
+  return html;
 }
 
 async function loadFileContent(slug, filePath) {
@@ -1479,6 +1548,273 @@ async function apiFetch(path, opts = {}) {
 
 function escHtml(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escAttr(s)  { return String(s).replace(/"/g,'&quot;'); }
+
+// ── Environment Variables Panel ───────────────────────────────────────────────
+
+const envOverlay        = $('env-overlay');
+const envVarRows        = $('env-var-rows');
+const envAddBtn         = $('env-add-btn');
+const envSaveBtn        = $('env-save-btn');
+const envBtn            = $('env-btn');
+const envSuggestions    = $('env-suggestions');
+const envSuggestionRows = $('env-suggestion-rows');
+const envSqlBlock       = $('env-sql-block');
+const envCopySqlBtn     = $('env-copy-sql-btn');
+const envVarsLabel      = $('env-vars-label');
+
+let envDirty = false;
+
+const KNOWN_SUGGESTIONS = {
+  supabase:  [
+    { key: 'SUPABASE_URL',      hint: 'supabase.com → Settings → API' },
+    { key: 'SUPABASE_ANON_KEY', hint: 'supabase.com → Settings → API' },
+  ],
+  stripe:    [{ key: 'STRIPE_KEY',         hint: 'stripe.com → API Keys (Publishable)' }],
+  openai:    [{ key: 'OPENAI_API_KEY',     hint: 'platform.openai.com → API Keys' }],
+  anthropic: [{ key: 'ANTHROPIC_API_KEY',  hint: 'console.anthropic.com → API Keys' }],
+  mapbox:    [{ key: 'MAPBOX_TOKEN',       hint: 'mapbox.com → Account → Access Tokens' }],
+  sendgrid:  [{ key: 'SENDGRID_API_KEY',   hint: 'app.sendgrid.com → Settings → API Keys' }],
+};
+
+function openEnvPanel() {
+  if (!envOverlay) return;
+  envOverlay.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  loadEnvVars();
+}
+
+function closeEnvPanel() {
+  if (!envOverlay) return;
+  envOverlay.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+if ($('env-close-btn')) $('env-close-btn').addEventListener('click', closeEnvPanel);
+if (envOverlay) envOverlay.addEventListener('click', (e) => { if (e.target === envOverlay) closeEnvPanel(); });
+if (envBtn) envBtn.addEventListener('click', openEnvPanel);
+
+async function loadEnvVars() {
+  if (!currentSlug || !envVarRows) return;
+  envVarRows.innerHTML = '';
+  envDirty = false;
+  if (envSaveBtn) envSaveBtn.disabled = true;
+
+  await detectAndShowSuggestions(currentSlug);
+
+  try {
+    const data = await apiFetch(`/api/projects/${currentSlug}/env`);
+    const vars = data.vars || [];
+    if (envVarsLabel) envVarsLabel.style.display = vars.length ? '' : 'none';
+    for (const { key, masked } of vars) addEnvRow(key, masked, true);
+  } catch (_) {
+    if (envVarsLabel) envVarsLabel.style.display = 'none';
+  }
+}
+
+async function detectAndShowSuggestions(slug) {
+  if (envSuggestions) envSuggestions.classList.add('hidden');
+  if (envSqlBlock)    envSqlBlock.classList.add('hidden');
+  _sqlContent = null;
+
+  try {
+    const data    = await apiFetch(`/api/projects/${slug}/files`);
+    const paths   = collectFilePaths(data.files || []);
+    const detected = new Set();
+
+    if (/supabase/i.test(paths))  detected.add('supabase');
+    if (/stripe/i.test(paths))    detected.add('stripe');
+    if (/openai/i.test(paths))    detected.add('openai');
+    if (/anthropic/i.test(paths)) detected.add('anthropic');
+    if (/mapbox/i.test(paths))    detected.add('mapbox');
+    if (/sendgrid/i.test(paths))  detected.add('sendgrid');
+
+    const suggestions = [];
+    for (const service of detected) suggestions.push(...(KNOWN_SUGGESTIONS[service] || []));
+    if (!suggestions.length) return;
+
+    if (envSuggestionRows) {
+      envSuggestionRows.innerHTML = suggestions.map((s) => `
+        <div class="env-suggestion-row" data-key="${escAttr(s.key)}">
+          <div class="env-suggestion-key">${escHtml(s.key)}</div>
+          <div class="env-suggestion-hint">${escHtml(s.hint)}</div>
+          <button class="env-suggestion-add-btn" type="button" data-key="${escAttr(s.key)}">Add</button>
+        </div>`).join('');
+
+      envSuggestionRows.querySelectorAll('.env-suggestion-add-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const key = btn.dataset.key;
+          if (!isKeyAlreadyAdded(key)) {
+            addEnvRow(key, '', false);
+            if (envVarsLabel) envVarsLabel.style.display = '';
+            markEnvDirty();
+          }
+          btn.textContent = 'Added'; btn.classList.add('added'); btn.disabled = true;
+        });
+      });
+    }
+    if (envSuggestions) envSuggestions.classList.remove('hidden');
+
+    if (detected.has('supabase')) {
+      if (envSqlBlock) envSqlBlock.classList.remove('hidden');
+      loadSqlForCopy(slug);
+    }
+  } catch (_) {}
+}
+
+function collectFilePaths(nodes) {
+  let paths = '';
+  for (const n of (nodes || [])) {
+    if (n.type === 'file') paths += ' ' + n.path;
+    else if (n.children) paths += collectFilePaths(n.children);
+  }
+  return paths;
+}
+
+let _sqlContent = null;
+
+async function loadSqlForCopy(slug) {
+  _sqlContent = null;
+  try {
+    const data = await apiFetch(`/api/preview/file/${encodeURIComponent(slug)}/sql/setup.sql`);
+    _sqlContent = data.content || null;
+  } catch (_) {}
+}
+
+if (envCopySqlBtn) {
+  envCopySqlBtn.addEventListener('click', () => {
+    if (!_sqlContent) {
+      envCopySqlBtn.textContent = 'Not found';
+      setTimeout(() => { envCopySqlBtn.textContent = 'Copy SQL'; }, 2000);
+      return;
+    }
+    navigator.clipboard.writeText(_sqlContent).then(() => {
+      envCopySqlBtn.textContent = 'Copied!';
+      envCopySqlBtn.classList.add('copied');
+      setTimeout(() => { envCopySqlBtn.textContent = 'Copy SQL'; envCopySqlBtn.classList.remove('copied'); }, 2200);
+    });
+  });
+}
+
+function isKeyAlreadyAdded(key) {
+  if (!envVarRows) return false;
+  return [...envVarRows.querySelectorAll('.env-key-input')].some(
+    (el) => el.value.toUpperCase() === key.toUpperCase()
+  );
+}
+
+function addEnvRow(key = '', value = '', masked = false) {
+  if (!envVarRows) return;
+  const row = document.createElement('div');
+  row.className = 'env-var-row';
+  const eyeIcon   = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const trashIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
+
+  row.innerHTML = `
+    <input class="env-key-input" type="text" placeholder="KEY_NAME" value="${escAttr(key)}" autocomplete="off" spellcheck="false">
+    <div class="env-val-wrapper">
+      <input class="env-val-input" type="password" placeholder="paste value" value="${escAttr(value)}" autocomplete="off" spellcheck="false" data-masked="${masked}">
+      <button class="env-show-btn" type="button" title="Show/hide">${eyeIcon}</button>
+    </div>
+    <button class="env-del-btn" type="button" title="Remove">${trashIcon}</button>`;
+
+  const keyInput = row.querySelector('.env-key-input');
+  const valInput = row.querySelector('.env-val-input');
+  const showBtn  = row.querySelector('.env-show-btn');
+  const delBtn   = row.querySelector('.env-del-btn');
+
+  keyInput.addEventListener('input', () => {
+    const pos = keyInput.selectionStart;
+    keyInput.value = keyInput.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+    keyInput.setSelectionRange(pos, pos);
+    markEnvDirty();
+  });
+
+  valInput.addEventListener('focus', () => {
+    if (valInput.dataset.masked === 'true') { valInput.value = ''; valInput.dataset.masked = 'false'; }
+  });
+  valInput.addEventListener('input', markEnvDirty);
+
+  showBtn.addEventListener('click', () => {
+    valInput.type = valInput.type === 'password' ? 'text' : 'password';
+    valInput.dataset.masked = 'false';
+  });
+
+  delBtn.addEventListener('click', () => {
+    row.style.opacity = '0'; row.style.transition = 'opacity 0.12s';
+    setTimeout(() => {
+      row.remove();
+      if (envVarsLabel) envVarsLabel.style.display = envVarRows.children.length ? '' : 'none';
+      markEnvDirty();
+    }, 120);
+  });
+
+  envVarRows.appendChild(row);
+  if (!key) keyInput.focus();
+}
+
+function markEnvDirty() {
+  envDirty = true;
+  if (envSaveBtn) envSaveBtn.disabled = false;
+}
+
+if (envAddBtn) {
+  envAddBtn.addEventListener('click', () => {
+    addEnvRow('', '', false);
+    if (envVarsLabel) envVarsLabel.style.display = '';
+    markEnvDirty();
+  });
+}
+
+if (envSaveBtn) {
+  envSaveBtn.addEventListener('click', async () => {
+    if (!currentSlug) return;
+    const rows = [...envVarRows.querySelectorAll('.env-var-row')];
+    const vars = [];
+    for (const row of rows) {
+      const key    = row.querySelector('.env-key-input')?.value?.trim();
+      const valEl  = row.querySelector('.env-val-input');
+      const masked = valEl?.dataset?.masked === 'true';
+      if (!key || masked) continue; // skip blank keys and unchanged masked values
+      vars.push({ key, value: valEl?.value || '' });
+    }
+    envSaveBtn.textContent = 'Saving...';
+    envSaveBtn.disabled = true;
+    try {
+      await apiFetch(`/api/projects/${currentSlug}/env`, {
+        method: 'POST',
+        body: JSON.stringify({ vars }),
+      });
+      envDirty = false;
+      envSaveBtn.textContent = 'Saved!';
+      updateEnvBadge(vars.length > 0);
+      setTimeout(() => {
+        envSaveBtn.textContent = 'Save & Reload Preview';
+        closeEnvPanel();
+        const iframe = $('preview-iframe');
+        if (iframe && iframe.src) { const s = iframe.src; iframe.src = ''; iframe.src = s; }
+      }, 600);
+    } catch (_) {
+      envSaveBtn.textContent = 'Error — try again';
+      envSaveBtn.disabled = false;
+      setTimeout(() => { envSaveBtn.textContent = 'Save & Reload Preview'; }, 2200);
+    }
+  });
+}
+
+function updateEnvBadge(hasVars) {
+  if (envBtn) envBtn.classList.toggle('has-vars', hasVars);
+}
+
+function syncEnvButton(slug) {
+  if (!envBtn) return;
+  if (slug) {
+    envBtn.style.display = '';
+    apiFetch(`/api/projects/${slug}/env`).then((d) => updateEnvBadge((d.vars||[]).length > 0)).catch(() => {});
+  } else {
+    envBtn.style.display = 'none';
+    updateEnvBadge(false);
+  }
+}
 
 // ── Fix My App — Debugger System ─────────────────────────────────────────────
 

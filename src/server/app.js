@@ -12,6 +12,8 @@ const deployRoutes   = require('../routes/deployRoutes');
 const billingRoutes  = require('../routes/billingRoutes');
 const debugRoutes    = require('../routes/debugRoutes');
 const backendRoutes  = require('../routes/backendRoutes');
+const envRoutes      = require('../routes/envRoutes');
+const { serveEnvScript } = require('../controllers/envController');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { stripeWebhook } = require('../controllers/billingController');
 const logger = require('../utils/logger');
@@ -53,11 +55,11 @@ app.use((_req, res, next) => {
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+      "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://js.stripe.com https://cdn.jsdelivr.net",
       "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
       "img-src 'self' data: https:",
       "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.stripe.com https://api.anthropic.com",
       "frame-src 'self'",
       "upgrade-insecure-requests",
     ].join('; ')
@@ -142,10 +144,17 @@ app.use('/api/debug',     requireAuth, debugRoutes);
 // No requireAuth — called directly from generated apps running in iframes/user browsers
 app.use('/api/backend',  backendRoutes);
 
+// Env vars API — auth-protected
+app.use('/api/projects', requireAuth, envRoutes);
+
 // Serve ZyraApp SDK to generated apps
 app.get('/zyra-sdk.js', (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/zyra-sdk.js'));
 });
+
+// Serve per-project env vars as a JS file — no auth (loaded by generated apps in iframes)
+// Same pattern as /zyra-sdk.js — accessible to iframe content, never logs raw values
+app.get('/zyra-env/:slugjs', serveEnvScript);
 
 // ── Fallback: any unmatched route — gate-protected ───────────────────────────
 app.get(/^(?!\/api)(?!\/preview)(?!\/access).*$/, requireGate, (_req, res) => {
