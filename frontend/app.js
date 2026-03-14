@@ -629,7 +629,7 @@ async function startGeneration(prompt, isPrefill = false) {
       try {
         updateLoadingMessage('Cancelling previous job...', '');
         await cancelAnyActiveJob();
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 1500));
         updateLoadingMessage('Retrying...', '');
         const data = await apiFetch('/api/generate', {
           method: 'POST',

@@ -1,6 +1,8 @@
 const { listJobs, getJob, cancelJob } = require('../storage/jobStore');
 const { isTerminal, STATUS_LABELS } = require('../config/jobStates');
 const logger = require('../utils/logger');
+let forceReleaseJob;
+try { ({ forceReleaseJob } = require('../services/generationService')); } catch (_) {}
 
 async function handleListJobs(req, res) {
   try {
@@ -43,6 +45,9 @@ async function handleCancelJob(req, res) {
     }
 
     const updated = await cancelJob(id);
+    // Immediately free the in-memory active slot so the next generation
+    // doesn't hit JOB_IN_PROGRESS while waiting for the pipeline to notice.
+    if (forceReleaseJob) forceReleaseJob(id);
     logger.info(`jobsController: cancellation requested for job ${id}`);
 
     return res.json({

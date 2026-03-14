@@ -46,6 +46,17 @@ function _removeActive(jobId, userId) {
   activeJobsAnon.delete(jobId);
 }
 
+/**
+ * Force-removes a job from all active tracking maps regardless of userId.
+ * Called by the cancel endpoint so the slot is freed immediately — without
+ * waiting for the pipeline's .finally() to fire (which may be blocked on
+ * a long-running API call).
+ */
+function forceReleaseJob(jobId) {
+  activeJobsAnon.delete(jobId);
+  for (const [, set] of activeJobsByUser) set.delete(jobId);
+}
+
 class CancelledError extends Error {
   constructor() { super('Generation was cancelled by user'); this.type = 'cancelled'; }
 }
@@ -337,4 +348,4 @@ function categoriseError(err, type) {
   return err.message;
 }
 
-module.exports = { startGeneration, getActiveJobCount };
+module.exports = { startGeneration, getActiveJobCount, forceReleaseJob };
