@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Zyra — AI App Builder</title>
+  <title>Zyra — AI SaaS Builder</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=5" />
   <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg?v=5" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -85,13 +85,13 @@
           <div class="welcome-mark">
             <img src="logo-symbol.svg" height="52" alt="Zyra" style="display:block;" />
           </div>
-          <p class="welcome-title">What would you like to build?</p>
-          <p class="welcome-sub">Describe any app, website, or tool and I'll generate it for you.</p>
+          <p class="welcome-title">Describe the product you want to build.</p>
+          <p class="welcome-sub">Zyra generates production-capable SaaS MVPs — with auth, dashboard, billing, and deploy-ready code.</p>
           <div class="welcome-chips">
-            <span class="example-chip" data-prompt="A landing page for a boutique design studio">Design studio page</span>
-            <span class="example-chip" data-prompt="A pill reminder app with daily schedule and tracking">Pill reminder</span>
-            <span class="example-chip" data-prompt="A clean todo app with priorities and local storage">Todo app</span>
-            <span class="example-chip" data-prompt="A personal portfolio with project gallery and contact">Portfolio</span>
+            <span class="example-chip" data-prompt="Build a SaaS for barbershop bookings — customers book slots, barbers manage availability, admin sees all bookings">Barbershop booking SaaS</span>
+            <span class="example-chip" data-prompt="Build an AI writing assistant SaaS — users sign up, get credits, generate marketing copy, upgrade to Pro for more credits">AI writing SaaS</span>
+            <span class="example-chip" data-prompt="Build a CRM SaaS for real estate agents — track clients, manage property pipeline, schedule follow-ups, team dashboard">Real estate CRM</span>
+            <span class="example-chip" data-prompt="Build a subscription-based client portal for fitness coaches — clients view workout plans, coaches manage programs, billing via Stripe">Fitness coach portal</span>
           </div>
         </div>
       </div>
@@ -100,11 +100,11 @@
       <div class="sidebar-input">
         <div class="mode-bar" id="mode-bar">
           <input type="radio" name="generation-mode" id="mode-fast" data-mode="fast" />
-          <label for="mode-fast">Fast</label>
+          <label for="mode-fast" title="Quick prototype — 3-8 files, no backend">Fast</label>
           <input type="radio" name="generation-mode" id="mode-standard" data-mode="balanced" checked />
-          <label for="mode-standard">Standard</label>
+          <label for="mode-standard" title="Full SaaS MVP — auth, dashboard, billing, 20+ files">Standard</label>
           <input type="radio" name="generation-mode" id="mode-quality" data-mode="quality" />
-          <label for="mode-quality">Quality</label>
+          <label for="mode-quality" title="Production-grade SaaS — 30-60 files, PWA, advanced DB">Quality</label>
           <div class="glass-glider"></div>
         </div>
 
@@ -113,7 +113,7 @@
             id="prompt-input"
             rows="3"
             maxlength="3000"
-            placeholder="Describe what you want to build..."
+            placeholder="Describe the SaaS product you want to build. E.g. 'Build a booking SaaS for barbers with auth, dashboard, and Stripe billing'"
           ></textarea>
           <div class="input-meta-row">
             <div class="input-right-meta">
@@ -303,69 +303,36 @@
   </div>
 </div>
 
-<!-- ── Env Vars Panel ──────────────────────────────────────────────────────── -->
-<div class="env-overlay hidden" id="env-overlay" role="dialog" aria-modal="true" aria-label="Environment Variables">
+<!-- ── Backend Config Panel ────────────────────────────────────────────────── -->
+<div class="env-overlay hidden" id="env-overlay" role="dialog" aria-modal="true" aria-label="Backend Config">
   <div class="env-panel">
     <div class="env-panel-header">
-      <div class="env-panel-title">Environment Variables</div>
+      <div class="env-panel-title">Backend Config</div>
       <button class="env-close-btn" id="env-close-btn" type="button" aria-label="Close">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
 
-    <p class="env-desc">Add API keys and config your app needs. Values are injected as <code>window.__ENV__.KEY_NAME</code> at runtime.</p>
+    <p class="env-desc">Connect services your app uses. Keys are injected as <code>window.__ENV__.KEY_NAME</code> at runtime — stored only on your server.</p>
 
-    <!-- Suggested vars (shown when auto-detected) -->
-    <div class="env-suggestions hidden" id="env-suggestions">
-      <div class="env-section-label">Detected — add values to enable features</div>
-      <div id="env-suggestion-rows"></div>
+    <!-- Integrations list — rendered by JS -->
+    <div id="integrations-list" class="integrations-list">
+      <div class="integrations-loading" id="integrations-loading">Loading integrations...</div>
     </div>
 
-    <!-- SQL setup shortcut (shown when Supabase detected) -->
-    <div class="env-sql-block hidden" id="env-sql-block">
-      <div class="env-section-label">Database Setup</div>
-      <div class="env-sql-row">
-        <span class="env-sql-hint">Run this SQL in your Supabase SQL Editor:</span>
-        <button class="env-copy-sql-btn" id="env-copy-sql-btn" type="button">Copy SQL</button>
+    <!-- Custom / extra vars -->
+    <div class="env-custom-section">
+      <div class="env-custom-header">
+        <span class="env-section-label">Custom Variables</span>
+        <button class="env-add-btn" id="env-add-btn" type="button">+ Add</button>
       </div>
-    </div>
-
-    <!-- User-defined rows -->
-    <div class="env-section-label" id="env-vars-label" style="display:none">Your Variables</div>
-    <div id="env-var-rows"></div>
-
-    <button class="env-add-btn" id="env-add-btn" type="button">+ Add Variable</button>
-
-    <!-- Supabase quick-setup guide (always visible) -->
-    <div class="env-guide">
-      <div class="env-guide-header" id="env-guide-toggle">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span>Supabase Quick Setup</span>
-        <svg class="env-guide-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><polyline points="6 9 12 15 18 9"/></svg>
-      </div>
-      <div class="env-guide-body hidden" id="env-guide-body">
-        <ol class="env-guide-steps">
-          <li>Go to <strong>supabase.com</strong> → New Project</li>
-          <li>Open <strong>SQL Editor</strong> → paste <code>sql/setup.sql</code> from your app's Code tab → Run</li>
-          <li>Go to <strong>Settings → API</strong></li>
-          <li>Copy <strong>Project URL</strong> → paste as <code>SUPABASE_URL</code> below</li>
-          <li>Copy <strong>anon / public key</strong> → paste as <code>SUPABASE_ANON_KEY</code> below</li>
-          <li>Click <strong>Save &amp; Reload Preview</strong></li>
-        </ol>
-        <div class="env-presets">
-          <div class="env-presets-label">Quick add:</div>
-          <button class="env-preset-btn" data-keys="SUPABASE_URL,SUPABASE_ANON_KEY" type="button">Supabase</button>
-          <button class="env-preset-btn" data-keys="STRIPE_KEY" type="button">Stripe</button>
-          <button class="env-preset-btn" data-keys="OPENAI_API_KEY" type="button">OpenAI</button>
-          <button class="env-preset-btn" data-keys="GOOGLE_MAPS_KEY" type="button">Maps</button>
-        </div>
-      </div>
+      <div id="env-var-rows"></div>
     </div>
 
     <div class="env-footer">
       <div class="env-privacy-note">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Stored on your Zyra server only. Never shared.
+        Stored on your server only. Never shared.
       </div>
       <button class="env-save-btn" id="env-save-btn" type="button" disabled>Save &amp; Reload Preview</button>
     </div>

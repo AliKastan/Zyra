@@ -326,8 +326,22 @@ function classifyLocally(prompt) {
   const text  = prompt.toLowerCase().trim();
   const chars = prompt.length;
   const words = text.split(/\s+/).length;
-  const complex = ['full-stack','fullstack','auth','authentication','login','register','database','db','sql','postgres','mongodb','prisma','payment','stripe','billing','subscription','saas','crm','erp','admin panel','role','permissions','multi-user','user management','real-time','websocket','notifications','email','oauth','jwt','session','backend api','rest api','graphql','microservice'];
-  const simple  = ['landing page','landing','portfolio','personal site','resume site','todo','task list','calculator','counter','timer','stopwatch','simple form','contact form','quiz','survey','simple','basic','minimal','static site','single page','one page','static','brochure','homepage'];
+  const complex = [
+    'full-stack','fullstack','auth','authentication','login','register','database','db','sql',
+    'postgres','mongodb','prisma','payment','stripe','billing','subscription','saas','crm','erp',
+    'admin panel','role','permissions','multi-user','user management','real-time','websocket',
+    'notifications','email','oauth','jwt','session','backend api','rest api','graphql','microservice',
+    'booking','reservation','appointment','scheduling','kanban','project management','workflow',
+    'marketplace','e-commerce','ecommerce','inventory','analytics','reporting','dashboard app',
+    'platform','portal','management system','team','workspace','organization','b2b','lms',
+    'learning platform','course','fitness','gym','health','hr platform','employee','invoice',
+    'accounting','ai tool','ai saas','ai wrapper','gpt','openai','llm',
+  ];
+  const simple = [
+    'landing page','landing','portfolio','personal site','resume site',
+    'calculator','counter','timer','stopwatch','simple form','contact form','quiz','survey',
+    'simple','basic','minimal','static site','single page','one page','static','brochure','homepage',
+  ];
   let score = 0;
   if (chars > 300)  score += 1;
   if (chars > 800)  score += 1;
@@ -1667,38 +1681,26 @@ async function apiFetch(path, opts = {}) {
 function escHtml(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escAttr(s)  { return String(s).replace(/"/g,'&quot;'); }
 
-// ── Environment Variables Panel ───────────────────────────────────────────────
+// ── Backend Config / Integrations Panel ──────────────────────────────────────
 
-const envOverlay        = $('env-overlay');
-const envVarRows        = $('env-var-rows');
-const envAddBtn         = $('env-add-btn');
-const envSaveBtn        = $('env-save-btn');
-const envBtn            = $('env-btn');
-const envSuggestions    = $('env-suggestions');
-const envSuggestionRows = $('env-suggestion-rows');
-const envSqlBlock       = $('env-sql-block');
-const envCopySqlBtn     = $('env-copy-sql-btn');
-const envVarsLabel      = $('env-vars-label');
+const envOverlay = $('env-overlay');
+const envVarRows = $('env-var-rows');
+const envAddBtn  = $('env-add-btn');
+const envSaveBtn = $('env-save-btn');
+const envBtn     = $('env-btn');
 
 let envDirty = false;
+// integrationVars: { [key]: { value, masked } } — collected from integration var inputs
+let integrationVars = {};
 
-const KNOWN_SUGGESTIONS = {
-  supabase:  [
-    { key: 'SUPABASE_URL',      hint: 'supabase.com → Settings → API' },
-    { key: 'SUPABASE_ANON_KEY', hint: 'supabase.com → Settings → API' },
-  ],
-  stripe:    [{ key: 'STRIPE_KEY',         hint: 'stripe.com → API Keys (Publishable)' }],
-  openai:    [{ key: 'OPENAI_API_KEY',     hint: 'platform.openai.com → API Keys' }],
-  anthropic: [{ key: 'ANTHROPIC_API_KEY',  hint: 'console.anthropic.com → API Keys' }],
-  mapbox:    [{ key: 'MAPBOX_TOKEN',       hint: 'mapbox.com → Account → Access Tokens' }],
-  sendgrid:  [{ key: 'SENDGRID_API_KEY',   hint: 'app.sendgrid.com → Settings → API Keys' }],
-};
+const eyeIconSvg   = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const trashIconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
 
 function openEnvPanel() {
   if (!envOverlay) return;
   envOverlay.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
-  loadEnvVars();
+  loadIntegrationsPanel();
 }
 
 function closeEnvPanel() {
@@ -1711,157 +1713,289 @@ if ($('env-close-btn')) $('env-close-btn').addEventListener('click', closeEnvPan
 if (envOverlay) envOverlay.addEventListener('click', (e) => { if (e.target === envOverlay) closeEnvPanel(); });
 if (envBtn) envBtn.addEventListener('click', openEnvPanel);
 
-// Guide toggle
-const envGuideToggle = $('env-guide-toggle');
-const envGuideBody   = $('env-guide-body');
-if (envGuideToggle && envGuideBody) {
-  envGuideToggle.addEventListener('click', () => {
-    const open = envGuideBody.classList.toggle('hidden');
-    envGuideToggle.classList.toggle('open', !open);
-  });
-}
+// ── Load integrations manifest ────────────────────────────────────────────────
 
-// Preset buttons — add rows for common service key sets
-document.querySelectorAll('.env-preset-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    const keys = (btn.dataset.keys || '').split(',').map((k) => k.trim()).filter(Boolean);
-    let added = 0;
-    for (const key of keys) {
-      if (!isKeyAlreadyAdded(key)) {
-        addEnvRow(key, '', false);
-        added++;
-      }
-    }
-    if (added > 0) {
-      if (envVarsLabel) envVarsLabel.style.display = '';
-      markEnvDirty();
-    }
-  });
-});
-
-async function loadEnvVars() {
-  if (!currentSlug || !envVarRows) return;
-  envVarRows.innerHTML = '';
+async function loadIntegrationsPanel() {
+  if (!currentSlug) return;
+  integrationVars = {};
   envDirty = false;
   if (envSaveBtn) envSaveBtn.disabled = true;
 
-  await detectAndShowSuggestions(currentSlug);
+  const list    = $('integrations-list');
+  const loading = $('integrations-loading');
+  if (!list) return;
+
+  if (loading) { loading.style.display = ''; loading.textContent = 'Loading integrations...'; }
+
+  // Load custom vars alongside integrations
+  if (envVarRows) envVarRows.innerHTML = '';
 
   try {
-    const data = await apiFetch(`/api/projects/${currentSlug}/env`);
-    const vars = data.vars || [];
-    if (envVarsLabel) envVarsLabel.style.display = vars.length ? '' : 'none';
-    for (const { key, masked } of vars) addEnvRow(key, masked, true);
+    const [intData, envData] = await Promise.all([
+      apiFetch(`/api/projects/${currentSlug}/integrations`),
+      apiFetch(`/api/projects/${currentSlug}/env`),
+    ]);
+
+    if (loading) loading.style.display = 'none';
+
+    const integrations  = intData.integrations || [];
+    const allEnvVarKeys = new Set(integrations.flatMap((i) => i.vars.map((v) => v.key)));
+
+    // Render integration cards
+    renderIntegrations(list, integrations);
+
+    // Populate custom vars (vars not belonging to any integration)
+    const customVars = (envData.vars || []).filter((v) => !allEnvVarKeys.has(v.key));
+    for (const { key, masked } of customVars) addEnvRow(key, masked, true);
+
   } catch (_) {
-    if (envVarsLabel) envVarsLabel.style.display = 'none';
+    if (loading) { loading.style.display = ''; loading.textContent = 'Failed to load integrations.'; }
   }
 }
 
-async function detectAndShowSuggestions(slug) {
-  if (envSuggestions) envSuggestions.classList.add('hidden');
-  if (envSqlBlock)    envSqlBlock.classList.add('hidden');
-  _sqlContent = null;
+// ── Render integration cards ──────────────────────────────────────────────────
 
-  try {
-    const data    = await apiFetch(`/api/projects/${slug}/files`);
-    const paths   = collectFilePaths(data.files || []);
-    const detected = new Set();
+const STATUS_LABELS = { configured: 'Configured', partial: 'Partial', missing: 'Missing' };
+const CATEGORY_LABELS = {
+  database: 'Database', auth: 'Auth', payments: 'Payments',
+  ai: 'AI', email: 'Email', storage: 'Storage',
+  analytics: 'Analytics', sms: 'SMS', maps: 'Maps', other: 'Other',
+};
 
-    if (/supabase/i.test(paths))  detected.add('supabase');
-    if (/stripe/i.test(paths))    detected.add('stripe');
-    if (/openai/i.test(paths))    detected.add('openai');
-    if (/anthropic/i.test(paths)) detected.add('anthropic');
-    if (/mapbox/i.test(paths))    detected.add('mapbox');
-    if (/sendgrid/i.test(paths))  detected.add('sendgrid');
-
-    const suggestions = [];
-    for (const service of detected) suggestions.push(...(KNOWN_SUGGESTIONS[service] || []));
-    if (!suggestions.length) return;
-
-    if (envSuggestionRows) {
-      envSuggestionRows.innerHTML = suggestions.map((s) => `
-        <div class="env-suggestion-row" data-key="${escAttr(s.key)}">
-          <div class="env-suggestion-key">${escHtml(s.key)}</div>
-          <div class="env-suggestion-hint">${escHtml(s.hint)}</div>
-          <button class="env-suggestion-add-btn" type="button" data-key="${escAttr(s.key)}">Add</button>
-        </div>`).join('');
-
-      envSuggestionRows.querySelectorAll('.env-suggestion-add-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const key = btn.dataset.key;
-          if (!isKeyAlreadyAdded(key)) {
-            addEnvRow(key, '', false);
-            if (envVarsLabel) envVarsLabel.style.display = '';
-            markEnvDirty();
-          }
-          btn.textContent = 'Added'; btn.classList.add('added'); btn.disabled = true;
-        });
-      });
-    }
-    if (envSuggestions) envSuggestions.classList.remove('hidden');
-
-    if (detected.has('supabase')) {
-      if (envSqlBlock) envSqlBlock.classList.remove('hidden');
-      loadSqlForCopy(slug);
-    }
-  } catch (_) {}
-}
-
-function collectFilePaths(nodes) {
-  let paths = '';
-  for (const n of (nodes || [])) {
-    if (n.type === 'file') paths += ' ' + n.path;
-    else if (n.children) paths += collectFilePaths(n.children);
+function renderIntegrations(container, integrations) {
+  // Group by category
+  const byCategory = {};
+  for (const intg of integrations) {
+    const cat = intg.category || 'other';
+    if (!byCategory[cat]) byCategory[cat] = [];
+    byCategory[cat].push(intg);
   }
-  return paths;
-}
 
-let _sqlContent = null;
-
-async function loadSqlForCopy(slug) {
-  _sqlContent = null;
-  try {
-    const data = await apiFetch(`/api/preview/file/${encodeURIComponent(slug)}/sql/setup.sql`);
-    _sqlContent = data.content || null;
-  } catch (_) {}
-}
-
-if (envCopySqlBtn) {
-  envCopySqlBtn.addEventListener('click', () => {
-    if (!_sqlContent) {
-      envCopySqlBtn.textContent = 'Not found';
-      setTimeout(() => { envCopySqlBtn.textContent = 'Copy SQL'; }, 2000);
-      return;
-    }
-    navigator.clipboard.writeText(_sqlContent).then(() => {
-      envCopySqlBtn.textContent = 'Copied!';
-      envCopySqlBtn.classList.add('copied');
-      setTimeout(() => { envCopySqlBtn.textContent = 'Copy SQL'; envCopySqlBtn.classList.remove('copied'); }, 2200);
-    });
+  // Clear all existing integration cards (keep loading sentinel)
+  [...container.children].forEach((el) => {
+    if (el.id !== 'integrations-loading') el.remove();
   });
+
+  if (!integrations.length) {
+    const empty = document.createElement('div');
+    empty.className = 'integrations-empty';
+    empty.textContent = 'No integrations detected for this project.';
+    container.appendChild(empty);
+    return;
+  }
+
+  for (const [cat, items] of Object.entries(byCategory)) {
+    const group = document.createElement('div');
+    group.className = 'intg-category-group';
+
+    const catLabel = document.createElement('div');
+    catLabel.className = 'intg-category-label';
+    catLabel.textContent = CATEGORY_LABELS[cat] || cat;
+    group.appendChild(catLabel);
+
+    for (const intg of items) {
+      group.appendChild(buildIntegrationCard(intg));
+    }
+    container.appendChild(group);
+  }
 }
 
-function isKeyAlreadyAdded(key) {
-  if (!envVarRows) return false;
-  return [...envVarRows.querySelectorAll('.env-key-input')].some(
-    (el) => el.value.toUpperCase() === key.toUpperCase()
-  );
+function buildIntegrationCard(intg) {
+  const card = document.createElement('div');
+  card.className = `intg-card intg-card--${intg.status}`;
+  card.dataset.id = intg.id;
+
+  // Card header
+  const header = document.createElement('div');
+  header.className = 'intg-card-header';
+  header.innerHTML = `
+    <div class="intg-card-left">
+      <span class="intg-card-name">${escHtml(intg.label)}</span>
+      <span class="intg-status-badge intg-status--${escAttr(intg.status)}">${escHtml(STATUS_LABELS[intg.status] || intg.status)}</span>
+    </div>
+    <button class="intg-toggle-btn" type="button" aria-expanded="false" title="Expand">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>`;
+  card.appendChild(header);
+
+  // Card body (collapsible)
+  const body = document.createElement('div');
+  body.className = 'intg-card-body hidden';
+
+  if (intg.description) {
+    const desc = document.createElement('p');
+    desc.className = 'intg-card-desc';
+    desc.textContent = intg.description;
+    body.appendChild(desc);
+  }
+
+  // Billing note (Stripe)
+  if (intg.billingNote) {
+    const note = document.createElement('div');
+    note.className = 'intg-billing-note';
+    note.textContent = intg.billingNote;
+    body.appendChild(note);
+  }
+
+  // Vars
+  const varsList = document.createElement('div');
+  varsList.className = 'intg-vars-list';
+  for (const varDef of intg.vars) {
+    varsList.appendChild(buildVarRow(varDef));
+  }
+  body.appendChild(varsList);
+
+  // SQL copy (for integrations with sqlFiles)
+  if (intg.sqlFiles && intg.sqlFiles.length > 0) {
+    const sqlRow = document.createElement('div');
+    sqlRow.className = 'intg-sql-row';
+    sqlRow.innerHTML = `
+      <span class="intg-sql-hint">Run setup SQL in your Supabase SQL Editor:</span>
+      <button class="intg-copy-sql-btn" type="button" data-slug="${escAttr(currentSlug || '')}" data-file="${escAttr(intg.sqlFiles[0])}">Copy SQL</button>`;
+    sqlRow.querySelector('.intg-copy-sql-btn').addEventListener('click', handleCopySql);
+    body.appendChild(sqlRow);
+  }
+
+  // Setup guide (collapsible)
+  if (intg.setupGuide && intg.setupGuide.length > 0) {
+    const guide = document.createElement('div');
+    guide.className = 'intg-guide';
+    guide.innerHTML = `
+      <button class="intg-guide-toggle" type="button">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Setup guide
+        <svg class="intg-guide-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <ol class="intg-guide-steps hidden">${intg.setupGuide.map((s) => `<li>${escHtml(s)}</li>`).join('')}</ol>`;
+    guide.querySelector('.intg-guide-toggle').addEventListener('click', (e) => {
+      const steps   = guide.querySelector('.intg-guide-steps');
+      const chevron = guide.querySelector('.intg-guide-chevron');
+      const open    = steps.classList.toggle('hidden');
+      chevron.style.transform = open ? '' : 'rotate(180deg)';
+    });
+    body.appendChild(guide);
+  }
+
+  // Docs link
+  if (intg.docsUrl) {
+    const link = document.createElement('a');
+    link.className = 'intg-docs-link';
+    link.href = intg.docsUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'View docs';
+    body.appendChild(link);
+  }
+
+  card.appendChild(body);
+
+  // Toggle expand/collapse
+  header.querySelector('.intg-toggle-btn').addEventListener('click', () => {
+    const isOpen = body.classList.toggle('hidden');
+    header.querySelector('.intg-toggle-btn').setAttribute('aria-expanded', String(!isOpen));
+    card.classList.toggle('intg-card--open', !isOpen);
+  });
+
+  // Auto-open if partial or missing
+  if (intg.status !== 'configured') {
+    body.classList.remove('hidden');
+    header.querySelector('.intg-toggle-btn').setAttribute('aria-expanded', 'true');
+    card.classList.add('intg-card--open');
+  }
+
+  return card;
 }
+
+function buildVarRow(varDef) {
+  const row = document.createElement('div');
+  row.className = 'intg-var-row';
+  row.dataset.key = varDef.key;
+
+  const statusIcon = varDef.isSet
+    ? (varDef.validationError
+        ? `<span class="intg-var-status intg-var-status--warn" title="${escAttr(varDef.validationError)}">!</span>`
+        : `<span class="intg-var-status intg-var-status--ok" title="Set">&#x2713;</span>`)
+    : `<span class="intg-var-status intg-var-status--empty" title="Not set"></span>`;
+
+  const requiredTag = varDef.required
+    ? `<span class="intg-var-required">required</span>`
+    : `<span class="intg-var-optional">optional</span>`;
+
+  row.innerHTML = `
+    <div class="intg-var-meta">
+      ${statusIcon}
+      <span class="intg-var-key">${escHtml(varDef.key)}</span>
+      ${requiredTag}
+    </div>
+    ${varDef.hint ? `<div class="intg-var-hint">${escHtml(varDef.hint)}</div>` : ''}
+    <div class="intg-var-input-row">
+      <div class="env-val-wrapper">
+        <input class="env-val-input intg-var-input" type="password"
+          placeholder="${escAttr(varDef.placeholder || 'paste value')}"
+          value="${escAttr(varDef.maskedValue || '')}"
+          autocomplete="off" spellcheck="false"
+          data-masked="${varDef.isSet ? 'true' : 'false'}"
+          data-key="${escAttr(varDef.key)}">
+        <button class="env-show-btn" type="button" title="Show/hide">${eyeIconSvg}</button>
+      </div>
+    </div>`;
+
+  const input   = row.querySelector('.intg-var-input');
+  const showBtn = row.querySelector('.env-show-btn');
+
+  input.addEventListener('focus', () => {
+    if (input.dataset.masked === 'true') { input.value = ''; input.dataset.masked = 'false'; }
+  });
+  input.addEventListener('input', () => {
+    integrationVars[varDef.key] = { value: input.value, masked: input.dataset.masked === 'true' };
+    markEnvDirty();
+  });
+  showBtn.addEventListener('click', () => {
+    input.type = input.type === 'password' ? 'text' : 'password';
+    input.dataset.masked = 'false';
+  });
+
+  // Track initial masked values too
+  if (varDef.isSet) {
+    integrationVars[varDef.key] = { value: varDef.maskedValue || '', masked: true };
+  }
+
+  return row;
+}
+
+async function handleCopySql(e) {
+  const btn  = e.currentTarget;
+  const slug = btn.dataset.slug;
+  const file = btn.dataset.file;
+  if (!slug || !file) return;
+  try {
+    const data = await apiFetch(`/api/preview/file/${encodeURIComponent(slug)}/${file}`);
+    const sql  = data.content || '';
+    if (!sql) { btn.textContent = 'Not found'; setTimeout(() => { btn.textContent = 'Copy SQL'; }, 2000); return; }
+    await navigator.clipboard.writeText(sql);
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy SQL'; btn.classList.remove('copied'); }, 2200);
+  } catch (_) {
+    btn.textContent = 'Error';
+    setTimeout(() => { btn.textContent = 'Copy SQL'; }, 2000);
+  }
+}
+
+// ── Custom var rows ───────────────────────────────────────────────────────────
 
 function addEnvRow(key = '', value = '', masked = false) {
   if (!envVarRows) return;
   const row = document.createElement('div');
   row.className = 'env-var-row';
-  const eyeIcon   = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
-  const trashIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
 
   row.innerHTML = `
     <input class="env-key-input" type="text" placeholder="KEY_NAME" value="${escAttr(key)}" autocomplete="off" spellcheck="false">
     <div class="env-val-wrapper">
       <input class="env-val-input" type="password" placeholder="paste value" value="${escAttr(value)}" autocomplete="off" spellcheck="false" data-masked="${masked}">
-      <button class="env-show-btn" type="button" title="Show/hide">${eyeIcon}</button>
+      <button class="env-show-btn" type="button" title="Show/hide">${eyeIconSvg}</button>
     </div>
-    <button class="env-del-btn" type="button" title="Remove">${trashIcon}</button>`;
+    <button class="env-del-btn" type="button" title="Remove">${trashIconSvg}</button>`;
 
   const keyInput = row.querySelector('.env-key-input');
   const valInput = row.querySelector('.env-val-input');
@@ -1874,24 +2008,17 @@ function addEnvRow(key = '', value = '', masked = false) {
     keyInput.setSelectionRange(pos, pos);
     markEnvDirty();
   });
-
   valInput.addEventListener('focus', () => {
     if (valInput.dataset.masked === 'true') { valInput.value = ''; valInput.dataset.masked = 'false'; }
   });
   valInput.addEventListener('input', markEnvDirty);
-
   showBtn.addEventListener('click', () => {
     valInput.type = valInput.type === 'password' ? 'text' : 'password';
     valInput.dataset.masked = 'false';
   });
-
   delBtn.addEventListener('click', () => {
     row.style.opacity = '0'; row.style.transition = 'opacity 0.12s';
-    setTimeout(() => {
-      row.remove();
-      if (envVarsLabel) envVarsLabel.style.display = envVarRows.children.length ? '' : 'none';
-      markEnvDirty();
-    }, 120);
+    setTimeout(() => { row.remove(); markEnvDirty(); }, 120);
   });
 
   envVarRows.appendChild(row);
@@ -1906,23 +2033,38 @@ function markEnvDirty() {
 if (envAddBtn) {
   envAddBtn.addEventListener('click', () => {
     addEnvRow('', '', false);
-    if (envVarsLabel) envVarsLabel.style.display = '';
     markEnvDirty();
   });
 }
 
+// ── Save all vars ─────────────────────────────────────────────────────────────
+
 if (envSaveBtn) {
   envSaveBtn.addEventListener('click', async () => {
     if (!currentSlug) return;
-    const rows = [...envVarRows.querySelectorAll('.env-var-row')];
     const vars = [];
-    for (const row of rows) {
-      const key    = row.querySelector('.env-key-input')?.value?.trim();
-      const valEl  = row.querySelector('.env-val-input');
-      const masked = valEl?.dataset?.masked === 'true';
-      if (!key || masked) continue; // skip blank keys and unchanged masked values
-      vars.push({ key, value: valEl?.value || '' });
+
+    // Collect integration vars (from rendered var rows inside integration cards)
+    document.querySelectorAll('.intg-var-input').forEach((input) => {
+      const key    = input.dataset.key;
+      const masked = input.dataset.masked === 'true';
+      const value  = input.value;
+      if (!key) return;
+      // Masked values: send the bullet placeholder so backend preserves the stored value
+      vars.push({ key, value });
+    });
+
+    // Collect custom vars
+    if (envVarRows) {
+      [...envVarRows.querySelectorAll('.env-var-row')].forEach((row) => {
+        const key    = row.querySelector('.env-key-input')?.value?.trim();
+        const valEl  = row.querySelector('.env-val-input');
+        const masked = valEl?.dataset?.masked === 'true';
+        if (!key || masked) return;
+        vars.push({ key, value: valEl?.value || '' });
+      });
     }
+
     envSaveBtn.textContent = 'Saving...';
     envSaveBtn.disabled = true;
     try {
@@ -1931,8 +2073,8 @@ if (envSaveBtn) {
         body: JSON.stringify({ vars }),
       });
       envDirty = false;
-      envSaveBtn.textContent = 'Saved!';
       updateEnvBadge(vars.length > 0);
+      envSaveBtn.textContent = 'Saved!';
       setTimeout(() => {
         envSaveBtn.textContent = 'Save & Reload Preview';
         closeEnvPanel();

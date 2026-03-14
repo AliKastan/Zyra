@@ -98,7 +98,14 @@ async function startGeneration(userPrompt, mode = 'balanced', options = {}) {
   await createJob(jobId, { prompt: userPrompt, mode, complexity, status: 'queued', startedAt });
   _addActive(jobId, userId);
 
-  logger.info(`generationService: job ${jobId} — mode="${mode}" complexity="${complexity.level}" appType="${complexity.appType}"`);
+  // Eager SaaS intent parse for logging (plannerService will re-parse with full context)
+  let saasHint = '';
+  try {
+    const { parseSaasIntent } = require('../utils/saasIntentParser');
+    const intent = parseSaasIntent(userPrompt);
+    if (intent.isSaaS) saasHint = ` saasCategory="${intent.category}"`;
+  } catch (_) {}
+  logger.info(`generationService: job ${jobId} — mode="${mode}" complexity="${complexity.level}" appType="${complexity.appType}"${saasHint}`);
 
   runPipeline(jobId, userPrompt, mode, complexity, startedAt, userId)
     .catch((err) => logger.error(`generationService: unhandled error for job ${jobId}`, { error: err.message }))

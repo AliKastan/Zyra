@@ -9,8 +9,152 @@
  */
 
 // ── App-type templates ────────────────────────────────────────────────────────
+// SaaS templates have richer file structures (20+ files) used as guidance for full generation.
+// Simple templates (calculator, timer, etc.) remain minimal.
 
 const TEMPLATES = {
+  // ── SaaS product types ──────────────────────────────────────────────────────
+  'booking-saas': {
+    summary: 'A booking SaaS MVP with auth, scheduling, provider management, notifications, and billing.',
+    stack: 'HTML/CSS/JS + Supabase',
+    files: [
+      'index.html', 'pages/login.html', 'pages/register.html', 'pages/forgot-password.html',
+      'pages/pricing.html',
+      'pages/dashboard/index.html', 'pages/dashboard/bookings.html',
+      'pages/dashboard/calendar.html', 'pages/dashboard/settings.html', 'pages/dashboard/billing.html',
+      'pages/provider/index.html', 'pages/provider/availability.html',
+      'pages/admin/index.html', 'pages/admin/users.html',
+      'css/main.css', 'css/components.css', 'css/layout.css', 'css/auth.css', 'css/responsive.css',
+      'js/app.js', 'js/auth.js', 'js/router.js', 'js/api.js', 'js/utils.js',
+      'js/bookings.js', 'js/calendar.js', 'js/billing.js', 'js/admin.js',
+      'js/components/modal.js', 'js/components/toast.js', 'js/components/sidebar.js',
+      'config/supabase.js', 'sql/schema.sql', 'sql/seed.sql', 'env.example', 'README.md',
+    ],
+    steps: [
+      'Build landing page with hero, feature highlights, pricing (Free/Pro/Business), and signup CTA',
+      'Implement Supabase auth: signup, login, password reset, user profile creation trigger',
+      'Build provider availability system: time slots, recurring schedules, blocking dates',
+      'Build booking flow: browse providers, select slot, confirm, receive confirmation',
+      'Build customer dashboard: upcoming bookings, history, cancel/reschedule',
+      'Build provider dashboard: booking requests, calendar view, manage availability',
+      'Build admin panel: user management, booking overview, platform analytics',
+      'Add billing architecture: plan table, subscriptions table, Stripe env setup',
+    ],
+  },
+
+  'crm-saas': {
+    summary: 'A CRM SaaS MVP with contacts, pipeline management, deal tracking, and team collaboration.',
+    stack: 'HTML/CSS/JS + Supabase',
+    files: [
+      'index.html', 'pages/login.html', 'pages/register.html', 'pages/forgot-password.html',
+      'pages/pricing.html',
+      'pages/dashboard/index.html', 'pages/dashboard/contacts.html',
+      'pages/dashboard/pipeline.html', 'pages/dashboard/deals.html',
+      'pages/dashboard/activities.html', 'pages/dashboard/settings.html', 'pages/dashboard/billing.html',
+      'pages/admin/index.html', 'pages/admin/users.html',
+      'css/main.css', 'css/components.css', 'css/layout.css', 'css/auth.css', 'css/responsive.css',
+      'js/app.js', 'js/auth.js', 'js/router.js', 'js/api.js', 'js/utils.js',
+      'js/contacts.js', 'js/pipeline.js', 'js/deals.js', 'js/activities.js',
+      'js/billing.js', 'js/admin.js',
+      'js/components/modal.js', 'js/components/toast.js', 'js/components/sidebar.js',
+      'config/supabase.js', 'sql/schema.sql', 'sql/seed.sql', 'env.example', 'README.md',
+    ],
+    steps: [
+      'Build landing page with CRM feature highlights, use-case sections, and pricing',
+      'Implement Supabase auth with profile + workspace creation on signup',
+      'Build contacts module: list with search/filter, contact card, notes, activity timeline',
+      'Build pipeline view: Kanban board with deal stages, drag-and-drop between columns',
+      'Build deals module: deal CRUD with value, close date, probability, contact linking',
+      'Build activities module: calls, emails, meetings — log and track per contact/deal',
+      'Build dashboard: pipeline value, win rate, deals by stage, recent activity feed',
+      'Add admin panel with user management, team invites, and subscription status',
+    ],
+  },
+
+  'ai-saas': {
+    summary: 'An AI SaaS MVP with prompt interface, usage tracking, plan limits, and billing.',
+    stack: 'HTML/CSS/JS + Supabase',
+    files: [
+      'index.html', 'pages/login.html', 'pages/register.html', 'pages/forgot-password.html',
+      'pages/pricing.html',
+      'pages/dashboard/index.html', 'pages/dashboard/generate.html',
+      'pages/dashboard/history.html', 'pages/dashboard/settings.html', 'pages/dashboard/billing.html',
+      'pages/admin/index.html', 'pages/admin/users.html', 'pages/admin/usage.html',
+      'css/main.css', 'css/components.css', 'css/layout.css', 'css/auth.css', 'css/responsive.css',
+      'js/app.js', 'js/auth.js', 'js/router.js', 'js/api.js', 'js/utils.js',
+      'js/generator.js', 'js/history.js', 'js/usage.js', 'js/billing.js', 'js/admin.js',
+      'js/components/modal.js', 'js/components/toast.js', 'js/components/sidebar.js',
+      'config/supabase.js', 'sql/schema.sql', 'sql/seed.sql', 'env.example', 'README.md',
+    ],
+    steps: [
+      'Build landing page with AI value prop, feature demos, usage stats, and pricing tiers',
+      'Implement auth + profile with usage_credits field seeded from plan',
+      'Build main AI generation interface: prompt textarea, model config, output display, copy button',
+      'Build generation history: past outputs with search, filter by date, regenerate, delete',
+      'Implement usage tracking: credits_used counter, plan limits enforcement before API call',
+      'Build usage dashboard: credits remaining, bar chart of usage over time, reset date',
+      'Build billing page: current plan, upgrade/downgrade, Stripe checkout redirect',
+      'Build admin panel: total users, API usage, revenue, per-user usage table',
+    ],
+  },
+
+  'project-management': {
+    summary: 'A project management SaaS MVP with boards, tasks, team members, and progress tracking.',
+    stack: 'HTML/CSS/JS + Supabase',
+    files: [
+      'index.html', 'pages/login.html', 'pages/register.html', 'pages/forgot-password.html',
+      'pages/pricing.html',
+      'pages/dashboard/index.html', 'pages/dashboard/projects.html',
+      'pages/dashboard/board.html', 'pages/dashboard/tasks.html',
+      'pages/dashboard/team.html', 'pages/dashboard/settings.html', 'pages/dashboard/billing.html',
+      'pages/admin/index.html',
+      'css/main.css', 'css/components.css', 'css/layout.css', 'css/auth.css', 'css/responsive.css',
+      'js/app.js', 'js/auth.js', 'js/router.js', 'js/api.js', 'js/utils.js',
+      'js/projects.js', 'js/board.js', 'js/tasks.js', 'js/team.js',
+      'js/billing.js', 'js/admin.js',
+      'js/components/modal.js', 'js/components/toast.js', 'js/components/sidebar.js',
+      'config/supabase.js', 'sql/schema.sql', 'sql/seed.sql', 'env.example', 'README.md',
+    ],
+    steps: [
+      'Build landing page with product demo, workflow features, team pricing',
+      'Implement auth + workspace creation (every user gets a personal workspace on signup)',
+      'Build projects list: create project, set name/color/icon, archive, member count',
+      'Build Kanban board: columns (Todo/In Progress/Review/Done), task cards, drag-and-drop',
+      'Build task detail modal: description, assignee, due date, priority, labels, comments',
+      'Build team management: invite by email, role assignment (owner/admin/member/viewer)',
+      'Build dashboard: tasks due today, project progress bars, recent activity',
+      'Add billing with workspace plan limits (projects count, members count per plan)',
+    ],
+  },
+
+  'collaboration-saas': {
+    summary: 'A team collaboration SaaS MVP with channels, direct messaging, members, and file sharing.',
+    stack: 'HTML/CSS/JS + Supabase',
+    files: [
+      'index.html', 'pages/login.html', 'pages/register.html', 'pages/forgot-password.html',
+      'pages/pricing.html', 'pages/create-workspace.html',
+      'pages/workspace/index.html', 'pages/workspace/channel.html', 'pages/workspace/dm.html',
+      'pages/workspace/members.html', 'pages/workspace/settings.html',
+      'pages/dashboard/billing.html', 'pages/admin/index.html',
+      'css/main.css', 'css/components.css', 'css/layout.css', 'css/auth.css', 'css/responsive.css',
+      'js/app.js', 'js/auth.js', 'js/router.js', 'js/api.js', 'js/utils.js',
+      'js/workspace.js', 'js/channels.js', 'js/messages.js', 'js/members.js',
+      'js/billing.js', 'js/admin.js',
+      'js/components/modal.js', 'js/components/toast.js',
+      'config/supabase.js', 'sql/schema.sql', 'sql/seed.sql', 'env.example', 'README.md',
+    ],
+    steps: [
+      'Build landing page with "team communication" positioning, channel screenshots, pricing',
+      'Implement auth + workspace creation wizard (name, invite team, create channels)',
+      'Build workspace layout: left sidebar (workspace switcher, channels, DMs), main content area',
+      'Build channel messaging: real-time messages via Supabase Realtime, message history',
+      'Build direct messaging: user picker, DM thread, online presence indicators',
+      'Build member management: invite, assign roles, view profiles, deactivate',
+      'Build notifications: unread counts per channel, notification preferences',
+      'Add billing: per-seat pricing model, workspace plan limits, Stripe setup',
+    ],
+  },
+
   'landing-page': {
     summary: 'A polished, responsive landing page with hero, features section, social proof, and call-to-action.',
     stack: 'HTML, CSS, JavaScript',

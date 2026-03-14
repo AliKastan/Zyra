@@ -139,8 +139,9 @@ async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTr
       if (typeof onRetry === 'function') onRetry(attempt, lastError?.message);
     }
 
+    const saasIntent = plan?._saasIntent || null;
     const { system, user } = attempt === 0
-      ? buildCoderPrompt(userPrompt, plan, mode)
+      ? buildCoderPrompt(userPrompt, plan, mode, saasIntent)
       : buildCoderRetryPrompt(userPrompt, plan, mode, attempt);
 
     // Reduce output budget on retries (simpler output expected)

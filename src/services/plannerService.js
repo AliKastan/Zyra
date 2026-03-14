@@ -2,6 +2,7 @@ const { callClaude, HAIKU_MODEL } = require('../providers/anthropicProvider');
 const { callOpenAI } = require('../providers/openaiProvider');
 const { buildPlannerPrompt } = require('../generators/promptBuilder');
 const { getInlinePlan, getFallbackPlan } = require('../generators/inlinePlanner');
+const { parseSaasIntent } = require('../utils/saasIntentParser');
 const { safeJsonParse } = require('../utils/safeJsonParse');
 const { withTimeout } = require('../utils/withTimeout');
 const { elapsedMs } = require('../utils/generationTimer');
@@ -41,8 +42,8 @@ function validatePlan(data) {
  * Calls the planner API with an aggressive timeout.
  * Returns null on timeout or failure (caller should use fallback).
  */
-async function callPlannerAPI(userPrompt, mode, timeoutMs) {
-  const { system, user } = buildPlannerPrompt(userPrompt, mode);
+async function callPlannerAPI(userPrompt, mode, timeoutMs, saasIntent) {
+  const { system, user } = buildPlannerPrompt(userPrompt, mode, saasIntent);
   const modelName = env.DEFAULT_PLANNER_MODEL;
   const maxTokens = limits.MODE_TOKENS[mode]?.planner || 600;
 
@@ -86,18 +87,26 @@ async function runPlanner(userPrompt, mode = 'balanced', complexity = {}) {
   const appType = complexity.appType || 'generic';
   const t0      = Date.now();
 
-  // ── Tier 1: Inline plan for simple requests ────────────────────────────────
-  if (level === 'simple' || mode === 'fast') {
-    const plan = getInlinePlan(appType, userPrompt);
-    logger.success(`plannerService: inline plan — appType="${appType}" [${Date.now() - t0}ms]`);
-    return plan;
+  // Parse SaaS intent once — thread through to API planner and fallback
+  const saasIntent = parseSaasIntent(userPrompt);
+  if (saasIntent.isSaaS) {
+    logger.info(`plannerService: SaaS detected — category="${saasIntent.category}" modules=[${saasIntent.requiredModules.join(',')}]`);
   }
 
-  // ── Tier 2: API planner for medium/complex requests ────────────────────────
+  // ── Tier 1: Inline plan for simple requests ────────────────────────────────
+  // SaaS types skip inline plan even when simple — they need API planning
+  const isSaasType = saasIntent.isSaaS || complexity.appType?.endsWith('-saas') || complexity.appType === 'project-management' || complexity.appType === 'marketplace' || complexity.appType === 'collaboration-saas';
+  if ((level === 'simple' || mode === 'fast') && !isSaasType) {
+    const plan = getInlinePlan(appType, userPrompt);
+    logger.success(`plannerService: inline plan — appType="${appType}" [${Date.now() - t0}ms]`);
+    return { ...plan, _saasIntent: saasIntent };
+  }
+
+  // ── Tier 2: API planner for medium/complex and all SaaS requests ───────────
   const timeoutMs = getPlannerTimeout(level, mode);
   logger.info(`plannerService: API call — level="${level}" mode="${mode}" timeout=${timeoutMs}ms`);
 
-  const plan = await callPlannerAPI(userPrompt, mode, timeoutMs);
+  const plan = await callPlannerAPI(userPrompt, mode, timeoutMs, saasIntent);
 
   if (plan) {
     // Enforce file count limit
@@ -108,14 +117,14 @@ async function runPlanner(userPrompt, mode = 'balanced', complexity = {}) {
     }
     const duration = Date.now() - t0;
     logger.success(`plannerService: API plan — ${plan.files.length} files [${duration}ms]`);
-    return { ...plan, _source: 'api' };
+    return { ...plan, _source: 'api', _saasIntent: saasIntent };
   }
 
   // ── Tier 3: Fallback plan ──────────────────────────────────────────────────
   logger.warn(`plannerService: using fallback plan for appType="${appType}"`);
   const fallback = getFallbackPlan(userPrompt, appType);
   logger.success(`plannerService: fallback plan — ${fallback.files.length} files [${Date.now() - t0}ms]`);
-  return fallback;
+  return { ...fallback, _saasIntent: saasIntent };
 }
 
 module.exports = { runPlanner };
