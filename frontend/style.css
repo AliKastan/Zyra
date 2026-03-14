@@ -919,6 +919,25 @@ html, body {
   user-select: none;
 }
 
+/* ── File progress bar ─────────────────────────────────────────────────────── */
+
+.msg-progress-track {
+  height: 2px;
+  background: var(--surface3, rgba(255,255,255,0.08));
+  border-radius: 2px;
+  margin: 0.45rem 0 0.1rem;
+  overflow: hidden;
+}
+
+.msg-progress-bar {
+  height: 100%;
+  width: 0%;
+  opacity: 0;
+  background: var(--accent, #566B48);
+  border-radius: 2px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+
 /* ── Live log stream ───────────────────────────────────────────────────────── */
 
 .msg-log-stream {

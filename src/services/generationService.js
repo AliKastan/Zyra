@@ -53,6 +53,22 @@ class DeadlineError extends Error {
   constructor(msg) { super(msg); this.type = 'timed_out'; }
 }
 
+/**
+ * Starts a heartbeat that appends a progress log every `intervalMs`.
+ * Prevents the UI log stream from appearing frozen during long AI calls.
+ * Returns a stop function — MUST be called after the stage completes.
+ */
+function startHeartbeat(log, stageStart, intervalMs = 20_000) {
+  const timer = setInterval(async () => {
+    const elapsed = Math.round((Date.now() - stageStart) / 1000);
+    const mins    = Math.floor(elapsed / 60);
+    const secs    = elapsed % 60;
+    const label   = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    try { await log(`Still generating... (${label} elapsed)`); } catch (_) {}
+  }, intervalMs);
+  return () => clearInterval(timer);
+}
+
 // ── Public entry point ────────────────────────────────────────────────────────
 
 async function startGeneration(userPrompt, mode = 'balanced', options = {}) {
@@ -136,14 +152,39 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
       mode !== 'quality';
     await log(isTemplate ? 'Building from template...' : 'Generating project files...');
 
-    let codeOutput = await runCoder(
-      userPrompt,
-      plan,
-      mode,
-      async (attempt) => { await log(`Retry ${attempt} — adjusting approach...`); },
-      cost,
-      complexity,
-    );
+    // Heartbeat: emit a progress log every 20s so the UI never looks frozen.
+    // Template calls are fast (<10s) so only start it for full generation.
+    const codingStart   = Date.now();
+    const stopHeartbeat = isTemplate ? () => {} : startHeartbeat(log, codingStart, 20_000);
+
+    // Progress callback: update job record as each file streams in.
+    // The frontend polls this and shows "Building index.html (2/8)..." live.
+    let lastProgressUpdate = 0;
+    const onProgress = async (progress) => {
+      const now = Date.now();
+      if (now - lastProgressUpdate < 800) return; // throttle to 1 update/0.8s max
+      lastProgressUpdate = now;
+      try {
+        await updateJob(jobId, { progress });
+      } catch (_) {}
+    };
+
+    let codeOutput;
+    try {
+      codeOutput = await runCoder(
+        userPrompt,
+        plan,
+        mode,
+        async (attempt) => { await log(`Retry ${attempt} — adjusting approach...`); },
+        cost,
+        complexity,
+        onProgress,
+      );
+    } finally {
+      stopHeartbeat();
+    }
+    // Clear progress once coding is done
+    await updateJob(jobId, { progress: null });
     await completeJobStage(jobId, 'coding');
 
     const genNote = codeOutput._template

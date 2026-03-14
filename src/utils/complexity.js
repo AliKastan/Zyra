@@ -5,21 +5,33 @@
  */
 
 const COMPLEX_SIGNALS = [
-  'full-stack', 'fullstack', 'auth', 'authentication', 'login', 'register',
-  'database', 'db', 'sql', 'postgres', 'mongodb', 'prisma',
-  'payment', 'stripe', 'billing', 'subscription',
-  'saas', 'crm', 'erp', 'admin panel', 'role', 'permissions',
-  'multi-user', 'user management', 'real-time', 'websocket',
+  'full-stack', 'fullstack', 'auth', 'authentication', 'login', 'register', 'sign up', 'sign in',
+  'database', 'db', 'sql', 'postgres', 'mongodb', 'prisma', 'supabase',
+  'payment', 'stripe', 'billing', 'subscription', 'checkout',
+  'saas', 'crm', 'erp', 'admin panel', 'admin dashboard', 'role', 'permissions',
+  'multi-user', 'user management', 'real-time', 'websocket', 'live',
   'notifications', 'email', 'oauth', 'jwt', 'session',
   'backend api', 'rest api', 'graphql', 'microservice',
+  'e-commerce', 'ecommerce', 'online store', 'shop', 'marketplace',
+  'social media', 'social network', 'feed', 'follow', 'like', 'comment',
+  'trading', 'stock', 'crypto', 'portfolio tracker', 'investment',
+  'booking', 'reservation', 'appointment', 'scheduling', 'calendar app',
+  'project management', 'kanban', 'task manager', 'workflow',
+  'inventory', 'warehouse', 'supply chain',
+  'analytics', 'reporting', 'metrics dashboard', 'data visualization',
+  'chat', 'messaging', 'forum', 'community',
+  'learning platform', 'lms', 'course', 'education app',
+  'health tracker', 'fitness app', 'medical', 'patient',
+  'finance', 'budget', 'expense tracker', 'accounting',
 ];
 
 const SIMPLE_SIGNALS = [
   'landing page', 'landing', 'portfolio', 'personal site', 'resume site',
-  'todo', 'task list', 'calculator', 'counter', 'timer', 'stopwatch',
+  'calculator', 'counter', 'timer', 'stopwatch', 'countdown',
   'simple form', 'contact form', 'quiz', 'survey',
   'simple', 'basic', 'minimal', 'static site', 'single page', 'one page',
   'static', 'brochure', 'homepage',
+  // note: 'todo' and 'task list' intentionally removed — needs data persistence → medium
 ];
 
 // Ordered from most-specific to least-specific

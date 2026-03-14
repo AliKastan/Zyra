@@ -15,7 +15,7 @@ const { v4: uuidv4 }        = require('uuid');
 const { now }               = require('../utils/timestamps');
 const { formatElapsed }     = require('../utils/generationTimer');
 const { withTimeout }       = require('../utils/withTimeout');
-const { callClaude }        = require('../providers/anthropicProvider');
+const { callClaude, HAIKU_MODEL, SONNET_MODEL } = require('../providers/anthropicProvider');
 const { callOpenAI }        = require('../providers/openaiProvider');
 const { buildEditCoderPrompt } = require('../generators/promptBuilder');
 const { safeJsonParse }     = require('../utils/safeJsonParse');
@@ -270,10 +270,15 @@ async function runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, 
 
 async function runEditCoder(userPrompt, existingFiles, projectSlug, mode, costTracker, editType = 'GENERAL_EDIT', projectContext = {}, tier = 3, opts = {}) {
   const modelName = env.DEFAULT_CODER_MODEL;
+  // Model tiering for edits:
+  //   Tier 1 (CSS/copy, single file) → Haiku — simple targeted changes, very cheap
+  //   Tier 2 (layout/component)      → Haiku — still focused, Haiku handles well
+  //   Tier 3 (bug fix, new feature)  → Sonnet — complex reasoning needed
+  const claudeModel = tier <= 2 ? HAIKU_MODEL : SONNET_MODEL;
   // Use tier-based token budget — much cheaper than full generation budget
   const maxTokens = TIER_BUDGETS[tier] || limits.MODE_TOKENS?.[mode]?.coder || 12_000;
 
-  logger.info(`editService: edit-coder model="${modelName}" tier=${tier} maxTokens=${maxTokens} files=${existingFiles.length} editType=${editType}`);
+  logger.info(`editService: edit-coder model="${modelName}" claude="${claudeModel}" tier=${tier} maxTokens=${maxTokens} files=${existingFiles.length} editType=${editType}`);
 
   let { system, user, contextChars } = buildEditCoderPrompt(
     userPrompt, existingFiles, projectSlug, editType, projectContext, tier
@@ -288,7 +293,7 @@ async function runEditCoder(userPrompt, existingFiles, projectSlug, mode, costTr
   try {
     const call = modelName === 'openai'
       ? callOpenAI(system, user, { maxTokens })
-      : callClaude(system, user, { maxTokens });
+      : callClaude(system, user, { maxTokens, model: claudeModel });
 
     raw = await withTimeout(call, limits.CODER_TIMEOUT_MS || 180_000, 'EditCoder');
   } catch (err) {

@@ -33,16 +33,18 @@ async function handleEdit(req, res) {
     logger.warn(`editController: metadata missing for "${slug}" but files found on disk — proceeding`);
   }
 
-  // Concurrency guard (shared with generation)
-  if (getActiveJobCount() >= (limits.MAX_CONCURRENT_JOBS || 1)) {
+  // Concurrency guard — per-user, shared with generation
+  const userId = req.user?.id;
+  if (getActiveJobCount(userId) >= (limits.MAX_CONCURRENT_JOBS || 1)) {
     return res.status(429).json({
-      error: 'A generation is already in progress. Please wait for it to complete or cancel it.',
+      error: 'A generation is already in progress.',
+      code:  'JOB_IN_PROGRESS',
+      hint:  'Cancel the running job to start a new one.',
     });
   }
 
   try {
     logger.info(`editController: starting edit for "${slug}" — "${prompt.trim().slice(0, 60)}"`);
-    const userId = req.user?.id;
     const jobId = await startEdit(prompt.trim(), slug, mode, { userId });
     return res.status(202).json({ jobId });
   } catch (err) {

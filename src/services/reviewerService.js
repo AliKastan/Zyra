@@ -1,4 +1,4 @@
-const { callClaude } = require('../providers/anthropicProvider');
+const { callClaude, HAIKU_MODEL } = require('../providers/anthropicProvider');
 const { callOpenAI } = require('../providers/openaiProvider');
 const { buildReviewerPrompt } = require('../generators/promptBuilder');
 const { safeJsonParse } = require('../utils/safeJsonParse');
@@ -35,9 +35,10 @@ async function runReviewer(projectName, files, mode = 'balanced') {
 
   logger.info(`reviewerService: model="${modelName}" mode="${mode}"`);
 
+  // Reviewer outputs tiny JSON — Haiku is sufficient and much cheaper
   const call = modelName === 'openai'
     ? callOpenAI(system, user, { maxTokens })
-    : callClaude(system, user, { maxTokens });
+    : callClaude(system, user, { maxTokens, model: HAIKU_MODEL });
 
   let raw;
   try {

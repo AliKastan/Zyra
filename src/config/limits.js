@@ -30,7 +30,7 @@ module.exports = {
   // ── Auto-fix (post-generation self-healing) ──────────────────────────────────
   AUTOFIX_TIMEOUT_MS:  parseInt(process.env.AUTOFIX_TIMEOUT_MS  || '60000', 10),
   // Max AI fix rounds after the free quick-fix pass (each round = 1 extra API call)
-  AUTOFIX_MAX_ROUNDS:  parseInt(process.env.AUTOFIX_MAX_ROUNDS  || '2',     10),
+  AUTOFIX_MAX_ROUNDS:  parseInt(process.env.AUTOFIX_MAX_ROUNDS  || '1',     10),
 
   // ── Retry config ─────────────────────────────────────────────────────────────
   CODER_MAX_RETRIES: parseInt(process.env.CODER_MAX_RETRIES || '2', 10),
@@ -45,10 +45,14 @@ module.exports = {
   // ── Token budgets per mode ───────────────────────────────────────────────────
   // Note: these apply to full-generation calls only.
   // Template-hybrid uses CONTENT_EXTRACTION_TOKENS (600) instead.
+  //
+  // Fast (Haiku):    3-8 files,  8K output  — cheap & quick
+  // Balanced (Sonnet): 8-20 files, 20K output — solid full-stack apps
+  // Quality (Sonnet):  15-40 files, 28K output — production-grade
   MODE_TOKENS: {
-    fast:     { planner: 400,  coder: 16000, reviewer: 0     },
-    balanced: { planner: 600,  coder: 28000, reviewer: 1500  },
-    quality:  { planner: 1000, coder: 32000, reviewer: 2000  },
+    fast:     { planner: 300,  coder: 8000,  reviewer: 0     },
+    balanced: { planner: 500,  coder: 20000, reviewer: 1000  },
+    quality:  { planner: 800,  coder: 28000, reviewer: 1500  },
   },
 
   MODE_MAX_FILES: {

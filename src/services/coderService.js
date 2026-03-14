@@ -1,4 +1,4 @@
-const { callClaude } = require('../providers/anthropicProvider');
+const { callClaude, callClaudeStream, HAIKU_MODEL, SONNET_MODEL } = require('../providers/anthropicProvider');
 const { callOpenAI } = require('../providers/openaiProvider');
 const {
   buildCoderPrompt,
@@ -46,6 +46,8 @@ const ERROR_TYPES = {
  */
 async function runTemplateCoder(userPrompt, appType, costTracker) {
   const modelName = env.DEFAULT_CODER_MODEL;
+  // Template extraction is a tiny structured call — always use Haiku (cheapest)
+  const claudeModel = HAIKU_MODEL;
   const styleTag  = detectStyleTag(userPrompt);
 
   logger.info(`coderService: template-hybrid — appType="${appType}" style="${styleTag}" model="${modelName}"`);
@@ -56,7 +58,7 @@ async function runTemplateCoder(userPrompt, appType, costTracker) {
   try {
     const call = modelName === 'openai'
       ? callOpenAI(system, user, { maxTokens: limits.CONTENT_EXTRACTION_TOKENS })
-      : callClaude(system, user, { maxTokens: limits.CONTENT_EXTRACTION_TOKENS });
+      : callClaude(system, user, { maxTokens: limits.CONTENT_EXTRACTION_TOKENS, model: claudeModel });
 
     raw = await withTimeout(call, 30_000, 'ContentExtract');
   } catch (err) {
@@ -79,22 +81,55 @@ async function runTemplateCoder(userPrompt, appType, costTracker) {
 // ── Full generation path ───────────────────────────────────────────────────────
 
 /**
- * Full code generation with retry logic and final fallback.
+ * Builds a chunk handler for streaming coder output.
+ * Scans accumulated text for ---FILE:--- / ---END FILE--- delimiters
+ * and calls onProgress({ filesComplete, currentFile, filesTotal }) when state changes.
+ */
+function makeStreamProgressTracker(plan, onProgress) {
+  if (!onProgress) return null;
+  const filesTotal      = plan?.files?.length || 0;
+  let lastEndCount      = 0;
+  let lastCurrentFile   = null;
+
+  return (_delta, fullText) => {
+    // Count completed files
+    const endCount = (fullText.match(/---END FILE---/gi) || []).length;
+
+    // Find the last FILE: header that does NOT yet have an END FILE after it
+    const fileHeaders = [...fullText.matchAll(/---FILE:\s*([^\n\r-]+?)\s*---/gi)];
+    const currentFile = fileHeaders.length > endCount
+      ? fileHeaders[fileHeaders.length - 1][1].trim()
+      : null;
+
+    if (endCount !== lastEndCount || currentFile !== lastCurrentFile) {
+      lastEndCount    = endCount;
+      lastCurrentFile = currentFile;
+      onProgress({ filesComplete: endCount, currentFile, filesTotal });
+    }
+  };
+}
+
+/**
+ * Full code generation with streaming + retry logic and final fallback.
  *
- * @param {string} userPrompt
- * @param {object} plan
- * @param {string} mode - 'fast' | 'balanced' | 'quality'
- * @param {Function} [onRetry]  - callback(attempt, reason) for status logging
- * @param {object}  [costTracker]
+ * @param {string}   userPrompt
+ * @param {object}   plan
+ * @param {string}   mode       - 'fast' | 'balanced' | 'quality'
+ * @param {Function} [onRetry]  - callback(attempt, reason)
+ * @param {object}   [costTracker]
+ * @param {Function} [onProgress] - callback({ filesComplete, currentFile, filesTotal })
  * @returns {Promise<{projectName, files, _fallback?}>}
  */
-async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTracker) {
-  const modelName  = env.DEFAULT_CODER_MODEL;
-  const maxFiles   = limits.MODE_MAX_FILES[mode] || 20;
-  const maxTokens  = limits.MODE_TOKENS[mode]?.coder || 16000;
-  const maxRetries = limits.CODER_MAX_RETRIES || 2;
+async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTracker, onProgress) {
+  const modelName   = env.DEFAULT_CODER_MODEL;
+  // Model tiering: fast → Haiku (cheap, fast), balanced/quality → Sonnet (smart)
+  const claudeModel = mode === 'fast' ? HAIKU_MODEL : SONNET_MODEL;
+  const maxFiles    = limits.MODE_MAX_FILES[mode] || 20;
+  const maxTokens   = limits.MODE_TOKENS[mode]?.coder || 16000;
+  const maxRetries  = limits.CODER_MAX_RETRIES || 2;
+  const useStream   = modelName !== 'openai'; // streaming only for Anthropic
 
-  logger.info(`coderService: full-gen model="${modelName}" mode="${mode}" maxTokens=${maxTokens} maxFiles=${maxFiles}`);
+  logger.info(`coderService: full-gen model="${modelName}" claude="${claudeModel}" mode="${mode}" maxTokens=${maxTokens} stream=${useStream}`);
 
   let lastError = null;
 
@@ -109,13 +144,21 @@ async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTr
       : buildCoderRetryPrompt(userPrompt, plan, mode, attempt);
 
     // Reduce output budget on retries (simpler output expected)
-    const attemptTokens = attempt === 0 ? maxTokens : Math.max(8000, Math.round(maxTokens * 0.6));
+    const attemptTokens = attempt === 0 ? maxTokens : Math.max(3000, Math.round(maxTokens * 0.5));
 
     let raw;
     try {
+      // Use streaming on first attempt (gives live file progress).
+      // On retries fall back to non-streaming (simpler, more reliable).
+      const onChunk = (attempt === 0 && useStream && onProgress)
+        ? makeStreamProgressTracker(plan, onProgress)
+        : null;
+
       const call = modelName === 'openai'
         ? callOpenAI(system, user, { maxTokens: attemptTokens })
-        : callClaude(system, user, { maxTokens: attemptTokens });
+        : (onChunk
+            ? callClaudeStream(system, user, { maxTokens: attemptTokens, model: claudeModel }, onChunk)
+            : callClaude(system, user, { maxTokens: attemptTokens, model: claudeModel }));
 
       raw = await withTimeout(call, limits.CODER_TIMEOUT_MS, `Coder(${attempt + 1})`);
     } catch (err) {
@@ -170,8 +213,9 @@ async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTr
  * @param {Function} [onRetry]
  * @param {object}  [costTracker]
  * @param {object}  [complexity]  - from classifyComplexity
+ * @param {Function} [onProgress] - ({ filesComplete, currentFile, filesTotal }) => void
  */
-async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity) {
+async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity, onProgress) {
   const appType = complexity?.appType || plan?._appType || 'generic';
   const level   = complexity?.level || 'simple';
 
@@ -195,11 +239,12 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
 
   // Full generation: AI handles Supabase directly via config/supabase.js pattern.
   // ZyraApp SDK injection is not used for full-generation output.
-  const result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker);
+  const result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, onProgress);
 
   // ── Post-generation code validation + multi-round auto-fix ────────────────
-  // Skip for fallback/template output (already known-good)
-  if (!result._fallback && !result._template) {
+  // Skip for fallback/template output (already known-good).
+  // Skip for fast mode — saves an extra API call; fast mode trades perfection for speed.
+  if (!result._fallback && !result._template && mode !== 'fast') {
     const MAX_AI_FIX_ROUNDS = limits.AUTOFIX_MAX_ROUNDS || 2;
     let files     = result.files;
     let autoFixed = false;
@@ -256,8 +301,8 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
  */
 async function runAutoFix(userPrompt, files, errors, mode, costTracker) {
   const modelName = env.DEFAULT_CODER_MODEL;
-  // Cap at 8000 tokens (enough for a targeted fix) but respect mode budget if lower
-  const maxTokens = Math.min(8000, limits.MODE_TOKENS[mode]?.coder || 8000);
+  // AutoFix is a targeted small fix — always use Haiku for cost efficiency
+  const maxTokens = Math.min(6000, limits.MODE_TOKENS[mode]?.coder || 6000);
 
   const { system, user } = buildAutoFixPrompt(userPrompt, files, errors);
 
@@ -265,7 +310,7 @@ async function runAutoFix(userPrompt, files, errors, mode, costTracker) {
   try {
     const call = modelName === 'openai'
       ? callOpenAI(system, user, { maxTokens })
-      : callClaude(system, user, { maxTokens });
+      : callClaude(system, user, { maxTokens, model: HAIKU_MODEL });
     raw = await withTimeout(call, limits.AUTOFIX_TIMEOUT_MS || 60_000, 'AutoFix');
   } catch (err) {
     throw new Error(`Auto-fix model call failed: ${err.message}`);

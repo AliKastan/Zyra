@@ -754,7 +754,7 @@ async function cancelAnyActiveJob() {
 // ── Polling ───────────────────────────────────────────────────────────────────
 function startPolling(jobId) {
   stopPolling();
-  pollInterval = setInterval(() => pollJob(jobId), 1800);
+  pollInterval = setInterval(() => pollJob(jobId), 1000);
   pollJob(jobId);
 }
 function stopPolling() {
@@ -921,7 +921,35 @@ function updateGeneratingMsg(id, job) {
   const stageText = job.isEdit
     ? { queued: 'Loading project...', loading: 'Loading files...', coding: 'Applying changes...', finalizing: 'Saving...' }
     : { queued: 'Starting...', planning: 'Planning...', coding: 'Writing code...', reviewing: 'Reviewing...', finalizing: 'Saving...' };
-  if (stageEl) stageEl.textContent = stageText[job.status] || (job.isEdit ? 'Modifying...' : 'Generating...');
+
+  // During coding: show live per-file streaming progress ("Building app.js (2/8)")
+  // Falls back to latest log entry, then generic stage text.
+  let labelText = stageText[job.status] || (job.isEdit ? 'Modifying...' : 'Generating...');
+  if (job.status === 'coding' && job.progress) {
+    const { filesComplete, currentFile, filesTotal } = job.progress;
+    if (currentFile) {
+      const fileName = currentFile.split('/').pop();
+      const counter  = filesTotal > 0 ? ` (${filesComplete + 1}/${filesTotal})` : '';
+      labelText = `Writing ${fileName}${counter}`;
+    } else if (filesComplete > 0) {
+      const counter = filesTotal > 0 ? ` (${filesComplete}/${filesTotal})` : '';
+      labelText = `Files written${counter}...`;
+    }
+  } else if (job.logs?.length && (job.status === 'coding' || job.status === 'loading')) {
+    const lastLog = job.logs[job.logs.length - 1]?.message;
+    if (lastLog) labelText = lastLog;
+  }
+  if (stageEl) stageEl.textContent = labelText;
+
+  // Update file progress bar if present
+  const progressEl = $(`msg-progress-${id}`);
+  if (progressEl && job.status === 'coding' && job.progress?.filesTotal > 0) {
+    const pct = Math.round((job.progress.filesComplete / job.progress.filesTotal) * 100);
+    progressEl.style.width = `${pct}%`;
+    progressEl.style.opacity = '1';
+  } else if (progressEl) {
+    progressEl.style.opacity = '0';
+  }
 
   // Update stage progress dots
   const stagesEl = $(`msg-stages-${id}`);
@@ -984,6 +1012,7 @@ function buildAssistantEl(msg) {
         <span class="msg-timer" id="msg-timer-${msg.id}">0s</span>
         <button class="msg-cancel-btn" data-job-id="${escAttr(currentJobId || '')}">Cancel</button>
       </div>
+      <div class="msg-progress-track"><div class="msg-progress-bar" id="msg-progress-${msg.id}"></div></div>
       <div class="msg-log-stream" id="msg-log-${msg.id}"></div>`;
 
   } else if (msg.status === 'completed') {
