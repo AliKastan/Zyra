@@ -429,6 +429,12 @@ function buildReviewerPrompt(projectName, files) {
   };
 }
 
+// ── JSON output rules (used by edit/autofix/reviewer prompts which still output JSON) ──
+
+const JSON_RULES = `OUTPUT: Pure JSON only. No markdown fences, no text before/after.
+Escape inside strings: \\" for quotes, \\n for newlines, \\\\ for backslashes.
+Must pass JSON.parse() as-is.`;
+
 // ── Edit coder — tiered system prompts ───────────────────────────────────────
 //
 // Tier 1 (~45 tokens): CSS/copy targeted — single file, minimal context
