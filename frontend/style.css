@@ -2902,6 +2902,131 @@ textarea::placeholder { color: var(--text-muted); }
 .skeleton-line.short { width: 40%; }
 .skeleton-line.full  { width: 100%; }
 
+/* ── Sidebar inline auth ───────────────────────────────────────────────────── */
+.sidebar-auth {
+  padding: 1rem 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-auth-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  border: 1px solid var(--border);
+}
+
+.sidebar-auth-tab {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.sidebar-auth-tab.sidebar-auth-tab--active {
+  color: var(--text);
+  background: var(--surface3);
+}
+
+.sidebar-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-auth-input {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 0.83rem;
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: var(--font);
+}
+
+.sidebar-auth-input::placeholder { color: var(--text-muted); }
+.sidebar-auth-input:focus { border-color: var(--border-hi); background: var(--surface2); }
+
+.sidebar-auth-error {
+  font-size: 0.76rem;
+  color: var(--danger);
+  min-height: 0;
+  line-height: 1.4;
+}
+
+.sidebar-auth-submit {
+  width: 100%;
+  padding: 9px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: #000;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: opacity 0.15s;
+  font-family: var(--font);
+}
+
+.sidebar-auth-submit:hover:not(:disabled) { opacity: 0.88; }
+.sidebar-auth-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.sidebar-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.sidebar-auth-divider::before,
+.sidebar-auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.sidebar-google-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  font-family: var(--font);
+}
+
+.sidebar-google-btn:hover:not(:disabled) {
+  border-color: var(--border-hi);
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.sidebar-google-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
 /* ── Virtual gamepad ───────────────────────────────────────────────────────── */
 .virtual-pad {
   position: absolute;
