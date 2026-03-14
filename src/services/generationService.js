@@ -19,11 +19,32 @@ const { saveProject } = require('../storage/projectStore');
 const limits = require('../config/limits');
 const logger = require('../utils/logger');
 
-const activeJobs = new Set();
+// Per-user concurrency tracking:
+// Each authenticated user has their own active job slot.
+// Anonymous/unauthenticated requests share a single global slot.
+const activeJobsByUser = new Map(); // userId → Set<jobId>
+const activeJobsAnon   = new Set(); // fallback for unauthenticated requests
+
 let chargeUsage;
 try { chargeUsage = require('../billing/meter').chargeUsage; } catch (_) { chargeUsage = null; }
 
-function getActiveJobCount() { return activeJobs.size; }
+function getActiveJobCount(userId) {
+  if (userId) return activeJobsByUser.get(userId)?.size || 0;
+  return activeJobsAnon.size;
+}
+
+function _addActive(jobId, userId) {
+  if (userId) {
+    if (!activeJobsByUser.has(userId)) activeJobsByUser.set(userId, new Set());
+    activeJobsByUser.get(userId).add(jobId);
+  }
+  activeJobsAnon.add(jobId); // always track globally for admin visibility
+}
+
+function _removeActive(jobId, userId) {
+  if (userId) activeJobsByUser.get(userId)?.delete(jobId);
+  activeJobsAnon.delete(jobId);
+}
 
 class CancelledError extends Error {
   constructor() { super('Generation was cancelled by user'); this.type = 'cancelled'; }
@@ -35,23 +56,26 @@ class DeadlineError extends Error {
 // ── Public entry point ────────────────────────────────────────────────────────
 
 async function startGeneration(userPrompt, mode = 'balanced', options = {}) {
-  if (activeJobs.size >= limits.MAX_CONCURRENT_JOBS) {
-    throw new Error('A generation is already in progress. Please wait for it to complete or cancel it.');
+  const { userId } = options;
+
+  if (getActiveJobCount(userId) >= limits.MAX_CONCURRENT_JOBS) {
+    const err = new Error('A generation is already in progress. Please wait for it to complete or cancel it.');
+    err.code = 'JOB_IN_PROGRESS';
+    throw err;
   }
 
-  const { userId } = options;
-  const jobId      = uuidv4();
+  const jobId = uuidv4();
   const startedAt  = now();
   const complexity = classifyComplexity(userPrompt);
 
   await createJob(jobId, { prompt: userPrompt, mode, complexity, status: 'queued', startedAt });
-  activeJobs.add(jobId);
+  _addActive(jobId, userId);
 
   logger.info(`generationService: job ${jobId} — mode="${mode}" complexity="${complexity.level}" appType="${complexity.appType}"`);
 
   runPipeline(jobId, userPrompt, mode, complexity, startedAt, userId)
     .catch((err) => logger.error(`generationService: unhandled error for job ${jobId}`, { error: err.message }))
-    .finally(() => activeJobs.delete(jobId));
+    .finally(() => _removeActive(jobId, userId));
 
   return jobId;
 }

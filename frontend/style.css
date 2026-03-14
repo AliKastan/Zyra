@@ -880,6 +880,109 @@ html, body {
   padding-left: 1.5rem;
 }
 
+/* ── Stage progress dots ───────────────────────────────────────────────────── */
+
+.msg-stages {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-bottom: 0.4rem;
+  flex-wrap: nowrap;
+}
+
+.msg-stage-pip {
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  padding: 0.1rem 0.4rem;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+.msg-stage-pip.done {
+  color: rgba(255,255,255,0.4);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.msg-stage-pip.active {
+  color: var(--accent);
+  background: rgba(86,107,72,0.18);
+  border-color: rgba(86,107,72,0.35);
+}
+
+.msg-stage-sep {
+  font-size: 0.55rem;
+  color: rgba(255,255,255,0.15);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* ── Live log stream ───────────────────────────────────────────────────────── */
+
+.msg-log-stream {
+  padding-left: 1.5rem;
+  margin-top: 0.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-height: 0.8em;
+}
+
+.msg-log-entry {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+  animation: fadeIn 0.15s ease both;
+}
+.msg-log-entry:last-child {
+  color: rgba(255,255,255,0.38);
+}
+
+/* ── Error card ────────────────────────────────────────────────────────────── */
+
+.msg-error-card {
+  background: rgba(239,68,68,0.06);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.msg-error-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--danger);
+  margin-bottom: 0.25rem;
+}
+
+.msg-error-detail {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.6);
+  line-height: 1.5;
+  margin: 0 0 0.25rem;
+  font-family: var(--mono);
+  word-break: break-word;
+}
+
+.msg-error-hint {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.4;
+  margin: 0;
+  font-style: italic;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: none; }
+}
+
 /* ── Editing banner ────────────────────────────────────────────────────────── */
 
 /* ── Input area ────────────────────────────────────────────────────────────── */

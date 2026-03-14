@@ -39,10 +39,13 @@ async function handleGenerate(req, res) {
     });
   }
 
-  // ── Concurrency guard ─────────────────────────────────────────────────────
-  if (getActiveJobCount() >= limits.MAX_CONCURRENT_JOBS) {
+  // ── Concurrency guard (per-user) ──────────────────────────────────────────
+  const userId = req.user?.id;
+  if (getActiveJobCount(userId) >= limits.MAX_CONCURRENT_JOBS) {
     return res.status(429).json({
-      error: 'A generation is already in progress. Please wait for it to complete or cancel it.',
+      error: 'A generation is already in progress.',
+      code:  'JOB_IN_PROGRESS',
+      hint:  'Cancel the running job to start a new one.',
     });
   }
 
@@ -50,7 +53,6 @@ async function handleGenerate(req, res) {
   const complexity = classifyComplexity(trimmed);
 
   try {
-    const userId = req.user?.id;
     const jobId = await startGeneration(trimmed, mode, { userId });
     logger.info(`generateController: job ${jobId} started (mode=${mode}, complexity=${complexity.level})`);
 

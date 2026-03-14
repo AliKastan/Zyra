@@ -625,11 +625,11 @@ async function startGeneration(prompt, isPrefill = false) {
     startPolling(currentJobId);
   } catch (err) {
     // "Already in progress" — cancel the stuck job then auto-retry
-    if (err.message?.toLowerCase().includes('already in progress')) {
+    if (err.code === 'JOB_IN_PROGRESS' || err.message?.toLowerCase().includes('already in progress')) {
       try {
         updateLoadingMessage('Cancelling previous job...', '');
         await cancelAnyActiveJob();
-        await new Promise(r => setTimeout(r, 1200));
+        await new Promise(r => setTimeout(r, 1000));
         updateLoadingMessage('Retrying...', '');
         const data = await apiFetch('/api/generate', {
           method: 'POST',
@@ -693,11 +693,11 @@ async function startEdit(prompt, projectSlug) {
     startPolling(currentJobId);
   } catch (err) {
     // "Already in progress" — cancel the stuck job then auto-retry
-    if (err.message?.toLowerCase().includes('already in progress')) {
+    if (err.code === 'JOB_IN_PROGRESS' || err.message?.toLowerCase().includes('already in progress')) {
       try {
         updateLoadingMessage('Cancelling previous job...', '');
         await cancelAnyActiveJob();
-        await new Promise(r => setTimeout(r, 1200));
+        await new Promise(r => setTimeout(r, 1000));
         updateLoadingMessage('Retrying edit...', '');
         const data = await apiFetch(`/api/edit/${encodeURIComponent(projectSlug)}`, {
           method: 'POST',
@@ -764,6 +764,7 @@ function stopPolling() {
 async function pollJob(jobId) {
   try {
     const { job } = await apiFetch(`/api/jobs/${jobId}`);
+    _pollFailCount = 0; // reset on successful poll
 
     // Live stage updates inside the generating message
     if (isActive(job.status) && activeMessageId) {
@@ -825,8 +826,26 @@ async function pollJob(jobId) {
         setPreviewState('error', errorTitle, errMsg, { showRegenerate: isExpired });
       }
     }
-  } catch (_) {}
+  } catch (err) {
+    // Network error or server restart — track consecutive failures
+    _pollFailCount = (_pollFailCount || 0) + 1;
+    if (_pollFailCount >= 4 && activeMessageId) {
+      // Server may have restarted — show a recovery prompt
+      const msgId = activeMessageId;
+      stopPolling();
+      setGenerating(false);
+      stopGenerationTimer();
+      activeMessageId = null;
+      updateMessage(msgId, {
+        status: 'failed',
+        error: 'Lost connection to the server. The server may have restarted.',
+      });
+      setPreviewState('error', 'Connection lost', 'Server may have restarted. Check your generation below.');
+    }
+  }
 }
+
+let _pollFailCount = 0;
 
 function buildSuccessText(job) {
   if (job.isEdit) {
@@ -896,17 +915,33 @@ function updateMessage(id, updates) {
 
 // Live updates for the generating message — targeted DOM edits, no full re-render
 function updateGeneratingMsg(id, job) {
-  const stageEl = $(`msg-stage-${id}`);
-  const logEl   = $(`msg-log-${id}`);
+  const stageEl  = $(`msg-stage-${id}`);
+  const logEl    = $(`msg-log-${id}`);
 
   const stageText = job.isEdit
     ? { queued: 'Loading project...', loading: 'Loading files...', coding: 'Applying changes...', finalizing: 'Saving...' }
-    : { queued: 'Starting...', planning: 'Planning...', coding: 'Writing code...', reviewing: 'Reviewing...', finalizing: 'Finalizing...' };
+    : { queued: 'Starting...', planning: 'Planning...', coding: 'Writing code...', reviewing: 'Reviewing...', finalizing: 'Saving...' };
   if (stageEl) stageEl.textContent = stageText[job.status] || (job.isEdit ? 'Modifying...' : 'Generating...');
 
+  // Update stage progress dots
+  const stagesEl = $(`msg-stages-${id}`);
+  if (stagesEl) {
+    const allStages = job.isEdit ? ['loading', 'coding', 'finalizing'] : ['planning', 'coding', 'reviewing', 'finalizing'];
+    const currentIdx = allStages.indexOf(job.status);
+    stagesEl.querySelectorAll('.msg-stage-pip').forEach((dot) => {
+      const s = dot.dataset.stage;
+      const i = allStages.indexOf(s);
+      dot.classList.toggle('done',   i < currentIdx);
+      dot.classList.toggle('active', i === currentIdx);
+    });
+  }
+
+  // Show last 3 log entries
   if (logEl && job.logs?.length) {
-    const last = job.logs[job.logs.length - 1];
-    if (last?.message) logEl.textContent = last.message;
+    const recent = job.logs.slice(-3);
+    logEl.innerHTML = recent
+      .map(l => `<div class="msg-log-entry">${escHtml(l.message || '')}</div>`)
+      .join('');
   }
 }
 
@@ -935,14 +970,21 @@ function buildAssistantEl(msg) {
   let bodyHtml = '';
 
   if (msg.status === 'generating') {
+    const isEdit = msg.isEdit || false;
+    const stagePips = isEdit
+      ? ['loading', 'coding', 'finalizing'].map(s =>
+          `<span class="msg-stage-pip" data-stage="${s}">${{loading:'Load',coding:'Edit',finalizing:'Save'}[s]}</span>`).join('<span class="msg-stage-sep">›</span>')
+      : ['planning', 'coding', 'reviewing', 'finalizing'].map(s =>
+          `<span class="msg-stage-pip" data-stage="${s}">${{planning:'Plan',coding:'Code',reviewing:'Review',finalizing:'Save'}[s]}</span>`).join('<span class="msg-stage-sep">›</span>');
     bodyHtml = `
+      <div class="msg-stages" id="msg-stages-${msg.id}">${stagePips}</div>
       <div class="msg-generating">
         <span class="msg-spinner"></span>
         <span class="msg-stage-label" id="msg-stage-${msg.id}">Starting...</span>
         <span class="msg-timer" id="msg-timer-${msg.id}">0s</span>
         <button class="msg-cancel-btn" data-job-id="${escAttr(currentJobId || '')}">Cancel</button>
       </div>
-      <div class="msg-log-line" id="msg-log-${msg.id}"></div>`;
+      <div class="msg-log-stream" id="msg-log-${msg.id}"></div>`;
 
   } else if (msg.status === 'completed') {
     const fc = msg.filesWritten?.length || 0;
@@ -956,20 +998,32 @@ function buildAssistantEl(msg) {
       </div>`;
 
   } else if (msg.status === 'failed' || msg.status === 'interrupted') {
+    const hint = getErrorHint(msg.error);
+    const showFast = msg.mode !== 'fast' && !msg.isEdit;
     bodyHtml = `
-      <p class="msg-text msg-text--error">${escHtml(msg.error || 'Generation failed.')}</p>
+      <div class="msg-error-card">
+        <div class="msg-error-title">${msg.isEdit ? 'Edit failed' : 'Generation failed'}</div>
+        <p class="msg-error-detail">${escHtml(msg.error || 'An unexpected error occurred.')}</p>
+        ${hint ? `<p class="msg-error-hint">${escHtml(hint)}</p>` : ''}
+      </div>
       <div class="msg-actions">
-        <button class="msg-btn msg-btn--ghost" data-action="regen" data-prompt="${escAttr(msg.userPrompt || '')}">Try again</button>
+        <button class="msg-btn" data-action="regen" data-prompt="${escAttr(msg.userPrompt || '')}">Try again</button>
+        ${showFast ? `<button class="msg-btn msg-btn--ghost" data-action="regen-fast" data-prompt="${escAttr(msg.userPrompt || '')}">Try in Fast mode</button>` : ''}
       </div>`;
 
   } else if (msg.status === 'cancelled') {
-    bodyHtml = `<p class="msg-text msg-text--muted">Generation cancelled.</p>`;
+    bodyHtml = `<p class="msg-text msg-text--muted">Cancelled.</p>`;
 
   } else if (msg.status === 'timed_out') {
+    const hint = 'Try Fast mode for a quicker result, or simplify your prompt.';
     bodyHtml = `
-      <p class="msg-text msg-text--error">Generation timed out.</p>
+      <div class="msg-error-card">
+        <div class="msg-error-title">Generation timed out</div>
+        <p class="msg-error-hint">${escHtml(hint)}</p>
+      </div>
       <div class="msg-actions">
-        <button class="msg-btn msg-btn--ghost" data-action="regen" data-prompt="${escAttr(msg.userPrompt || '')}">Try again</button>
+        <button class="msg-btn" data-action="regen" data-prompt="${escAttr(msg.userPrompt || '')}">Try again</button>
+        ${msg.mode !== 'fast' ? `<button class="msg-btn msg-btn--ghost" data-action="regen-fast" data-prompt="${escAttr(msg.userPrompt || '')}">Try in Fast mode</button>` : ''}
       </div>`;
   }
 
@@ -995,6 +1049,24 @@ function buildAssistantEl(msg) {
   return el;
 }
 
+// Returns an actionable hint string based on the error message content.
+function getErrorHint(errorMsg) {
+  const msg = (errorMsg || '').toLowerCase();
+  if (msg.includes('api key') || msg.includes('unauthorized') || msg.includes('authentication'))
+    return 'Check that your API key is configured correctly in your environment.';
+  if (msg.includes('timed out') || msg.includes('timeout') || msg.includes('took too long'))
+    return 'Try Fast mode for a quicker result, or simplify your prompt.';
+  if (msg.includes('parse') || msg.includes('format') || msg.includes('unexpected'))
+    return 'The AI returned an unexpected format. This usually resolves on retry.';
+  if (msg.includes('too long') || msg.includes('words') || msg.includes('chars'))
+    return 'Try shortening your prompt or breaking it into smaller requests.';
+  if (msg.includes('connection') || msg.includes('server') || msg.includes('restart'))
+    return 'The server may have restarted. Your generation did not complete — try again.';
+  if (msg.includes('disk') || msg.includes('write') || msg.includes('space'))
+    return 'A server storage issue occurred. Contact support if this persists.';
+  return 'This is usually temporary. Try again or switch to Fast mode.';
+}
+
 function handleMsgAction(btn) {
   const action = btn.dataset.action;
   const slug   = btn.dataset.slug;
@@ -1012,6 +1084,20 @@ function handleMsgAction(btn) {
   }
   if (action === 'regen' && prompt) {
     handlePromptSubmit(prompt);
+  }
+  if (action === 'regen-fast' && prompt) {
+    // Force fast mode for the retry
+    const prev = currentMode;
+    currentMode = 'fast';
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'fast'));
+    handlePromptSubmit(prompt);
+    // Restore mode if generation doesn't start (e.g. auth gate)
+    setTimeout(() => {
+      if (!currentJobId) {
+        currentMode = prev;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === prev));
+      }
+    }, 100);
   }
 }
 
@@ -1540,7 +1626,10 @@ async function apiFetch(path, opts = {}) {
   const data = await res.json();
   if (!res.ok) {
     const err = new Error(data.error || `HTTP ${res.status}`);
-    err.expired = data.expired || false;
+    err.expired  = data.expired  || false;
+    err.code     = data.code     || null;
+    err.hint     = data.hint     || null;
+    err.httpStatus = res.status;
     throw err;
   }
   return data;
