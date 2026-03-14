@@ -122,7 +122,10 @@ function makeStreamProgressTracker(plan, onProgress) {
  */
 async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTracker, onProgress) {
   const modelName   = env.DEFAULT_CODER_MODEL;
-  // Model tiering: fast → Haiku (cheap, fast), balanced/quality → Sonnet (smart)
+  // Model tiering:
+  //   fast     → Haiku  (ultra-cheap, simple 2-6 file apps)
+  //   balanced → Sonnet (real SaaS quality; 14K budget = ~55% cheaper than old 32K)
+  //   quality  → Sonnet (maximum quality, 28K budget)
   const claudeModel = mode === 'fast' ? HAIKU_MODEL : SONNET_MODEL;
   const maxFiles    = limits.MODE_MAX_FILES[mode] || 20;
   const maxTokens   = limits.MODE_TOKENS[mode]?.coder || 16000;

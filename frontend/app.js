@@ -284,7 +284,8 @@ const refreshPreviewBtn  = $('refresh-preview-btn');
 const openTabBtn         = $('open-tab-btn');
 const retryPreviewBtn       = $('retry-preview-btn');
 const regenerateProjectBtn  = $('regenerate-project-btn');
-const fixBtn             = $('fix-my-app-btn');
+const keysBtn            = $('keys-btn');
+const fixBtn             = $('fix-my-app-btn'); // element removed; null-guarded below
 
 // Code
 const codeArea     = $('code-area');
@@ -1405,10 +1406,8 @@ let currentDeploySlug  = null;
 function updateDeployButton(slug) {
   if (slug) {
     deployBtn.classList.remove('hidden');
-    fixBtn.classList.remove('hidden');
   } else {
     deployBtn.classList.add('hidden');
-    fixBtn.classList.add('hidden');
     closeDeployPanel();
   }
 }
@@ -1687,73 +1686,211 @@ const envOverlay = $('env-overlay');
 const envVarRows = $('env-var-rows');
 const envAddBtn  = $('env-add-btn');
 const envSaveBtn = $('env-save-btn');
-const envBtn     = $('env-btn');
+const envVarEmpty = $('env-var-empty');
 
 let envDirty = false;
-// integrationVars: { [key]: { value, masked } } — collected from integration var inputs
-let integrationVars = {};
+let activeEnvTab = 'variables'; // 'variables' | 'integrations'
+let integrationsLoaded = false;
 
-const eyeIconSvg   = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
-const trashIconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
+const EYE_ICON   = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const TRASH_ICON = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
 
-function openEnvPanel() {
+// ── Open / close ──────────────────────────────────────────────────────────────
+
+function openEnvPanel(defaultTab = 'variables') {
   if (!envOverlay) return;
   envOverlay.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
-  loadIntegrationsPanel();
+  switchEnvTab(defaultTab);
+  if (defaultTab === 'variables') loadVarsTab();
 }
 
 function closeEnvPanel() {
   if (!envOverlay) return;
   envOverlay.classList.add('hidden');
   document.body.style.overflow = '';
+  hidePasteArea();
 }
 
 if ($('env-close-btn')) $('env-close-btn').addEventListener('click', closeEnvPanel);
 if (envOverlay) envOverlay.addEventListener('click', (e) => { if (e.target === envOverlay) closeEnvPanel(); });
-if (envBtn) envBtn.addEventListener('click', openEnvPanel);
+if (keysBtn) keysBtn.addEventListener('click', () => openEnvPanel('variables'));
 
-// ── Load integrations manifest ────────────────────────────────────────────────
+// ── Tab switching ─────────────────────────────────────────────────────────────
 
-async function loadIntegrationsPanel() {
-  if (!currentSlug) return;
-  integrationVars = {};
+function switchEnvTab(tab) {
+  activeEnvTab = tab;
+  document.querySelectorAll('.env-tab').forEach((btn) => {
+    btn.classList.toggle('env-tab--active', btn.dataset.tab === tab);
+  });
+  const varPane  = $('tab-pane-variables');
+  const intPane  = $('tab-pane-integrations');
+  if (varPane)  varPane.classList.toggle('hidden', tab !== 'variables');
+  if (intPane) intPane.classList.toggle('hidden', tab !== 'integrations');
+
+  if (tab === 'variables' && !envDirty) loadVarsTab();
+  if (tab === 'integrations' && !integrationsLoaded) loadIntegrationsPane();
+}
+
+document.querySelectorAll('.env-tab').forEach((btn) => {
+  btn.addEventListener('click', () => switchEnvTab(btn.dataset.tab));
+});
+
+// ── Variables tab — Railway-style raw editor ──────────────────────────────────
+
+async function loadVarsTab() {
+  if (!currentSlug || !envVarRows) return;
+  envVarRows.innerHTML = '';
   envDirty = false;
   if (envSaveBtn) envSaveBtn.disabled = true;
+  refreshEmptyState();
+
+  try {
+    const data = await apiFetch(`/api/projects/${currentSlug}/env`);
+    for (const { key, masked } of (data.vars || [])) addVarRow(key, masked, true);
+  } catch (_) {}
+  refreshEmptyState();
+}
+
+function addVarRow(key = '', value = '', masked = false) {
+  if (!envVarRows) return;
+  const row = document.createElement('div');
+  row.className = 'env-var-row';
+  row.innerHTML = `
+    <div class="env-var-key-cell">
+      <input class="env-key-input" type="text" placeholder="VARIABLE_NAME" value="${escAttr(key)}" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="env-var-val-cell">
+      <div class="env-val-wrapper">
+        <input class="env-val-input" type="password" placeholder="value" value="${escAttr(value)}" autocomplete="off" spellcheck="false" data-masked="${masked}">
+        <button class="env-show-btn" type="button" title="Show/hide">${EYE_ICON}</button>
+      </div>
+    </div>
+    <button class="env-del-btn" type="button" title="Remove">${TRASH_ICON}</button>`;
+
+  const keyInput = row.querySelector('.env-key-input');
+  const valInput = row.querySelector('.env-val-input');
+
+  keyInput.addEventListener('input', () => {
+    const p = keyInput.selectionStart;
+    keyInput.value = keyInput.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+    keyInput.setSelectionRange(p, p);
+    markDirty();
+  });
+  valInput.addEventListener('focus', () => {
+    if (valInput.dataset.masked === 'true') { valInput.value = ''; valInput.dataset.masked = 'false'; }
+  });
+  valInput.addEventListener('input', markDirty);
+  row.querySelector('.env-show-btn').addEventListener('click', () => {
+    valInput.type = valInput.type === 'password' ? 'text' : 'password';
+    valInput.dataset.masked = 'false';
+  });
+  row.querySelector('.env-del-btn').addEventListener('click', () => {
+    row.style.opacity = '0'; row.style.transition = 'opacity .12s';
+    setTimeout(() => { row.remove(); refreshEmptyState(); markDirty(); }, 120);
+  });
+
+  envVarRows.appendChild(row);
+  if (!key) keyInput.focus();
+  refreshEmptyState();
+}
+
+function refreshEmptyState() {
+  if (!envVarEmpty) return;
+  const empty = !envVarRows || envVarRows.children.length === 0;
+  envVarEmpty.classList.toggle('hidden', !empty);
+}
+
+function markDirty() {
+  envDirty = true;
+  if (envSaveBtn) envSaveBtn.disabled = false;
+}
+
+if (envAddBtn) {
+  envAddBtn.addEventListener('click', () => {
+    addVarRow('', '', false);
+    markDirty();
+  });
+}
+
+// ── .env paste import ─────────────────────────────────────────────────────────
+
+function hidePasteArea() {
+  const area = $('env-paste-area');
+  if (area) area.classList.add('hidden');
+  const toggle = $('env-paste-toggle');
+  if (toggle) toggle.classList.remove('active');
+}
+
+if ($('env-paste-toggle')) {
+  $('env-paste-toggle').addEventListener('click', () => {
+    const area = $('env-paste-area');
+    if (!area) return;
+    const hidden = area.classList.toggle('hidden');
+    $('env-paste-toggle').classList.toggle('active', !hidden);
+    if (!hidden) $('env-paste-input')?.focus();
+  });
+}
+if ($('env-paste-cancel')) $('env-paste-cancel').addEventListener('click', hidePasteArea);
+
+if ($('env-paste-import')) {
+  $('env-paste-import').addEventListener('click', () => {
+    const text = $('env-paste-input')?.value?.trim() || '';
+    if (!text) return;
+    const existingKeys = new Set(
+      [...(envVarRows?.querySelectorAll('.env-key-input') || [])].map((el) => el.value.toUpperCase())
+    );
+    let added = 0;
+    for (const line of text.split('\n')) {
+      const clean = line.trim();
+      if (!clean || clean.startsWith('#')) continue;
+      const eqIdx = clean.indexOf('=');
+      if (eqIdx < 1) continue;
+      const k = clean.slice(0, eqIdx).trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+      const v = clean.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+      if (!k) continue;
+      if (existingKeys.has(k)) {
+        // update existing row value
+        const rows = envVarRows?.querySelectorAll('.env-var-row') || [];
+        for (const row of rows) {
+          const ki = row.querySelector('.env-key-input');
+          if (ki?.value === k) {
+            const vi = row.querySelector('.env-val-input');
+            if (vi) { vi.value = v; vi.dataset.masked = 'false'; }
+            break;
+          }
+        }
+      } else {
+        addVarRow(k, v, false);
+        existingKeys.add(k);
+        added++;
+      }
+    }
+    if ($('env-paste-input')) $('env-paste-input').value = '';
+    hidePasteArea();
+    markDirty();
+  });
+}
+
+// ── Integrations tab ──────────────────────────────────────────────────────────
+
+async function loadIntegrationsPane() {
+  if (!currentSlug) return;
+  integrationsLoaded = true;
 
   const list    = $('integrations-list');
   const loading = $('integrations-loading');
   if (!list) return;
-
   if (loading) { loading.style.display = ''; loading.textContent = 'Loading integrations...'; }
 
-  // Load custom vars alongside integrations
-  if (envVarRows) envVarRows.innerHTML = '';
-
   try {
-    const [intData, envData] = await Promise.all([
-      apiFetch(`/api/projects/${currentSlug}/integrations`),
-      apiFetch(`/api/projects/${currentSlug}/env`),
-    ]);
-
+    const intData = await apiFetch(`/api/projects/${currentSlug}/integrations`);
     if (loading) loading.style.display = 'none';
-
-    const integrations  = intData.integrations || [];
-    const allEnvVarKeys = new Set(integrations.flatMap((i) => i.vars.map((v) => v.key)));
-
-    // Render integration cards
-    renderIntegrations(list, integrations);
-
-    // Populate custom vars (vars not belonging to any integration)
-    const customVars = (envData.vars || []).filter((v) => !allEnvVarKeys.has(v.key));
-    for (const { key, masked } of customVars) addEnvRow(key, masked, true);
-
+    renderIntegrations(list, intData.integrations || []);
   } catch (_) {
     if (loading) { loading.style.display = ''; loading.textContent = 'Failed to load integrations.'; }
   }
 }
-
-// ── Render integration cards ──────────────────────────────────────────────────
 
 const STATUS_LABELS = { configured: 'Configured', partial: 'Partial', missing: 'Missing' };
 const CATEGORY_LABELS = {
@@ -1763,18 +1900,13 @@ const CATEGORY_LABELS = {
 };
 
 function renderIntegrations(container, integrations) {
-  // Group by category
   const byCategory = {};
   for (const intg of integrations) {
     const cat = intg.category || 'other';
     if (!byCategory[cat]) byCategory[cat] = [];
     byCategory[cat].push(intg);
   }
-
-  // Clear all existing integration cards (keep loading sentinel)
-  [...container.children].forEach((el) => {
-    if (el.id !== 'integrations-loading') el.remove();
-  });
+  [...container.children].forEach((el) => { if (el.id !== 'integrations-loading') el.remove(); });
 
   if (!integrations.length) {
     const empty = document.createElement('div');
@@ -1787,15 +1919,11 @@ function renderIntegrations(container, integrations) {
   for (const [cat, items] of Object.entries(byCategory)) {
     const group = document.createElement('div');
     group.className = 'intg-category-group';
-
     const catLabel = document.createElement('div');
     catLabel.className = 'intg-category-label';
     catLabel.textContent = CATEGORY_LABELS[cat] || cat;
     group.appendChild(catLabel);
-
-    for (const intg of items) {
-      group.appendChild(buildIntegrationCard(intg));
-    }
+    for (const intg of items) group.appendChild(buildIntegrationCard(intg));
     container.appendChild(group);
   }
 }
@@ -1805,7 +1933,6 @@ function buildIntegrationCard(intg) {
   card.className = `intg-card intg-card--${intg.status}`;
   card.dataset.id = intg.id;
 
-  // Card header
   const header = document.createElement('div');
   header.className = 'intg-card-header';
   header.innerHTML = `
@@ -1813,12 +1940,11 @@ function buildIntegrationCard(intg) {
       <span class="intg-card-name">${escHtml(intg.label)}</span>
       <span class="intg-status-badge intg-status--${escAttr(intg.status)}">${escHtml(STATUS_LABELS[intg.status] || intg.status)}</span>
     </div>
-    <button class="intg-toggle-btn" type="button" aria-expanded="false" title="Expand">
+    <button class="intg-toggle-btn" type="button" aria-expanded="false">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><polyline points="6 9 12 15 18 9"/></svg>
     </button>`;
   card.appendChild(header);
 
-  // Card body (collapsible)
   const body = document.createElement('div');
   body.className = 'intg-card-body hidden';
 
@@ -1828,8 +1954,6 @@ function buildIntegrationCard(intg) {
     desc.textContent = intg.description;
     body.appendChild(desc);
   }
-
-  // Billing note (Stripe)
   if (intg.billingNote) {
     const note = document.createElement('div');
     note.className = 'intg-billing-note';
@@ -1837,66 +1961,80 @@ function buildIntegrationCard(intg) {
     body.appendChild(note);
   }
 
-  // Vars
+  // Vars — clicking "Add to Variables" switches to Variables tab and pre-fills
   const varsList = document.createElement('div');
   varsList.className = 'intg-vars-list';
   for (const varDef of intg.vars) {
-    varsList.appendChild(buildVarRow(varDef));
+    const vr = document.createElement('div');
+    vr.className = 'intg-var-row';
+    const statusIcon = varDef.isSet
+      ? `<span class="intg-var-status intg-var-status--ok" title="Set">&#x2713;</span>`
+      : `<span class="intg-var-status intg-var-status--empty"></span>`;
+    const req = varDef.required ? `<span class="intg-var-required">required</span>` : `<span class="intg-var-optional">optional</span>`;
+    vr.innerHTML = `
+      <div class="intg-var-meta">${statusIcon}<span class="intg-var-key">${escHtml(varDef.key)}</span>${req}</div>
+      ${varDef.hint ? `<div class="intg-var-hint">${escHtml(varDef.hint)}</div>` : ''}
+      ${!varDef.isSet ? `<button class="intg-add-var-btn" type="button" data-key="${escAttr(varDef.key)}">Add to Variables</button>` : ''}`;
+    if (!varDef.isSet) {
+      vr.querySelector('.intg-add-var-btn').addEventListener('click', () => {
+        switchEnvTab('variables');
+        loadVarsTab().then(() => {
+          const existing = [...(envVarRows?.querySelectorAll('.env-key-input') || [])].find((el) => el.value === varDef.key);
+          if (existing) {
+            existing.closest('.env-var-row')?.querySelector('.env-val-input')?.focus();
+          } else {
+            addVarRow(varDef.key, '', false);
+          }
+          markDirty();
+        });
+      });
+    }
+    varsList.appendChild(vr);
   }
   body.appendChild(varsList);
 
-  // SQL copy (for integrations with sqlFiles)
-  if (intg.sqlFiles && intg.sqlFiles.length > 0) {
+  if (intg.sqlFiles?.length) {
     const sqlRow = document.createElement('div');
     sqlRow.className = 'intg-sql-row';
-    sqlRow.innerHTML = `
-      <span class="intg-sql-hint">Run setup SQL in your Supabase SQL Editor:</span>
-      <button class="intg-copy-sql-btn" type="button" data-slug="${escAttr(currentSlug || '')}" data-file="${escAttr(intg.sqlFiles[0])}">Copy SQL</button>`;
+    sqlRow.innerHTML = `<span class="intg-sql-hint">Run setup SQL in Supabase SQL Editor:</span><button class="intg-copy-sql-btn" type="button" data-slug="${escAttr(currentSlug||'')}" data-file="${escAttr(intg.sqlFiles[0])}">Copy SQL</button>`;
     sqlRow.querySelector('.intg-copy-sql-btn').addEventListener('click', handleCopySql);
     body.appendChild(sqlRow);
   }
 
-  // Setup guide (collapsible)
-  if (intg.setupGuide && intg.setupGuide.length > 0) {
+  if (intg.setupGuide?.length) {
     const guide = document.createElement('div');
     guide.className = 'intg-guide';
-    guide.innerHTML = `
-      <button class="intg-guide-toggle" type="button">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        Setup guide
-        <svg class="intg-guide-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      <ol class="intg-guide-steps hidden">${intg.setupGuide.map((s) => `<li>${escHtml(s)}</li>`).join('')}</ol>`;
-    guide.querySelector('.intg-guide-toggle').addEventListener('click', (e) => {
-      const steps   = guide.querySelector('.intg-guide-steps');
+    guide.innerHTML = `<button class="intg-guide-toggle" type="button">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Setup guide
+      <svg class="intg-guide-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <ol class="intg-guide-steps hidden">${intg.setupGuide.map((s) => `<li>${escHtml(s)}</li>`).join('')}</ol>`;
+    guide.querySelector('.intg-guide-toggle').addEventListener('click', () => {
+      const steps = guide.querySelector('.intg-guide-steps');
       const chevron = guide.querySelector('.intg-guide-chevron');
-      const open    = steps.classList.toggle('hidden');
+      const open = steps.classList.toggle('hidden');
       chevron.style.transform = open ? '' : 'rotate(180deg)';
     });
     body.appendChild(guide);
   }
 
-  // Docs link
   if (intg.docsUrl) {
     const link = document.createElement('a');
     link.className = 'intg-docs-link';
-    link.href = intg.docsUrl;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
+    link.href = intg.docsUrl; link.target = '_blank'; link.rel = 'noopener noreferrer';
     link.textContent = 'View docs';
     body.appendChild(link);
   }
 
   card.appendChild(body);
 
-  // Toggle expand/collapse
   header.querySelector('.intg-toggle-btn').addEventListener('click', () => {
-    const isOpen = body.classList.toggle('hidden');
-    header.querySelector('.intg-toggle-btn').setAttribute('aria-expanded', String(!isOpen));
-    card.classList.toggle('intg-card--open', !isOpen);
+    const open = body.classList.toggle('hidden');
+    header.querySelector('.intg-toggle-btn').setAttribute('aria-expanded', String(!open));
+    card.classList.toggle('intg-card--open', !open);
   });
 
-  // Auto-open if partial or missing
   if (intg.status !== 'configured') {
     body.classList.remove('hidden');
     header.querySelector('.intg-toggle-btn').setAttribute('aria-expanded', 'true');
@@ -1906,180 +2044,49 @@ function buildIntegrationCard(intg) {
   return card;
 }
 
-function buildVarRow(varDef) {
-  const row = document.createElement('div');
-  row.className = 'intg-var-row';
-  row.dataset.key = varDef.key;
-
-  const statusIcon = varDef.isSet
-    ? (varDef.validationError
-        ? `<span class="intg-var-status intg-var-status--warn" title="${escAttr(varDef.validationError)}">!</span>`
-        : `<span class="intg-var-status intg-var-status--ok" title="Set">&#x2713;</span>`)
-    : `<span class="intg-var-status intg-var-status--empty" title="Not set"></span>`;
-
-  const requiredTag = varDef.required
-    ? `<span class="intg-var-required">required</span>`
-    : `<span class="intg-var-optional">optional</span>`;
-
-  row.innerHTML = `
-    <div class="intg-var-meta">
-      ${statusIcon}
-      <span class="intg-var-key">${escHtml(varDef.key)}</span>
-      ${requiredTag}
-    </div>
-    ${varDef.hint ? `<div class="intg-var-hint">${escHtml(varDef.hint)}</div>` : ''}
-    <div class="intg-var-input-row">
-      <div class="env-val-wrapper">
-        <input class="env-val-input intg-var-input" type="password"
-          placeholder="${escAttr(varDef.placeholder || 'paste value')}"
-          value="${escAttr(varDef.maskedValue || '')}"
-          autocomplete="off" spellcheck="false"
-          data-masked="${varDef.isSet ? 'true' : 'false'}"
-          data-key="${escAttr(varDef.key)}">
-        <button class="env-show-btn" type="button" title="Show/hide">${eyeIconSvg}</button>
-      </div>
-    </div>`;
-
-  const input   = row.querySelector('.intg-var-input');
-  const showBtn = row.querySelector('.env-show-btn');
-
-  input.addEventListener('focus', () => {
-    if (input.dataset.masked === 'true') { input.value = ''; input.dataset.masked = 'false'; }
-  });
-  input.addEventListener('input', () => {
-    integrationVars[varDef.key] = { value: input.value, masked: input.dataset.masked === 'true' };
-    markEnvDirty();
-  });
-  showBtn.addEventListener('click', () => {
-    input.type = input.type === 'password' ? 'text' : 'password';
-    input.dataset.masked = 'false';
-  });
-
-  // Track initial masked values too
-  if (varDef.isSet) {
-    integrationVars[varDef.key] = { value: varDef.maskedValue || '', masked: true };
-  }
-
-  return row;
-}
-
 async function handleCopySql(e) {
-  const btn  = e.currentTarget;
-  const slug = btn.dataset.slug;
-  const file = btn.dataset.file;
+  const btn = e.currentTarget;
+  const { slug, file } = btn.dataset;
   if (!slug || !file) return;
   try {
     const data = await apiFetch(`/api/preview/file/${encodeURIComponent(slug)}/${file}`);
-    const sql  = data.content || '';
+    const sql = data.content || '';
     if (!sql) { btn.textContent = 'Not found'; setTimeout(() => { btn.textContent = 'Copy SQL'; }, 2000); return; }
     await navigator.clipboard.writeText(sql);
-    btn.textContent = 'Copied!';
-    btn.classList.add('copied');
+    btn.textContent = 'Copied!'; btn.classList.add('copied');
     setTimeout(() => { btn.textContent = 'Copy SQL'; btn.classList.remove('copied'); }, 2200);
-  } catch (_) {
-    btn.textContent = 'Error';
-    setTimeout(() => { btn.textContent = 'Copy SQL'; }, 2000);
-  }
+  } catch (_) { btn.textContent = 'Error'; setTimeout(() => { btn.textContent = 'Copy SQL'; }, 2000); }
 }
 
-// ── Custom var rows ───────────────────────────────────────────────────────────
-
-function addEnvRow(key = '', value = '', masked = false) {
-  if (!envVarRows) return;
-  const row = document.createElement('div');
-  row.className = 'env-var-row';
-
-  row.innerHTML = `
-    <input class="env-key-input" type="text" placeholder="KEY_NAME" value="${escAttr(key)}" autocomplete="off" spellcheck="false">
-    <div class="env-val-wrapper">
-      <input class="env-val-input" type="password" placeholder="paste value" value="${escAttr(value)}" autocomplete="off" spellcheck="false" data-masked="${masked}">
-      <button class="env-show-btn" type="button" title="Show/hide">${eyeIconSvg}</button>
-    </div>
-    <button class="env-del-btn" type="button" title="Remove">${trashIconSvg}</button>`;
-
-  const keyInput = row.querySelector('.env-key-input');
-  const valInput = row.querySelector('.env-val-input');
-  const showBtn  = row.querySelector('.env-show-btn');
-  const delBtn   = row.querySelector('.env-del-btn');
-
-  keyInput.addEventListener('input', () => {
-    const pos = keyInput.selectionStart;
-    keyInput.value = keyInput.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
-    keyInput.setSelectionRange(pos, pos);
-    markEnvDirty();
-  });
-  valInput.addEventListener('focus', () => {
-    if (valInput.dataset.masked === 'true') { valInput.value = ''; valInput.dataset.masked = 'false'; }
-  });
-  valInput.addEventListener('input', markEnvDirty);
-  showBtn.addEventListener('click', () => {
-    valInput.type = valInput.type === 'password' ? 'text' : 'password';
-    valInput.dataset.masked = 'false';
-  });
-  delBtn.addEventListener('click', () => {
-    row.style.opacity = '0'; row.style.transition = 'opacity 0.12s';
-    setTimeout(() => { row.remove(); markEnvDirty(); }, 120);
-  });
-
-  envVarRows.appendChild(row);
-  if (!key) keyInput.focus();
-}
-
-function markEnvDirty() {
-  envDirty = true;
-  if (envSaveBtn) envSaveBtn.disabled = false;
-}
-
-if (envAddBtn) {
-  envAddBtn.addEventListener('click', () => {
-    addEnvRow('', '', false);
-    markEnvDirty();
-  });
-}
-
-// ── Save all vars ─────────────────────────────────────────────────────────────
+// ── Save ──────────────────────────────────────────────────────────────────────
 
 if (envSaveBtn) {
   envSaveBtn.addEventListener('click', async () => {
-    if (!currentSlug) return;
+    if (!currentSlug || !envVarRows) return;
     const vars = [];
-
-    // Collect integration vars (from rendered var rows inside integration cards)
-    document.querySelectorAll('.intg-var-input').forEach((input) => {
-      const key    = input.dataset.key;
-      const masked = input.dataset.masked === 'true';
-      const value  = input.value;
-      if (!key) return;
-      // Masked values: send the bullet placeholder so backend preserves the stored value
-      vars.push({ key, value });
+    envVarRows.querySelectorAll('.env-var-row').forEach((row) => {
+      const key    = row.querySelector('.env-key-input')?.value?.trim();
+      const valEl  = row.querySelector('.env-val-input');
+      const masked = valEl?.dataset?.masked === 'true';
+      if (!key || masked) return; // skip blank keys and unchanged masked values
+      vars.push({ key, value: valEl?.value || '' });
     });
-
-    // Collect custom vars
-    if (envVarRows) {
-      [...envVarRows.querySelectorAll('.env-var-row')].forEach((row) => {
-        const key    = row.querySelector('.env-key-input')?.value?.trim();
-        const valEl  = row.querySelector('.env-val-input');
-        const masked = valEl?.dataset?.masked === 'true';
-        if (!key || masked) return;
-        vars.push({ key, value: valEl?.value || '' });
-      });
-    }
 
     envSaveBtn.textContent = 'Saving...';
     envSaveBtn.disabled = true;
     try {
       await apiFetch(`/api/projects/${currentSlug}/env`, {
-        method: 'POST',
-        body: JSON.stringify({ vars }),
+        method: 'POST', body: JSON.stringify({ vars }),
       });
       envDirty = false;
+      integrationsLoaded = false; // force reload on next integrations tab open
       updateEnvBadge(vars.length > 0);
       envSaveBtn.textContent = 'Saved!';
       setTimeout(() => {
         envSaveBtn.textContent = 'Save & Reload Preview';
         closeEnvPanel();
         const iframe = $('preview-iframe');
-        if (iframe && iframe.src) { const s = iframe.src; iframe.src = ''; iframe.src = s; }
+        if (iframe?.src) { const s = iframe.src; iframe.src = ''; iframe.src = s; }
       }, 600);
     } catch (_) {
       envSaveBtn.textContent = 'Error — try again';
@@ -2090,16 +2097,17 @@ if (envSaveBtn) {
 }
 
 function updateEnvBadge(hasVars) {
-  if (envBtn) envBtn.classList.toggle('has-vars', hasVars);
+  if (keysBtn) keysBtn.classList.toggle('has-vars', hasVars);
 }
 
 function syncEnvButton(slug) {
-  if (!envBtn) return;
+  if (!keysBtn) return;
   if (slug) {
-    envBtn.style.display = '';
+    keysBtn.classList.remove('hidden');
+    integrationsLoaded = false;
     apiFetch(`/api/projects/${slug}/env`).then((d) => updateEnvBadge((d.vars||[]).length > 0)).catch(() => {});
   } else {
-    envBtn.style.display = 'none';
+    keysBtn.classList.add('hidden');
     updateEnvBadge(false);
   }
 }
@@ -2128,7 +2136,7 @@ const DEBUG_STAGES = [
   { key: 'diagnosing', label: 'AI diagnosis' },
 ];
 
-fixBtn.addEventListener('click', () => {
+if (fixBtn) fixBtn.addEventListener('click', () => {
   if (!currentSlug) return;
   debugState.slug         = currentSlug;
   debugState.jobId        = null;
@@ -2839,3 +2847,135 @@ window.addEventListener('message', (event) => {
     triggerRuntimeAutoFix(msg);
   }, 2500);
 });
+
+// ── Mobile layout ─────────────────────────────────────────────────────────────
+
+const studioBody        = document.querySelector('.studio-body');
+const mobileTabBuild    = $('mobile-tab-build');
+const mobileTabPreview  = $('mobile-tab-preview');
+
+function isMobile() {
+  return window.innerWidth <= 768;
+}
+
+function setMobilePanel(panel) {
+  if (!studioBody) return;
+  studioBody.classList.remove('mobile-build', 'mobile-preview');
+  studioBody.classList.add(panel === 'preview' ? 'mobile-preview' : 'mobile-build');
+
+  if (mobileTabBuild)   mobileTabBuild.classList.toggle('mobile-nav-btn--active',   panel !== 'preview');
+  if (mobileTabPreview) mobileTabPreview.classList.toggle('mobile-nav-btn--active', panel === 'preview');
+}
+
+function initMobileLayout() {
+  if (!studioBody) return;
+  // Default: show build panel
+  studioBody.classList.add('mobile-build');
+}
+
+if (mobileTabBuild) {
+  mobileTabBuild.addEventListener('click', () => setMobilePanel('build'));
+}
+
+if (mobileTabPreview) {
+  mobileTabPreview.addEventListener('click', () => setMobilePanel('preview'));
+}
+
+// Auto-switch to preview on mobile when generation completes
+const _mobilePreviewObserver = new MutationObserver(() => {
+  if (stateFrame && !stateFrame.classList.contains('hidden') && isMobile()) {
+    setMobilePanel('preview');
+    if (mobileTabPreview) mobileTabPreview.dataset.hasPreview = 'true';
+  }
+});
+if (stateFrame) _mobilePreviewObserver.observe(stateFrame, { attributes: true, attributeFilter: ['class'] });
+
+// Init on load and on resize
+initMobileLayout();
+window.addEventListener('resize', () => {
+  if (!isMobile()) {
+    // Reset — desktop layout doesn't need mobile classes
+    if (studioBody) studioBody.classList.remove('mobile-build', 'mobile-preview');
+  } else {
+    // Re-apply current mobile state
+    if (!studioBody.classList.contains('mobile-preview') && !studioBody.classList.contains('mobile-build')) {
+      initMobileLayout();
+    }
+  }
+});
+
+// ── Virtual gamepad ───────────────────────────────────────────────────────────
+
+const virtualPad       = $('virtual-pad');
+const vpadToggleBtn    = $('vpad-toggle-btn');
+let   vpadVisible      = false;
+
+function showVpad(show) {
+  vpadVisible = show;
+  if (virtualPad)    virtualPad.classList.toggle('hidden', !show);
+  if (vpadToggleBtn) vpadToggleBtn.classList.toggle('vpad-on', show);
+}
+
+if (vpadToggleBtn) {
+  vpadToggleBtn.addEventListener('click', () => showVpad(!vpadVisible));
+}
+
+// Dispatch keyboard events into the preview iframe
+function dispatchKeyToIframe(key, code, type) {
+  const iframe = $('preview-iframe');
+  if (!iframe) return;
+  try {
+    const win = iframe.contentWindow;
+    if (!win) return;
+    const evt = new KeyboardEvent(type, {
+      key, code,
+      bubbles: true,
+      cancelable: true,
+      keyCode: key === 'ArrowUp' ? 38 : key === 'ArrowDown' ? 40 : key === 'ArrowLeft' ? 37 : key === 'ArrowRight' ? 39 : key === ' ' ? 32 : key === 'Enter' ? 13 : key === 'Escape' ? 27 : 0,
+      which:   key === 'ArrowUp' ? 38 : key === 'ArrowDown' ? 40 : key === 'ArrowLeft' ? 37 : key === 'ArrowRight' ? 39 : key === ' ' ? 32 : key === 'Enter' ? 13 : key === 'Escape' ? 27 : 0,
+    });
+    // Try dispatching to the focused element first, then document
+    const target = win.document.activeElement || win.document.body || win.document;
+    target.dispatchEvent(evt);
+    if (target !== win.document) win.document.dispatchEvent(evt);
+  } catch (e) {
+    // Cross-origin — silently fail
+  }
+}
+
+// Wire up virtual pad buttons with press/release for proper keydown+keyup
+if (virtualPad) {
+  virtualPad.addEventListener('pointerdown', (e) => {
+    const btn = e.target.closest('.vpad-btn');
+    if (!btn) return;
+    e.preventDefault();
+    const key  = btn.dataset.key;
+    const code = btn.dataset.code;
+    if (!key) return;
+    btn.classList.add('vpad-pressed');
+    dispatchKeyToIframe(key, code, 'keydown');
+
+    // Auto-repeat while held
+    let repeatTimer = setInterval(() => dispatchKeyToIframe(key, code, 'keydown'), 80);
+
+    const release = () => {
+      btn.classList.remove('vpad-pressed');
+      clearInterval(repeatTimer);
+      dispatchKeyToIframe(key, code, 'keyup');
+      window.removeEventListener('pointerup',     release);
+      window.removeEventListener('pointercancel', release);
+    };
+    window.addEventListener('pointerup',     release, { once: true });
+    window.addEventListener('pointercancel', release, { once: true });
+  });
+}
+
+// Show vpad toggle button whenever there's an active preview
+const _vpadPreviewObserver = new MutationObserver(() => {
+  const sf = $('state-frame');
+  if (!sf) return;
+  const hasPreview = !sf.classList.contains('hidden');
+  if (vpadToggleBtn) vpadToggleBtn.classList.toggle('hidden', !hasPreview);
+  if (!hasPreview) showVpad(false);
+});
+if (stateFrame) _vpadPreviewObserver.observe(stateFrame, { attributes: true, attributeFilter: ['class'] });

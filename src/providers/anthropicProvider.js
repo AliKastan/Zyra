@@ -45,7 +45,7 @@ async function callClaude(systemPrompt, userPrompt, options = {}) {
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
       },
-      timeout: 120000,
+      timeout: 600_000, // 10 min — Sonnet at 14K-28K output tokens can take 3-8 minutes
     }
   );
 

@@ -15,10 +15,11 @@ const { v4: uuidv4 }        = require('uuid');
 const { now }               = require('../utils/timestamps');
 const { formatElapsed }     = require('../utils/generationTimer');
 const { withTimeout }       = require('../utils/withTimeout');
-const { callClaude, HAIKU_MODEL, SONNET_MODEL } = require('../providers/anthropicProvider');
+const { callClaude, callClaudeStream, HAIKU_MODEL, SONNET_MODEL } = require('../providers/anthropicProvider');
 const { callOpenAI }        = require('../providers/openaiProvider');
 const { buildEditCoderPrompt } = require('../generators/promptBuilder');
 const { safeJsonParse }     = require('../utils/safeJsonParse');
+const { parseFileDelimited } = require('../utils/parseFileDelimited');
 const { classifyEditType, hasStyleOnlyWords } = require('../utils/intentClassifier');
 const { getEditTier, filterFilesForEdit, applyLocalTransform, TIER_BUDGETS } = require('../utils/editTier');
 const { writeFiles }        = require('../generators/fileWriter');
@@ -289,19 +290,44 @@ async function runEditCoder(userPrompt, existingFiles, projectSlug, mode, costTr
     user = user + `\nREMINDER: Apply as CSS only. Style words must NEVER become page text/headings.`;
   }
 
+  // Tier 3 uses streaming (Sonnet, up to 14K tokens — takes 3-5 min, streaming keeps connection alive)
+  // Tier 1/2 use non-streaming (Haiku, small output, fast enough)
+  const useStream = tier >= 3 && modelName !== 'openai';
+
   let raw;
   try {
     const call = modelName === 'openai'
       ? callOpenAI(system, user, { maxTokens })
-      : callClaude(system, user, { maxTokens, model: claudeModel });
+      : (useStream
+          ? callClaudeStream(system, user, { maxTokens, model: claudeModel })
+          : callClaude(system, user, { maxTokens, model: claudeModel }));
 
-    raw = await withTimeout(call, limits.CODER_TIMEOUT_MS || 180_000, 'EditCoder');
+    raw = await withTimeout(call, limits.CODER_TIMEOUT_MS || 300_000, 'EditCoder');
   } catch (err) {
     logger.error(`editService: edit-coder API/timeout error`, { error: err.message });
     throw Object.assign(new Error(`Edit coder failed: ${err.message}`), { type: 'failed' });
   }
 
   if (costTracker) costTracker.record('edit-coder', system, user, raw, { tier, editType, contextChars, filesInContext: existingFiles.length });
+
+  // Tier 3 uses ---FILE--- delimiter format (no JSON escaping issues for large code outputs)
+  // Tier 1/2 use JSON format (small controlled outputs)
+  if (tier >= 3) {
+    const { success, files } = parseFileDelimited(raw);
+    if (!success || files.length === 0) {
+      // Fallback: try JSON parse in case the model used JSON anyway
+      const { success: jsonOk, data } = safeJsonParse(raw);
+      if (jsonOk && data) {
+        const jsonFiles = Array.isArray(data.files) ? data.files : [];
+        return jsonFiles
+          .filter((f) => f && typeof f.path === 'string' && f.path.trim())
+          .map((f) => ({ path: f.path.trim(), content: typeof f.content === 'string' ? f.content : String(f.content || '') }));
+      }
+      logger.warn('editService: edit-coder (tier3) returned no parseable output, no changes applied');
+      return [];
+    }
+    return files;
+  }
 
   const { success, data } = safeJsonParse(raw);
   if (!success || !data) {
@@ -310,8 +336,8 @@ async function runEditCoder(userPrompt, existingFiles, projectSlug, mode, costTr
   }
 
   // Accept both { files: [...] } and { projectName, files: [...] }
-  const files = Array.isArray(data.files) ? data.files : [];
-  return files
+  const jsonFiles = Array.isArray(data.files) ? data.files : [];
+  return jsonFiles
     .filter((f) => f && typeof f.path === 'string' && f.path.trim())
     .map((f) => ({
       path:    f.path.trim(),

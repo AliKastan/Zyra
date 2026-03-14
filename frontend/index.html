@@ -145,9 +145,12 @@
         </div>
 
         <div class="preview-controls">
-          <button id="fix-my-app-btn" class="fix-btn hidden" type="button">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-            Fix My App
+          <button id="vpad-toggle-btn" class="icon-btn vpad-toggle-btn hidden" title="Virtual gamepad" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="10" r="1.5" fill="currentColor"/><circle cx="12" cy="14" r="1.5" fill="currentColor"/><circle cx="16" cy="12" r="1.5" fill="currentColor"/></svg>
+          </button>
+          <button id="keys-btn" class="keys-btn hidden" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            Keys
           </button>
           <div class="device-btns" id="device-btns">
             <button class="device-btn device-btn--active" data-device="desktop" title="Desktop" type="button">
@@ -161,9 +164,6 @@
             </button>
           </div>
           <div class="preview-action-btns">
-            <button id="env-btn" class="icon-btn" title="Environment Variables" type="button" style="display:none">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            </button>
             <button id="refresh-preview-btn" class="icon-btn" title="Refresh" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
             </button>
@@ -268,6 +268,34 @@
               <div class="home-indicator"></div>
             </div>
           </div>
+
+            <!-- Virtual gamepad — for testing keyboard-controlled apps on touch devices -->
+            <div class="virtual-pad hidden" id="virtual-pad" aria-label="Virtual gamepad">
+              <div class="vpad-inner">
+                <div class="vpad-dpad">
+                  <button class="vpad-btn vpad-up"    data-key="ArrowUp"    data-code="ArrowUp"    aria-label="Up"    type="button">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+                  </button>
+                  <div class="vpad-mid-row">
+                    <button class="vpad-btn vpad-left"  data-key="ArrowLeft"  data-code="ArrowLeft"  aria-label="Left"  type="button">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <div class="vpad-center"></div>
+                    <button class="vpad-btn vpad-right" data-key="ArrowRight" data-code="ArrowRight" aria-label="Right" type="button">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  </div>
+                  <button class="vpad-btn vpad-down"   data-key="ArrowDown"  data-code="ArrowDown"  aria-label="Down"  type="button">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                </div>
+                <div class="vpad-actions">
+                  <button class="vpad-btn vpad-action-btn vpad-b" data-key="Escape"  data-code="Escape" aria-label="Escape" type="button">esc</button>
+                  <button class="vpad-btn vpad-action-btn vpad-a" data-key=" "        data-code="Space"  aria-label="Space"  type="button">A</button>
+                  <button class="vpad-btn vpad-action-btn vpad-enter" data-key="Enter" data-code="Enter" aria-label="Enter"  type="button">&#9166;</button>
+                </div>
+              </div>
+            </div>
         </div>
 
         <div class="preview-state hidden" id="state-error">
@@ -303,6 +331,18 @@
   </div>
 </div>
 
+  <!-- Mobile bottom navigation -->
+  <nav class="mobile-bottom-nav" id="mobile-bottom-nav" aria-label="Mobile navigation">
+    <button class="mobile-nav-btn mobile-nav-btn--active" id="mobile-tab-build" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Build</span>
+    </button>
+    <button class="mobile-nav-btn" id="mobile-tab-preview" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <span>Preview</span>
+    </button>
+  </nav>
+
 <!-- ── Backend Config Panel ────────────────────────────────────────────────── -->
 <div class="env-overlay hidden" id="env-overlay" role="dialog" aria-modal="true" aria-label="Backend Config">
   <div class="env-panel">
@@ -313,20 +353,45 @@
       </button>
     </div>
 
-    <p class="env-desc">Connect services your app uses. Keys are injected as <code>window.__ENV__.KEY_NAME</code> at runtime — stored only on your server.</p>
-
-    <!-- Integrations list — rendered by JS -->
-    <div id="integrations-list" class="integrations-list">
-      <div class="integrations-loading" id="integrations-loading">Loading integrations...</div>
+    <!-- Tabs -->
+    <div class="env-tabs">
+      <button class="env-tab env-tab--active" id="tab-btn-variables" data-tab="variables" type="button">Variables</button>
+      <button class="env-tab" id="tab-btn-integrations" data-tab="integrations" type="button">Integrations</button>
     </div>
 
-    <!-- Custom / extra vars -->
-    <div class="env-custom-section">
-      <div class="env-custom-header">
-        <span class="env-section-label">Custom Variables</span>
-        <button class="env-add-btn" id="env-add-btn" type="button">+ Add</button>
+    <!-- Variables tab — Railway-style raw editor -->
+    <div class="env-tab-pane" id="tab-pane-variables">
+      <div class="env-var-toolbar">
+        <button class="env-paste-toggle-btn" id="env-paste-toggle" type="button">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+          Paste .env
+        </button>
+        <button class="env-add-btn" id="env-add-btn" type="button">+ Add Variable</button>
       </div>
-      <div id="env-var-rows"></div>
+
+      <!-- .env paste area (hidden by default) -->
+      <div class="env-paste-area hidden" id="env-paste-area">
+        <textarea id="env-paste-input" class="env-paste-input" placeholder="Paste your .env file content:&#10;&#10;SUPABASE_URL=https://xyz.supabase.co&#10;SUPABASE_ANON_KEY=eyJhbGci...&#10;STRIPE_PUBLISHABLE_KEY=pk_test_..." spellcheck="false" rows="6"></textarea>
+        <div class="env-paste-actions">
+          <button class="env-paste-cancel-btn" id="env-paste-cancel" type="button">Cancel</button>
+          <button class="env-paste-import-btn" id="env-paste-import" type="button">Import Variables</button>
+        </div>
+      </div>
+
+      <!-- Variable rows -->
+      <div id="env-var-rows" class="env-var-rows"></div>
+      <div class="env-var-empty hidden" id="env-var-empty">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".35"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        <span>No variables yet — add one or paste a .env file</span>
+      </div>
+    </div>
+
+    <!-- Integrations tab -->
+    <div class="env-tab-pane hidden" id="tab-pane-integrations">
+      <p class="env-desc">Detected services for this project. Click to expand and add keys.</p>
+      <div id="integrations-list" class="integrations-list">
+        <div class="integrations-loading" id="integrations-loading">Loading integrations...</div>
+      </div>
     </div>
 
     <div class="env-footer">

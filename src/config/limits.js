@@ -11,8 +11,8 @@ module.exports = {
   MAX_FILE_SIZE_BYTES:      parseInt(process.env.MAX_FILE_SIZE_BYTES      || '200000',  10),
   MAX_TOTAL_OUTPUT_BYTES:   parseInt(process.env.MAX_TOTAL_OUTPUT_BYTES   || '4194304', 10), // 4MB
   MAX_TOTAL_TOKENS_PER_JOB: parseInt(process.env.MAX_TOTAL_TOKENS_PER_JOB || '600000',  10),
-  SIMPLE_MAX_FILES:         parseInt(process.env.SIMPLE_MAX_FILES         || '10',      10),
-  MEDIUM_MAX_FILES:         parseInt(process.env.MEDIUM_MAX_FILES         || '25',      10),
+  SIMPLE_MAX_FILES:         parseInt(process.env.SIMPLE_MAX_FILES         || '6',       10),
+  MEDIUM_MAX_FILES:         parseInt(process.env.MEDIUM_MAX_FILES         || '14',      10),
 
   // ── Global job timeout ───────────────────────────────────────────────────────
   MAX_JOB_DURATION_MS: parseInt(process.env.MAX_JOB_DURATION_MS || '900000', 10),
@@ -30,35 +30,35 @@ module.exports = {
   // ── Auto-fix (post-generation self-healing) ──────────────────────────────────
   AUTOFIX_TIMEOUT_MS:  parseInt(process.env.AUTOFIX_TIMEOUT_MS  || '60000', 10),
   // Max AI fix rounds after the free quick-fix pass (each round = 1 extra API call)
-  AUTOFIX_MAX_ROUNDS:  parseInt(process.env.AUTOFIX_MAX_ROUNDS  || '1',     10),
+  // Default 0 = regex-only quickfix, no extra API calls. Set to 1 to re-enable.
+  AUTOFIX_MAX_ROUNDS:  parseInt(process.env.AUTOFIX_MAX_ROUNDS  || '0',     10),
 
   // ── Retry config ─────────────────────────────────────────────────────────────
   CODER_MAX_RETRIES: parseInt(process.env.CODER_MAX_RETRIES || '2', 10),
 
   // ── Template-hybrid content extraction ──────────────────────────────────────
   // Max tokens for the tiny content-extraction API call in template-hybrid mode.
-  CONTENT_EXTRACTION_TOKENS: parseInt(process.env.CONTENT_EXTRACTION_TOKENS || '600', 10),
+  CONTENT_EXTRACTION_TOKENS: parseInt(process.env.CONTENT_EXTRACTION_TOKENS || '400', 10),
 
   // ── Concurrency ──────────────────────────────────────────────────────────────
   MAX_CONCURRENT_JOBS: parseInt(process.env.MAX_CONCURRENT_JOBS || '1', 10),
 
   // ── Token budgets per mode ───────────────────────────────────────────────────
-  // Note: these apply to full-generation calls only.
-  // Template-hybrid uses CONTENT_EXTRACTION_TOKENS (600) instead.
+  // Template-hybrid uses CONTENT_EXTRACTION_TOKENS (~400) instead of these.
   //
-  // Fast (Haiku):    5-10 files, 10K output  — cheap & quick
-  // Balanced (Sonnet): 12-30 files, 32K output — solid full-stack apps
-  // Quality (Sonnet):  20-60 files, 48K output — production-grade
+  // Fast (Haiku):     2-6 files,  6K output  — ultra-cheap (~$0.025/gen)
+  // Balanced (Sonnet): 8-14 files, 14K output  — real SaaS quality (~$0.215/gen, 55% off old)
+  // Quality (Sonnet):  15-22 files, 28K output — production-grade (~$0.42/gen)
   MODE_TOKENS: {
-    fast:     { planner: 300,  coder: 10000, reviewer: 0     },
-    balanced: { planner: 600,  coder: 32000, reviewer: 1000  },
-    quality:  { planner: 900,  coder: 48000, reviewer: 2000  },
+    fast:     { planner: 200,  coder: 6000,  reviewer: 0    },
+    balanced: { planner: 400,  coder: 14000, reviewer: 0    },
+    quality:  { planner: 600,  coder: 28000, reviewer: 1500 },
   },
 
   MODE_MAX_FILES: {
-    fast:     10,
-    balanced: 30,
-    quality:  60,
+    fast:     6,
+    balanced: 14,
+    quality:  22,
   },
 
   // ── Edit pipeline token budgets (per tier) ──────────────────────────────────
