@@ -7,7 +7,20 @@
     "start": "node src/server/index.js",
     "dev": "nodemon src/server/index.js",
     "frontend": "npx serve frontend -p 5173",
-    "all": "concurrently \"npm run dev\" \"npm run frontend\""
+    "all": "concurrently \"npm run dev\" \"npm run frontend\"",
+    "self-heal": "node scripts/self-heal.js",
+    "self-heal:dry": "node scripts/self-heal.js --dry-run --verbose",
+    "test:debugger": "node test/debugger/classifier.test.js && node test/debugger/auto-fix.test.js",
+    "test:inference": "node test/inference/requirements.test.js",
+    "test:complexity": "node test/complexity/scorer.test.js",
+    "test:multipass": "node test/generation/multipass.test.js",
+    "test:file-generator": "node test/file-generator/artifacts.test.js",
+    "test:validator": "node test/validator/validator.test.js",
+    "test:repair": "node test/repair/repair.test.js",
+    "test": "node test/inference/requirements.test.js && node test/complexity/scorer.test.js && node test/generation/multipass.test.js && node test/file-generator/artifacts.test.js && node test/validator/validator.test.js && node test/repair/repair.test.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",

@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zyra — Deploy Debug Report</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=5" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0D0D0F;
+      --surface:    #18181C;
+      --surface2:   #1F1F26;
+      --border:     rgba(255,255,255,0.08);
+      --border-hi:  rgba(255,255,255,0.18);
+      --text:       #E8E8F0;
+      --text-dim:   rgba(232,232,240,0.60);
+      --text-muted: rgba(232,232,240,0.35);
+      --accent:     #4F9EFF;
+      --green:      #4ADE80;
+      --yellow:     #FBBF24;
+      --red:        #F87171;
+      --purple:     #A78BFA;
+      --mono:       'JetBrains Mono', 'Courier New', monospace;
+      --font:       'Inter', system-ui, sans-serif;
+      --radius:     10px;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────────── */
+    .page { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .topbar-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .topbar-logo svg { width: 20px; height: 22px; }
+    .topbar-logo span { font-size: 1rem; font-weight: 600; letter-spacing: -0.02em; }
+
+    .topbar-title {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* ── Status header ─────────────────────────────────────────────────── */
+    .status-header {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .status-badge {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .badge-fixed            { background: rgba(74,222,128,0.15); color: var(--green);  border: 1px solid rgba(74,222,128,0.25); }
+    .badge-partial          { background: rgba(251,191,36,0.15);  color: var(--yellow); border: 1px solid rgba(251,191,36,0.25); }
+    .badge-review_required  { background: rgba(167,139,250,0.15); color: var(--purple); border: 1px solid rgba(167,139,250,0.25); }
+    .badge-failed           { background: rgba(248,113,113,0.15); color: var(--red);    border: 1px solid rgba(248,113,113,0.25); }
+    .badge-unknown          { background: rgba(255,255,255,0.06); color: var(--text-dim); border: 1px solid var(--border); }
+
+    .status-category {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-dim);
+      font-family: var(--mono);
+    }
+
+    .confidence-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .confidence-bar {
+      height: 4px;
+      width: 80px;
+      background: var(--surface2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .confidence-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+
+    .meta-row {
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+
+    /* ── Section cards ─────────────────────────────────────────────────── */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+
+    .section-header {
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .section-icon { font-size: 0.85rem; }
+
+    .section-body { padding: 1rem 1.25rem; }
+
+    /* ── Root cause ────────────────────────────────────────────────────── */
+    .root-cause-text {
+      font-size: 0.88rem;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    /* ── Log lines ─────────────────────────────────────────────────────── */
+    .log-list {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+      background: #0A0A0D;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .log-line-error { color: var(--red); }
+    .log-line-warn  { color: var(--yellow); }
+
+    /* ── Changes ───────────────────────────────────────────────────────── */
+    .change-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .change-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      font-size: 0.83rem;
+    }
+    .change-icon { flex-shrink: 0; width: 18px; }
+    .change-icon-edit   { color: var(--accent); }
+    .change-icon-create { color: var(--green); }
+    .change-icon-delete { color: var(--red); }
+    .change-path { font-family: var(--mono); color: var(--text); }
+    .change-desc { color: var(--text-dim); margin-left: 4px; }
+
+    /* ── Proposals ─────────────────────────────────────────────────────── */
+    .proposal {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      overflow: hidden;
+    }
+    .proposal:last-child { margin-bottom: 0; }
+
+    .proposal-header {
+      padding: 0.7rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: var(--surface2);
+      font-size: 0.83rem;
+      font-weight: 500;
+    }
+    .risk-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .risk-low    { background: var(--green); }
+    .risk-medium { background: var(--yellow); }
+    .risk-high   { background: var(--red); }
+
+    .proposal-body {
+      padding: 0.85rem 1rem;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+    }
+
+    .proposal-changes {
+      margin-top: 0.75rem;
+      border-top: 1px solid var(--border);
+      padding-top: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .proposal-change-item { font-size: 0.78rem; }
+    .proposal-patch {
+      font-family: var(--mono);
+      font-size: 0.73rem;
+      background: #0A0A0D;
+      border-radius: 5px;
+      padding: 0.5rem 0.75rem;
+      margin-top: 0.4rem;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--green);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    /* ── Next actions ──────────────────────────────────────────────────── */
+    .action-list { list-style: none; counter-reset: actions; display: flex; flex-direction: column; gap: 6px; }
+    .action-item {
+      counter-increment: actions;
+      display: flex;
+      gap: 0.6rem;
+      align-items: flex-start;
+      font-size: 0.83rem;
+      line-height: 1.5;
+    }
+    .action-num {
+      counter-increment: none;
+      content: counter(actions);
+      min-width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      font-size: 0.7rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: var(--text-dim);
+    }
+
+    /* ── Analyze button / form ─────────────────────────────────────────── */
+    .analyze-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+    .analyze-panel h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--text-dim);
+    }
+    .analyze-textarea {
+      width: 100%;
+      min-height: 120px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      background: #0A0A0D;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.6rem 0.8rem;
+      color: var(--text);
+      outline: none;
+      resize: vertical;
+      transition: border-color 0.15s;
+    }
+    .analyze-textarea:focus { border-color: var(--border-hi); }
+    .analyze-row {
+      display: flex;
+      gap: 0.6rem;
+      margin-top: 0.65rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .btn-analyze {
+      padding: 7px 18px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #000;
+      background: var(--accent);
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      font-family: var(--font);
+    }
+    .btn-analyze:hover:not(:disabled) { opacity: 0.85; }
+    .btn-analyze:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary {
+      padding: 7px 14px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-dim);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      font-family: var(--font);
+    }
+    .btn-secondary:hover { border-color: var(--border-hi); color: var(--text); }
+    .dry-run-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .analyze-status {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    /* ── Copy button ───────────────────────────────────────────────────── */
+    .copy-btn {
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: var(--font);
+      margin-left: auto;
+      transition: color 0.15s;
+    }
+    .copy-btn:hover { color: var(--text); border-color: var(--border-hi); }
+
+    /* ── Empty state ───────────────────────────────────────────────────── */
+    .empty {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    /* ── Loader ────────────────────────────────────────────────────────── */
+    .loader {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <a class="topbar-logo" href="/app">
+      <svg viewBox="0 0 185 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M 0,0 L 150,0 L 185,60 L 150,120 L 96,200 L 50,120 L 85,60 L 35,60 Z" fill="currentColor"/>
+      </svg>
+      <span>Zyra</span>
+    </a>
+    <span class="topbar-title">Deploy Debug Report</span>
+  </div>
+
+  <!-- Analyze panel -->
+  <div class="analyze-panel">
+    <h3>Run self-heal analysis</h3>
+    <textarea class="analyze-textarea" id="log-input"
+      placeholder="Paste your Railway / build / runtime log here, then click Analyze…"></textarea>
+    <div class="analyze-row">
+      <button class="btn-analyze" id="analyze-btn">Analyze</button>
+      <button class="btn-secondary" id="load-btn">Load latest report</button>
+      <label class="dry-run-label">
+        <input type="checkbox" id="dry-run-check" /> Dry run (no file writes)
+      </label>
+      <span class="analyze-status" id="analyze-status"></span>
+    </div>
+  </div>
+
+  <!-- Report output -->
+  <div id="report-output"></div>
+
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function statusBadgeClass(status) {
+  return {
+    fixed:           'badge-fixed',
+    partial:         'badge-partial',
+    review_required: 'badge-review_required',
+    failed:          'badge-failed',
+    unknown:         'badge-unknown',
+  }[status] || 'badge-unknown';
+}
+
+function statusLabel(status) {
+  return {
+    fixed:           'Fixed',
+    partial:         'Partial Fix',
+    review_required: 'Review Required',
+    failed:          'Failed',
+    unknown:         'Unknown',
+  }[status] || status;
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+  }).catch(() => {});
+}
+
+// ── Render report ────────────────────────────────────────────────────────────
+
+function renderReport(r) {
+  const out = [];
+
+  // ── Status header ────────────────────────────────────────────────────────
+  const pct = Math.round((r.confidence || 0) * 100);
+  out.push(`
+    <div class="status-header">
+      <div class="status-row">
+        <span class="status-badge ${statusBadgeClass(r.status)}">${escHtml(statusLabel(r.status))}</span>
+        <span class="status-category">${escHtml(r.category)}</span>
+        <div class="confidence-bar-wrap">
+          <div class="confidence-bar"><div class="confidence-fill" style="width:${pct}%"></div></div>
+          <span>${pct}% confidence</span>
+        </div>
+      </div>
+      <div class="meta-row">
+        <span>Report: <code>${escHtml(r.reportId || '—')}</code></span>
+        <span>Generated: ${escHtml(r.generatedAt ? new Date(r.generatedAt).toLocaleString() : '—')}</span>
+        ${r.safeAutoFixApplied ? '<span style="color:var(--green)">Auto-fix applied</span>' : ''}
+        ${r.manualReviewRequired ? '<span style="color:var(--yellow)">Manual review required</span>' : ''}
+      </div>
+    </div>
+  `);
+
+  // ── Root cause ───────────────────────────────────────────────────────────
+  if (r.rootCause) {
+    out.push(`
+      <div class="section">
+        <div class="section-header"><span class="section-icon">🔍</span> Root Cause</div>
+        <div class="section-body">
+          <div class="root-cause-text">${escHtml(r.rootCause)}</div>
+        </div>
+      </div>
+    `);
+  }
+
+  // ── Key log lines ────────────────────────────────────────────────────────
+  if (r.importantLogLines && r.importantLogLines.length > 0) {
+    const logHtml = r.importantLogLines.map((l) => {
+      const ll = l.toLowerCase();
+      const cls = ll.includes('error') || ll.includes('fail') ? 'log-line-error'
+                : ll.includes('warn') ? 'log-line-warn' : '';
+      return `<span class="${cls}">${escHtml(l)}</span>`;
+    }).join('\n');
+
+    const logId = 'log-' + Math.random().toString(36).slice(2);
+    out.push(`
+      <div class="section">
+        <div class="section-header">
+          <span class="section-icon">📋</span> Key Log Lines
+          <button class="copy-btn" id="${logId}-copy">Copy</button>
+        </div>
+        <div class="section-body">
+          <div class="log-list" id="${logId}">${logHtml}</div>
+        </div>
+      </div>
+    `);
+  }
+
+  // ── Changes applied ──────────────────────────────────────────────────────
+  if (r.changesMade && r.changesMade.length > 0) {
+    const changeItems = r.changesMade.map((c) => {
+      const icon = c.type === 'create' ? '➕' : c.type === 'delete' ? '➖' : '✏️';
+      const cls  = `change-icon-${c.type}`;
+      return `
+        <li class="change-item">
+          <span class="change-icon ${cls}">${icon}</span>
+          <span><span class="change-path">${escHtml(c.path)}</span><span class="change-desc">— ${escHtml(c.description)}</span></span>
+        </li>`;
+    }).join('');
+
+    out.push(`
+      <div class="section">
+        <div class="section-header"><span class="section-icon">✅</span> Changes Applied Automatically</div>
+        <div class="section-body">
+          <ul class="change-list">${changeItems}</ul>
+        </div>
+      </div>
+    `);
+  }
+
+  // ── Proposals ────────────────────────────────────────────────────────────
+  if (r.proposals && r.proposals.length > 0) {
+    const proposalHtml = r.proposals.map((p) => {
+      const changesHtml = p.changes && p.changes.length > 0 ? `
+        <div class="proposal-changes">
+          ${p.changes.map((c) => `
+            <div class="proposal-change-item">
+              <span class="change-path">${escHtml(c.path)}</span> — ${escHtml(c.description)}
+              ${c.after ? `<pre class="proposal-patch">${escHtml(c.after.slice(0, 600))}</pre>` : ''}
+            </div>
+          `).join('')}
+        </div>` : '';
+
+      return `
+        <div class="proposal">
+          <div class="proposal-header">
+            <span class="risk-dot risk-${escHtml(p.risk)}"></span>
+            ${escHtml(p.title)}
+          </div>
+          <div class="proposal-body">
+            ${escHtml(p.explanation)}
+            ${changesHtml}
+          </div>
+        </div>`;
+    }).join('');
+
+    out.push(`
+      <div class="section">
+        <div class="section-header"><span class="section-icon">🔍</span> Proposals Requiring Manual Review (${r.proposals.length})</div>
+        <div class="section-body">${proposalHtml}</div>
+      </div>
+    `);
+  }
+
+  // ── Next actions ─────────────────────────────────────────────────────────
+  if (r.nextActions && r.nextActions.length > 0) {
+    const actionItems = r.nextActions.map((a, i) => `
+      <li class="action-item">
+        <span class="action-num">${i + 1}</span>
+        <span>${escHtml(a)}</span>
+      </li>`).join('');
+
+    out.push(`
+      <div class="section">
+        <div class="section-header"><span class="section-icon">🚀</span> Next Actions</div>
+        <div class="section-body">
+          <ul class="action-list">${actionItems}</ul>
+        </div>
+      </div>
+    `);
+  }
+
+  // ── Markdown copy ────────────────────────────────────────────────────────
+  if (r.markdownReport) {
+    const mdId = 'md-' + Math.random().toString(36).slice(2);
+    out.push(`
+      <div class="section">
+        <div class="section-header">
+          <span class="section-icon">📄</span> Full Markdown Report
+          <button class="copy-btn" id="${mdId}-copy">Copy</button>
+        </div>
+        <div class="section-body">
+          <pre class="log-list" id="${mdId}" style="max-height:300px;overflow-y:auto;">${escHtml(r.markdownReport)}</pre>
+        </div>
+      </div>
+    `);
+  }
+
+  // Write to DOM
+  $('report-output').innerHTML = out.join('');
+
+  // Wire copy buttons
+  document.querySelectorAll('.copy-btn').forEach((btn) => {
+    const targetId = btn.id.replace(/-copy$/, '');
+    const target   = document.getElementById(targetId);
+    if (target) btn.addEventListener('click', () => copyText(target.textContent, btn));
+  });
+}
+
+// ── API calls ────────────────────────────────────────────────────────────────
+
+async function analyze() {
+  const logText = $('log-input').value.trim();
+  const dryRun  = $('dry-run-check').checked;
+  const btn     = $('analyze-btn');
+  const status  = $('analyze-status');
+
+  if (!logText) { status.textContent = 'Paste some log output first.'; return; }
+
+  btn.disabled = true;
+  status.innerHTML = '<span class="loader"></span> Analyzing…';
+  $('report-output').innerHTML = '';
+
+  try {
+    const res  = await fetch('/api/self-heal', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ logText, dryRun, source: 'ui' }),
+    });
+    if (res.status === 401) {
+      status.textContent = 'Not authenticated. Please sign in.';
+      return;
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      status.textContent = 'Error: ' + (err.error || res.statusText);
+      return;
+    }
+    const report = await res.json();
+    renderReport(report);
+    status.textContent = 'Analysis complete.';
+  } catch (e) {
+    status.textContent = 'Request failed: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function loadLatest() {
+  const btn    = $('load-btn');
+  const status = $('analyze-status');
+  btn.disabled = true;
+  status.innerHTML = '<span class="loader"></span> Loading…';
+  $('report-output').innerHTML = '';
+  try {
+    const res = await fetch('/api/self-heal/report');
+    if (res.status === 404) {
+      status.textContent = 'No saved report found.';
+      $('report-output').innerHTML = '<div class="empty">No debug report found yet. Run an analysis first.</div>';
+      return;
+    }
+    if (!res.ok) {
+      status.textContent = 'Error loading report.';
+      return;
+    }
+    const report = await res.json();
+    renderReport(report);
+    status.textContent = 'Loaded.';
+  } catch (e) {
+    status.textContent = 'Request failed: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+$('analyze-btn').addEventListener('click', analyze);
+$('load-btn').addEventListener('click', loadLatest);
+
+// Auto-load latest report on page open
+loadLatest();
+</script>
+</body>
+</html>

@@ -243,7 +243,7 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
 
   // Full generation: AI handles Supabase directly via config/supabase.js pattern.
   // ZyraApp SDK injection is not used for full-generation output.
-  const result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, onProgress);
+  let result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, onProgress);
 
   // ── Post-generation code validation + multi-round auto-fix ────────────────
   // Skip for fallback/template output (already known-good).

@@ -15,7 +15,8 @@ module.exports = {
   MEDIUM_MAX_FILES:         parseInt(process.env.MEDIUM_MAX_FILES         || '14',      10),
 
   // ── Global job timeout ───────────────────────────────────────────────────────
-  MAX_JOB_DURATION_MS: parseInt(process.env.MAX_JOB_DURATION_MS || '900000', 10),
+  // Advanced pipeline: 5 Sonnet planning calls + 2 Sonnet streaming passes + repair = ~15-20 min
+  MAX_JOB_DURATION_MS: parseInt(process.env.MAX_JOB_DURATION_MS || '1800000', 10), // 30 min ceiling
 
   // ── Planner timeouts ─────────────────────────────────────────────────────────
   SIMPLE_PLANNER_TIMEOUT_MS:   parseInt(process.env.SIMPLE_PLANNER_TIMEOUT_MS   || '5000',  10),
@@ -26,6 +27,25 @@ module.exports = {
   CODER_TIMEOUT_MS:    parseInt(process.env.CODER_TIMEOUT_MS    || '600000', 10), // 10 min for large multi-file outputs
   REVIEW_TIMEOUT_MS:   parseInt(process.env.REVIEW_TIMEOUT_MS   || '90000',  10),
   FINALIZE_TIMEOUT_MS: parseInt(process.env.FINALIZE_TIMEOUT_MS || '60000',  10),
+
+  // ── Advanced pipeline stage timeouts (all Sonnet — generous for quality) ────
+  // Stage 1.5: requirement inference — deterministic + optional LLM (~0-10s)
+  INFERENCE_TIMEOUT_MS:  parseInt(process.env.INFERENCE_TIMEOUT_MS  || '15000', 10),
+  // Stage 1.8: complexity scoring — deterministic, near-instant (~0-5s)
+  COMPLEXITY_TIMEOUT_MS: parseInt(process.env.COMPLEXITY_TIMEOUT_MS || '10000', 10),
+  // Stage 1: deep intent analysis — 1500 tokens output, ~20-40s for rich spec
+  INTENT_TIMEOUT_MS:    parseInt(process.env.INTENT_TIMEOUT_MS    || '60000',  10),
+  // Stage 2: full product spec — 2500 tokens output, ~30-60s for detailed pages/models
+  PRODUCT_TIMEOUT_MS:   parseInt(process.env.PRODUCT_TIMEOUT_MS   || '90000',  10),
+  // Stage 3: architecture plan — 1500 tokens output, ~20-40s
+  STACK_TIMEOUT_MS:     parseInt(process.env.STACK_TIMEOUT_MS     || '60000',  10),
+  // Stage 4: blueprint — 4000 tokens output, ~60-120s for complete design system + specs
+  BLUEPRINT_TIMEOUT_MS: parseInt(process.env.BLUEPRINT_TIMEOUT_MS || '180000', 10),
+  // Stage 6.5: generation validator — deterministic, near-instant (~0-5s); async LLM variant up to ~15s
+  VALIDATOR_TIMEOUT_MS: parseInt(process.env.VALIDATOR_TIMEOUT_MS || '8000', 10),
+  // Stage 7: repair pass — up to 12000 tokens output
+  REPAIR_TIMEOUT_MS:    parseInt(process.env.REPAIR_TIMEOUT_MS    || '180000', 10),
+  REPAIR_MAX_TOKENS:    parseInt(process.env.REPAIR_MAX_TOKENS    || '12000',  10),
 
   // ── Auto-fix (post-generation self-healing) ──────────────────────────────────
   AUTOFIX_TIMEOUT_MS:  parseInt(process.env.AUTOFIX_TIMEOUT_MS  || '60000', 10),

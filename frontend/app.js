@@ -464,77 +464,7 @@ $('auth-google-btn').addEventListener('click', async () => {
   }
 });
 
-// ── Sidebar inline auth ───────────────────────────────────────────────────────
-let sidebarAuthMode = 'signin';
-
-$('sidebar-tab-signin')?.addEventListener('click', () => {
-  sidebarAuthMode = 'signin';
-  $('sidebar-tab-signin').classList.add('sidebar-auth-tab--active');
-  $('sidebar-tab-signup').classList.remove('sidebar-auth-tab--active');
-  $('sidebar-auth-submit').textContent = 'Sign in';
-  $('sidebar-auth-password').autocomplete = 'current-password';
-  $('sidebar-auth-error').textContent = '';
-});
-
-$('sidebar-tab-signup')?.addEventListener('click', () => {
-  sidebarAuthMode = 'signup';
-  $('sidebar-tab-signup').classList.add('sidebar-auth-tab--active');
-  $('sidebar-tab-signin').classList.remove('sidebar-auth-tab--active');
-  $('sidebar-auth-submit').textContent = 'Create account';
-  $('sidebar-auth-password').autocomplete = 'new-password';
-  $('sidebar-auth-error').textContent = '';
-});
-
-$('sidebar-auth-form')?.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email    = $('sidebar-auth-email').value.trim();
-  const password = $('sidebar-auth-password').value;
-  const submit   = $('sidebar-auth-submit');
-  const errEl    = $('sidebar-auth-error');
-  errEl.textContent = '';
-  if (!email || !password) { errEl.textContent = 'Please enter your email and password.'; return; }
-  submit.disabled = true;
-  submit.textContent = sidebarAuthMode === 'signup' ? 'Creating account...' : 'Signing in...';
-  try {
-    const sb = window._zyraAuth?._sb;
-    if (!sb) throw new Error('Auth not initialised');
-    let result;
-    if (sidebarAuthMode === 'signup') {
-      result = await sb.auth.signUp({ email, password });
-      if (!result.error && result.data.user && !result.data.session) {
-        errEl.textContent = 'Check your email to confirm your account, then sign in.';
-        submit.disabled = false;
-        submit.textContent = 'Create account';
-        return;
-      }
-    } else {
-      result = await sb.auth.signInWithPassword({ email, password });
-    }
-    if (result.error) throw result.error;
-  } catch (err) {
-    submit.disabled = false;
-    submit.textContent = sidebarAuthMode === 'signup' ? 'Create account' : 'Sign in';
-    $('sidebar-auth-error').textContent = friendlyAuthError(err.message);
-  }
-});
-
-$('sidebar-google-btn')?.addEventListener('click', async () => {
-  $('sidebar-google-btn').disabled = true;
-  $('sidebar-auth-error').textContent = '';
-  try {
-    const sb = window._zyraAuth?._sb;
-    if (!sb) throw new Error('Auth not initialised');
-    if (_pendingPrompt) sessionStorage.setItem('zyra_pending_prompt', _pendingPrompt);
-    const { error } = await sb.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin + '/app' },
-    });
-    if (error) throw error;
-  } catch (err) {
-    $('sidebar-google-btn').disabled = false;
-    $('sidebar-auth-error').textContent = friendlyAuthError(err.message);
-  }
-});
+// (Inline sidebar auth removed — guests click through to /login)
 
 function friendlyAuthError(msg) {
   if (!msg) return 'Something went wrong. Please try again.';
@@ -863,11 +793,7 @@ async function pollJob(jobId) {
     if (isActive(job.status) && activeMessageId) {
       updateGeneratingMsg(activeMessageId, job);
       // Mirror in preview loading area
-      const stageText = {
-        planning: 'Planning...', coding: 'Writing code...',
-        reviewing: 'Reviewing...', finalizing: 'Finalizing...',
-      };
-      updateLoadingMessage(stageText[job.status] || 'Generating...', '');
+      updateLoadingMessage('Generating...', '');
     }
 
     if (isTerminal(job.status)) {

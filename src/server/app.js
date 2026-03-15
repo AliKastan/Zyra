@@ -11,6 +11,7 @@ const previewRoutes  = require('../routes/previewRoutes');
 const deployRoutes   = require('../routes/deployRoutes');
 const billingRoutes  = require('../routes/billingRoutes');
 const debugRoutes    = require('../routes/debugRoutes');
+const selfHealRoutes = require('../routes/selfHealRoutes');
 const backendRoutes  = require('../routes/backendRoutes');
 const envRoutes      = require('../routes/envRoutes');
 const { serveEnvScript } = require('../controllers/envController');
@@ -121,6 +122,11 @@ app.get('/billing', requireGate, (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/billing.html'));
 });
 
+// Debug report page: gate-protected
+app.get('/debug-report', requireGate, (_req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../frontend/debug-report.html'));
+});
+
 // ── Static assets (CSS, JS, images) — index:false prevents serving index.html ─
 // Registered AFTER page routes so it only handles actual asset files.
 app.use(express.static(path.resolve(__dirname, '../../frontend'), { index: false }));
@@ -141,6 +147,7 @@ app.use('/api/preview',   requireAuth, previewRoutes);
 app.use('/api/deploy',    requireAuth, deployRoutes);
 app.use('/api/billing',   requireAuth, billingRoutes);
 app.use('/api/debug',     requireAuth, debugRoutes);
+app.use('/api/self-heal', requireAuth, selfHealRoutes);
 // No requireAuth — called directly from generated apps running in iframes/user browsers
 app.use('/api/backend',  backendRoutes);
 

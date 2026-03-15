@@ -196,6 +196,11 @@
       min-height: 20px;
     }
 
+    @media (max-width: 480px) {
+      body { padding: 16px; align-items: flex-start; padding-top: 40px; }
+      .auth-card { padding: 28px 20px; border-radius: 16px; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; }
     }
@@ -262,8 +267,16 @@
     }
   });
 
+  // ── Pre-select tab from URL param (?mode=signup) ─────────────────────────────
+  let mode = new URLSearchParams(window.location.search).get('mode') === 'signup' ? 'signup' : 'signin';
+  if (mode === 'signup') {
+    document.getElementById('tab-signup').classList.add('active');
+    document.getElementById('tab-signin').classList.remove('active');
+    document.getElementById('submit-btn').textContent = 'Create account';
+    document.getElementById('password').autocomplete = 'new-password';
+  }
+
   // ── Tab switching ─────────────────────────────────────────────────────────────
-  let mode = 'signin';
 
   document.getElementById('tab-signin').addEventListener('click', () => {
     mode = 'signin';

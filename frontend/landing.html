@@ -4,16 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Zyra — Build with AI</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=5" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
       --bg: #07070A;
       --text: #EEF0F8;
-      --text-dim: rgba(238,240,248,0.5);
+      --text-dim: rgba(238,240,248,0.55);
       --accent: #4F9EFF;
     }
 
@@ -21,7 +22,7 @@
       height: 100%;
       background: var(--bg);
       color: var(--text);
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
       -webkit-font-smoothing: antialiased;
       overflow: hidden;
     }
@@ -40,14 +41,13 @@
       z-index: 1;
       display: flex;
       flex-direction: column;
-      height: 100vh;
+      height: 100dvh;
     }
 
     /* Navbar */
     nav {
       display: flex;
       align-items: center;
-      justify-content: space-between;
       padding: 0 2rem;
       height: 64px;
       flex-shrink: 0;
@@ -61,149 +61,134 @@
     }
 
     .nav-logo svg {
-      width: 26px;
-      height: 28px;
+      width: 22px;
+      height: 24px;
+      flex-shrink: 0;
     }
 
     .nav-logo-text {
-      font-size: 1.15rem;
-      font-weight: 600;
+      font-size: 1.1rem;
+      font-weight: 700;
       color: #fff;
-      letter-spacing: -0.01em;
+      letter-spacing: -0.02em;
     }
 
-    .nav-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .nav-signin {
-      background: none;
-      border: none;
-      color: var(--text-dim);
-      font: 500 0.875rem/1 'Inter', sans-serif;
-      cursor: pointer;
-      padding: 0.5rem 0.75rem;
-      border-radius: 8px;
-      transition: color 0.18s;
-      text-decoration: none;
-    }
-    .nav-signin:hover { color: var(--text); }
-
-    .nav-cta {
-      background: rgba(255,255,255,0.09);
-      border: 1px solid rgba(255,255,255,0.12);
-      color: #fff;
-      font: 500 0.875rem/1 'Inter', sans-serif;
-      cursor: pointer;
-      padding: 0.5rem 1.1rem;
-      border-radius: 8px;
-      transition: background 0.18s, border-color 0.18s;
-      text-decoration: none;
-    }
-    .nav-cta:hover {
-      background: rgba(255,255,255,0.13);
-      border-color: rgba(255,255,255,0.2);
-    }
-
-    /* Center content */
-    .center {
+    /* Hero */
+    .hero {
       flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 0 1.5rem 5rem;
-      gap: 2rem;
+      padding: 0 1.5rem 4rem;
+      gap: 0;
+      text-align: center;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: rgba(238,240,248,0.45);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 1.75rem;
+    }
+
+    .hero-badge-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.7;
     }
 
     .headline {
-      text-align: center;
-      font-size: clamp(1.75rem, 4vw, 2.75rem);
+      font-size: clamp(2rem, 6vw, 3.5rem);
       font-weight: 300;
-      letter-spacing: -0.03em;
-      line-height: 1.2;
-      color: rgba(238,240,248,0.85);
-      user-select: none;
+      letter-spacing: -0.035em;
+      line-height: 1.15;
+      color: rgba(238,240,248,0.82);
+      max-width: 640px;
+      margin-bottom: 1.1rem;
     }
+
     .headline strong {
-      font-weight: 500;
+      font-weight: 600;
       color: #fff;
     }
 
-    /* Prompt box */
-    .prompt-wrap {
-      width: 100%;
-      max-width: 640px;
+    .subheading {
+      font-size: clamp(0.9rem, 2vw, 1.05rem);
+      font-weight: 400;
+      color: var(--text-dim);
+      line-height: 1.6;
+      max-width: 420px;
+      margin-bottom: 2.5rem;
     }
 
-    .prompt-box {
+    /* CTA buttons */
+    .cta-group {
       display: flex;
-      align-items: center;
       gap: 0.75rem;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.09);
-      border-radius: 16px;
-      padding: 0.875rem 0.875rem 0.875rem 1.25rem;
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-    }
-    .prompt-box:focus-within {
-      border-color: rgba(79,158,255,0.3);
-      background: rgba(255,255,255,0.07);
-      box-shadow: 0 0 0 3px rgba(79,158,255,0.07);
-    }
-
-    .prompt-icon {
-      flex-shrink: 0;
-      color: rgba(238,240,248,0.3);
-      display: flex;
       align-items: center;
-      transition: color 0.2s;
+      flex-wrap: wrap;
+      justify-content: center;
     }
-    .prompt-box:focus-within .prompt-icon { color: rgba(238,240,248,0.5); }
 
-    .prompt-input {
-      flex: 1;
-      background: none;
-      border: none;
-      outline: none;
-      color: var(--text);
-      font: 400 1rem/1.5 'Inter', sans-serif;
-      caret-color: var(--accent);
-      min-width: 0;
-    }
-    .prompt-input::placeholder { color: rgba(238,240,248,0.28); }
-
-    .prompt-send {
-      flex-shrink: 0;
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
-      border: none;
-      background: rgba(255,255,255,0.07);
-      color: rgba(238,240,248,0.45);
-      display: flex;
+    .btn-signup {
+      display: inline-flex;
       align-items: center;
       justify-content: center;
+      padding: 0.75rem 1.75rem;
+      font: 600 0.95rem/1 'Inter', sans-serif;
+      color: #07070A;
+      background: #EEF0F8;
+      border: none;
+      border-radius: 10px;
       cursor: pointer;
-      transition: background 0.18s, color 0.18s, transform 0.15s;
+      text-decoration: none;
+      transition: opacity 0.18s, transform 0.12s;
+      white-space: nowrap;
+      min-height: 44px;
     }
-    .prompt-send:hover {
-      background: rgba(255,255,255,0.92);
-      color: #0a0a0a;
-      transform: scale(1.06);
-    }
-    .prompt-send:active { transform: scale(0.96); }
+    .btn-signup:hover { opacity: 0.88; }
+    .btn-signup:active { transform: scale(0.97); }
 
-    .prompt-hint {
-      text-align: center;
-      margin-top: 0.9rem;
-      font-size: 0.77rem;
-      color: rgba(238,240,248,0.2);
-      letter-spacing: 0.015em;
+    .btn-signin {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem 1.5rem;
+      font: 500 0.95rem/1 'Inter', sans-serif;
+      color: rgba(238,240,248,0.7);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.11);
+      border-radius: 10px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.18s, border-color 0.18s, color 0.18s;
+      white-space: nowrap;
+      min-height: 44px;
+    }
+    .btn-signin:hover {
+      background: rgba(255,255,255,0.09);
+      border-color: rgba(255,255,255,0.2);
+      color: #fff;
+    }
+
+    /* Mobile */
+    @media (max-width: 480px) {
+      nav { padding: 0 1.25rem; height: 56px; }
+      .hero { padding: 0 1.25rem 3rem; }
+      .cta-group { flex-direction: column; width: 100%; max-width: 280px; }
+      .btn-signup, .btn-signin { width: 100%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
     }
   </style>
 </head>
@@ -214,59 +199,41 @@
 <div class="page">
   <nav>
     <a class="nav-logo" href="/">
-      <svg viewBox="0 0 185 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zyra">
+      <svg viewBox="0 0 185 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <path d="M 0,0 L 150,0 L 185,60 L 150,120 L 96,200 L 50,120 L 85,60 L 35,60 Z" fill="#ffffff"/>
       </svg>
       <span class="nav-logo-text">Zyra</span>
     </a>
-    <div class="nav-actions">
-      <a class="nav-signin" href="/app">Sign in</a>
-      <a class="nav-cta" href="/app">Get started</a>
-    </div>
   </nav>
 
-  <div class="center">
-    <h1 class="headline">Build something with <strong>Zyra</strong></h1>
-
-    <div class="prompt-wrap">
-      <div class="prompt-box">
-        <span class="prompt-icon">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-          </svg>
-        </span>
-
-        <input
-          class="prompt-input"
-          type="text"
-          id="promptInput"
-          placeholder="Describe the app you want to build..."
-          autocomplete="off"
-          spellcheck="false"
-        />
-
-        <button class="prompt-send" id="sendBtn" title="Build">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 13V3M8 3L3.5 7.5M8 3l4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-      </div>
-      <p class="prompt-hint">Press Enter to build &middot; Zyra generates a full working app</p>
+  <main class="hero">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      AI App Builder
     </div>
-  </div>
+
+    <h1 class="headline">Build full-stack apps<br>with <strong>Zyra</strong></h1>
+
+    <p class="subheading">Describe what you want to build. Zyra generates the code, deploys a live preview, and gets you from idea to working app in seconds.</p>
+
+    <div class="cta-group">
+      <a class="btn-signup" href="/login?mode=signup">Get started free</a>
+      <a class="btn-signin" href="/login">Sign in</a>
+    </div>
+  </main>
 </div>
 
 <script>
-/* ── Particle system ── */
+/* Particle system */
 (function () {
   const canvas = document.getElementById('particles');
   const ctx = canvas.getContext('2d');
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-  const COUNT = 110;
-  const MOUSE_RADIUS = 130;
+  const COUNT = 90;
+  const MOUSE_RADIUS = 120;
   const RETURN_SPEED = 0.03;
-  const BASE_SPEED = 0.15;
+  const BASE_SPEED = 0.14;
 
   let W, H, dpr;
   const mouse = { x: -9999, y: -9999 };
@@ -288,13 +255,11 @@
 
   function makeParticle() {
     const x = rand(0, W), y = rand(0, H);
-    return {
-      ox: x, oy: y,
-      x, y,
+    return { ox: x, oy: y, x, y,
       vx: rand(-BASE_SPEED, BASE_SPEED),
       vy: rand(-BASE_SPEED, BASE_SPEED),
       r: rand(0.5, 1.5),
-      a: rand(0.12, 0.5),
+      a: rand(0.1, 0.45),
     };
   }
 
@@ -305,9 +270,7 @@
 
   function tick() {
     ctx.clearRect(0, 0, W, H);
-
     for (const p of particles) {
-      // drift origin
       p.ox += p.vx;
       p.oy += p.vy;
       if (p.ox < -10) p.ox = W + 10;
@@ -315,18 +278,15 @@
       if (p.oy < -10) p.oy = H + 10;
       else if (p.oy > H + 10) p.oy = -10;
 
-      // mouse push
       const dx = p.x - mouse.x;
       const dy = p.y - mouse.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       let tx = p.ox, ty = p.oy;
       if (dist < MOUSE_RADIUS && dist > 0.1) {
-        const f = (1 - dist / MOUSE_RADIUS);
-        tx += (dx / dist) * f * 55;
-        ty += (dy / dist) * f * 55;
+        const f = 1 - dist / MOUSE_RADIUS;
+        tx += (dx / dist) * f * 50;
+        ty += (dy / dist) * f * 50;
       }
-
-      // lerp toward target
       p.x += (tx - p.x) * RETURN_SPEED;
       p.y += (ty - p.y) * RETURN_SPEED;
 
@@ -335,44 +295,43 @@
       ctx.fillStyle = 'rgba(255,255,255,' + p.a + ')';
       ctx.fill();
     }
-
     raf = requestAnimationFrame(tick);
   }
 
   window.addEventListener('resize', () => {
     resize();
-    for (const p of particles) {
-      p.ox = rand(0, W); p.oy = rand(0, H);
-      p.x = p.ox; p.y = p.oy;
-    }
+    for (const p of particles) { p.ox = rand(0, W); p.oy = rand(0, H); p.x = p.ox; p.y = p.oy; }
   });
-
   window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
   window.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
-
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { cancelAnimationFrame(raf); }
-    else { raf = requestAnimationFrame(tick); }
+    if (document.hidden) cancelAnimationFrame(raf);
+    else raf = requestAnimationFrame(tick);
   });
 
   init();
   raf = requestAnimationFrame(tick);
 })();
 
-/* ── Prompt submit ── */
+/* Redirect if already signed in — load config.js → Supabase SDK → check session */
 (function () {
-  const input = document.getElementById('promptInput');
-  const btn = document.getElementById('sendBtn');
-
-  function submit() {
-    const val = input.value.trim();
-    if (!val) return;
-    window.location.href = '/app?prompt=' + encodeURIComponent(val);
+  function loadScript(src, cb) {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = cb;
+    s.onerror = function () {}; // fail silently — redirect is optional
+    document.head.appendChild(s);
   }
 
-  btn.addEventListener('click', submit);
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+  loadScript('config.js', function () {
+    const cfg = window.ZYRA_CONFIG || {};
+    if (!cfg.supabaseUrl || !cfg.supabaseKey) return;
+    loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js', function () {
+      const sb = supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+      sb.auth.getSession().then(function (res) {
+        if (res.data.session) window.location.replace('/app');
+      });
+    });
   });
 })();
 </script>

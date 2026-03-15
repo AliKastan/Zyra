@@ -1,0 +1,17 @@
+[build]
+# npm ci is faster and reproducible in CI
+builder = "NIXPACKS"
+
+[deploy]
+# The production start command. Must match package.json scripts.start
+startCommand = "npm start"
+
+# Health check path — Railway pings this after deployment
+healthcheckPath = "/api/health"
+
+# Give the server time to start before marking healthy (seconds)
+healthcheckTimeout = 120
+
+# Railway will restart the container if it exits with a non-zero code
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
