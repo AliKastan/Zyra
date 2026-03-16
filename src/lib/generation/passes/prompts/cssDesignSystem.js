@@ -69,9 +69,15 @@ REQUIREMENTS:
 11. NO inline styles, NO !important spam, NO hacks
 12. Use CSS custom properties from :root throughout — no hard-coded color values`;
 
+  // Inject design spec generation hints if available (from Stage 4.5)
+  const designSpec = blueprint._designSpec;
+  const designHintsBlock = designSpec && designSpec.generationHints?.length > 0
+    ? `\nDESIGN SYSTEM HINTS (${designSpec.preset} preset — ${designSpec.visualTone} tone):\n${designSpec.generationHints.map(h => `- ${h}`).join('\n')}\n`
+    : '';
+
   const user = `Project: ${blueprint.projectName}
 Design notes: ${blueprint.designNotes || 'Clean, professional design'}
-
+${designHintsBlock}
 DESIGN SYSTEM — implement these as CSS custom properties:
 
 Colors:

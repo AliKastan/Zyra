@@ -38,6 +38,10 @@ const { runMultiPassGeneration }    = require('../lib/generation/passes');
 const { buildGeneratedProjectFiles } = require('../lib/file-generator');
 const { validateGeneratedProject, summarizeValidationReport } = require('../lib/validator');
 const { repairGeneratedProject, summarizeRepairReport }     = require('../lib/repair');
+const { assembleFinalProjectPackage, summarizeFinalPackage } = require('../lib/packaging');
+const { runDesignSystemStage }      = require('../lib/design-system');
+const { checkProductionReadiness, summarizeReadinessReport, buildUiReadinessPayload } = require('../lib/readiness');
+const { runErrorPreventionPreflight, runInFlightPreventionChecks, summarizePreventionReport, buildUiPreventionPayload } = require('../lib/error-prevention');
 const { withTimeout }       = require('../utils/withTimeout');
 const { slugify }           = require('../utils/slugify');
 const limits                = require('../config/limits');
@@ -152,6 +156,44 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
   );
   logger.info(`advancedPipeline[4/7] blueprint: projectName="${blueprint.projectName}" files=${blueprint.fileList?.length} cssComponents=${blueprint.cssComponents?.length}`);
 
+  // ── Stage 4.5: Design System Selection + Token Injection ────────────────────
+  await emit('Selecting design system...');
+  let enrichedBlueprint = blueprint;
+  try {
+    const designCtx = {
+      intent:          scoredIntent,
+      product,
+      blueprint,
+      complexityReport: complexityReport || null,
+      overrides:       scoredIntent?.designOverrides || {},
+    };
+    const dsResult = runDesignSystemStage(designCtx, blueprint);
+    enrichedBlueprint = dsResult.enrichedBlueprint || blueprint;
+    logger.info(`advancedPipeline[4.5/7] design: ${dsResult.summary}`);
+  } catch (dsErr) {
+    logger.warn(`advancedPipeline[4.5/7] design system failed (${dsErr.message}), using blueprint as-is`);
+  }
+
+  // ── Stage 7: Error Prevention Preflight ─────────────────────────────────────
+  // Proactively detects structural, deployment, and integration gaps in the plan.
+  // Injects safe defaults into enrichedBlueprint before generation. Non-fatal.
+  let preventionReport = null;
+  try {
+    await emit('Running error prevention preflight...');
+    const preflightResult = runErrorPreventionPreflight({
+      intent:          scoredIntent,
+      product,
+      stack,
+      blueprint:       enrichedBlueprint,
+      complexityReport: complexityReport || null,
+    });
+    enrichedBlueprint = preflightResult.blueprint;
+    preventionReport  = preflightResult.preventionReport;
+    logger.info(`advancedPipeline[7/12] prevention: ${summarizePreventionReport(preventionReport)}`);
+  } catch (epErr) {
+    logger.warn(`advancedPipeline[7/12] error prevention preflight failed (${epErr.message}), continuing`);
+  }
+
   // ── Stage 5: Code Generation ────────────────────────────────────────────────
   // medium/advanced/production_heavy → multi-pass (6 focused passes)
   // simple → legacy two-pass HTML→CSS/JS (kept for fast simple apps)
@@ -160,19 +202,19 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
 
   if (useMultiPass) {
     logger.info(`advancedPipeline[5/7] using multi-pass generation (tier="${complexityReport.complexityTier}")`);
-    const mpResult = await runMultiPassGeneration(blueprint, scoredIntent, complexityReport, cost, onProgress, log);
+    const mpResult = await runMultiPassGeneration(enrichedBlueprint, scoredIntent, complexityReport, cost, onProgress, log);
     files       = mpResult.files;
     projectName = mpResult.projectName;
     logger.info(`advancedPipeline[5/7] multi-pass: ${files.length} files across ${mpResult.passReports.length} passes`);
   } else {
     logger.info(`advancedPipeline[5/7] using two-pass generation (simple tier)`);
-    ({ files, projectName } = await generateCode(blueprint, cost, onProgress, log));
+    ({ files, projectName } = await generateCode(enrichedBlueprint, cost, onProgress, log));
     logger.info(`advancedPipeline[5/7] two-pass: ${files.length} files generated`);
   }
 
   // ── Stage 5.5: File Artifact Enrichment ─────────────────────────────────────
   const fileGeneratorContext = {
-    blueprint,
+    blueprint: enrichedBlueprint,
     intent:          scoredIntent,
     complexityReport: complexityReport || null,
     existingPaths:   new Set(),
@@ -182,7 +224,7 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
 
   // ── Stage 6: Semantic Validation (HTML/CSS/JS structural) ──────────────────
   await emit('Validating output...');
-  const stageValidationReport = validateOutput(files, blueprint);
+  const stageValidationReport = validateOutput(files, enrichedBlueprint);
 
   const stageWarningCount = stageValidationReport.issues.filter(i => i.severity === 'warning').length;
   logger.info(`advancedPipeline[6/7] validation: score=${stageValidationReport.score} critical=${stageValidationReport.issues.filter(i => i.severity === 'critical').length} warnings=${stageWarningCount}`);
@@ -197,7 +239,7 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
     withTimeout(
       Promise.resolve(validateGeneratedProject({
         files,
-        blueprint,
+        blueprint: enrichedBlueprint,
         intent:           scoredIntent,
         complexityReport: complexityReport || null,
         fileArtifacts:    projectFiles,
@@ -224,7 +266,7 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
     Promise.resolve(repairGeneratedProject({
       files,
       validationReport,
-      blueprint,
+      blueprint: enrichedBlueprint,
       intent:          scoredIntent,
       complexityReport: complexityReport || null,
     })),
@@ -264,7 +306,7 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
     await emit(`Repairing: ${repairDesc}...`);
 
     const result = await _safe(
-      repairFiles(filesAfterStructuralRepair, validationReport, blueprint, cost),
+      repairFiles(filesAfterStructuralRepair, validationReport, enrichedBlueprint, cost),
       { files, repairReport: { repairsApplied: [], allRepaired: false } },
       'repairEngine',
     );
@@ -280,16 +322,123 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
     repairReport = { repairsApplied: [], allRepaired: true };
   }
 
+  // ── Stage 10: Final Packaging / Output Assembly / Delivery ──────────────────
+  // Assembles all pipeline outputs into a clean, structured final deliverable.
+  // Non-fatal — pipeline result is returned even if packaging fails.
+  await emit('Assembling final package...');
+  let finalPackage = null;
+
+  const packagingResult = await _safe(
+    Promise.resolve(assembleFinalProjectPackage({
+      intent:                scoredIntent,
+      product,
+      stack,
+      blueprint: enrichedBlueprint,
+      complexityReport:      complexityReport || null,
+      files:                 finalFiles,
+      fileArtifacts:         projectFiles,
+      validationReport,
+      structuralRepairReport: structuralRepairReport || null,
+      repairReport,
+      projectName,
+      generatedAt:           new Date().toISOString(),
+    })),
+    null,
+    'finalPackaging',
+  );
+
+  if (packagingResult) {
+    finalPackage = packagingResult;
+    logger.info(`advancedPipeline[10/10] ${summarizeFinalPackage(finalPackage)}`);
+    await emit(`Package ready: ${finalPackage.packageStatus}`);
+  } else {
+    logger.warn('advancedPipeline[10/10] final packaging failed — returning raw pipeline output');
+  }
+
+  // ── Stage 10.5: In-Flight Error Prevention ───────────────────────────────
+  // Checks actual generated files for hardcoded ports, localhost URLs, missing
+  // env examples, missing error handling, localStorage in mobile, etc.
+  // Merges discovered issues into the existing preventionReport. Non-fatal.
+  try {
+    const inFlightFiles = finalFiles instanceof Map
+      ? Object.fromEntries(finalFiles)
+      : (Array.isArray(finalFiles)
+          ? Object.fromEntries(finalFiles.map(f => [f.path || f.filename, f.content || '']))
+          : finalFiles);
+
+    const inFlightIssues = runInFlightPreventionChecks({
+      files:    inFlightFiles,
+      blueprint: enrichedBlueprint,
+      intent:   scoredIntent,
+      stack,
+    });
+
+    if (inFlightIssues.length > 0) {
+      logger.info(`advancedPipeline[10.5/12] in-flight prevention: ${inFlightIssues.length} issue(s) detected`);
+    }
+
+    if (preventionReport && inFlightIssues.length > 0) {
+      // Merge in-flight issues into the existing prevention report
+      const { buildPreventionReport } = require('../lib/error-prevention');
+      preventionReport = buildPreventionReport(
+        preventionReport.preventedIssues,
+        preventionReport.injectedDefaults,
+        preventionReport.generationAdjustments,
+        inFlightIssues,
+      );
+    } else if (!preventionReport && inFlightIssues.length > 0) {
+      const { buildPreventionReport } = require('../lib/error-prevention');
+      preventionReport = buildPreventionReport([], [], [], inFlightIssues);
+    }
+  } catch (ifErr) {
+    logger.warn(`advancedPipeline[10.5/12] in-flight prevention failed (${ifErr.message}), skipping`);
+  }
+
+  // ── Stage 12: Production Readiness Check ─────────────────────────────────
+  // Evaluates deployability: runtime, env, integrations, port config, security.
+  // Non-fatal — pipeline result is returned even if this check fails.
+  await emit('Checking production readiness...');
+  let readinessReport = null;
+
+  try {
+    // Normalize files to a plain object (may be a Map from generation passes)
+    const readinessFiles = finalFiles instanceof Map
+      ? Object.fromEntries(finalFiles)
+      : (Array.isArray(finalFiles)
+          ? Object.fromEntries(finalFiles.map(f => [f.path || f.filename, f.content || '']))
+          : finalFiles);
+
+    readinessReport = checkProductionReadiness({
+      files:           readinessFiles,
+      blueprint:       enrichedBlueprint,
+      intent:          scoredIntent,
+      stack,
+      complexityReport: complexityReport || null,
+      validationReport,
+      finalPackage:    finalPackage || null,
+      projectName,
+    });
+    logger.info(`advancedPipeline[12/12] ${summarizeReadinessReport(readinessReport)}`);
+    await emit(`Readiness: ${readinessReport.status} (score: ${readinessReport.score.total}/100)`);
+  } catch (rdErr) {
+    logger.warn(`advancedPipeline[12/12] readiness check failed (${rdErr.message})`);
+  }
+
   return {
     projectName,
     files:                  finalFiles,
-    blueprint,
+    blueprint: enrichedBlueprint,
     validationReport,                         // comprehensive architectural report (Stage 6.5)
     stageValidationReport,                    // HTML/CSS/JS structural report (Stage 6)
     repairReport,
     complexityReport:         complexityReport || null,
     fileArtifacts:            projectFiles,
     structuralRepairReport:   structuralRepairReport || null,
+    finalPackage:             finalPackage || null,           // Stage 11 output
+    readinessReport:          readinessReport || null,        // Stage 12 output
+    readinessPayload:         readinessReport ? buildUiReadinessPayload(readinessReport) : null,
+    preventionReport:         preventionReport || null,       // Stage 7 + 10.5 output
+    preventionPayload:        preventionReport ? buildUiPreventionPayload(preventionReport) : null,
     _advanced:                true,
   };
 }
