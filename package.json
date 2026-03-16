@@ -21,7 +21,8 @@
     "test:design-system": "node test/design-system/design-system.test.js",
     "test:readiness": "node test/readiness/readiness.test.js",
     "test:error-prevention": "node test/error-prevention/error-prevention.test.js",
-    "test": "node test/inference/requirements.test.js && node test/complexity/scorer.test.js && node test/generation/multipass.test.js && node test/file-generator/artifacts.test.js && node test/validator/validator.test.js && node test/repair/repair.test.js && node test/packaging/packaging.test.js && node test/design-system/design-system.test.js && node test/readiness/readiness.test.js && node test/error-prevention/error-prevention.test.js"
+    "test:authenticity": "node test/backend-authenticity/backend-authenticity.test.js",
+    "test": "node test/inference/requirements.test.js && node test/complexity/scorer.test.js && node test/generation/multipass.test.js && node test/file-generator/artifacts.test.js && node test/validator/validator.test.js && node test/repair/repair.test.js && node test/packaging/packaging.test.js && node test/design-system/design-system.test.js && node test/readiness/readiness.test.js && node test/error-prevention/error-prevention.test.js && node test/backend-authenticity/backend-authenticity.test.js"
   },
   "engines": {
     "node": ">=18.0.0"

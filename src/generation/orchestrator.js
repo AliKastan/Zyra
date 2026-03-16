@@ -42,6 +42,7 @@ const { assembleFinalProjectPackage, summarizeFinalPackage } = require('../lib/p
 const { runDesignSystemStage }      = require('../lib/design-system');
 const { checkProductionReadiness, summarizeReadinessReport, buildUiReadinessPayload } = require('../lib/readiness');
 const { runErrorPreventionPreflight, runInFlightPreventionChecks, summarizePreventionReport, buildUiPreventionPayload } = require('../lib/error-prevention');
+const { checkBackendAuthenticity, summarizeAuthenticity, buildUiAuthenticityPayload } = require('../lib/backend-authenticity');
 const { withTimeout }       = require('../utils/withTimeout');
 const { slugify }           = require('../utils/slugify');
 const limits                = require('../config/limits');
@@ -424,6 +425,33 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
     logger.warn(`advancedPipeline[12/12] readiness check failed (${rdErr.message})`);
   }
 
+  // ── Stage 13: Backend Authenticity Check ─────────────────────────────────
+  // Scans generated code for fake backend patterns: hardcoded data, missing
+  // API routes, fake auth, fake billing, stub integrations, unguarded admin.
+  // Non-fatal — informs repair system and UI. Does not block delivery.
+  let authenticityReport = null;
+  try {
+    const authenticityFiles = finalFiles instanceof Map
+      ? Object.fromEntries(finalFiles)
+      : (Array.isArray(finalFiles)
+          ? Object.fromEntries(finalFiles.map(f => [f.path || f.filename, f.content || '']))
+          : finalFiles);
+
+    authenticityReport = checkBackendAuthenticity({
+      files:           authenticityFiles,
+      blueprint:       enrichedBlueprint,
+      intent:          scoredIntent,
+      stack,
+      complexityReport: complexityReport || null,
+    });
+    logger.info(`advancedPipeline[13/13] authenticity: ${summarizeAuthenticity(authenticityReport)}`);
+    if (authenticityReport.status === 'fake_backend_detected') {
+      await emit(`Authenticity: fake backend patterns detected (${authenticityReport.fakeBackendIssues.length} issue(s))`);
+    }
+  } catch (authErr) {
+    logger.warn(`advancedPipeline[13/13] authenticity check failed (${authErr.message})`);
+  }
+
   return {
     projectName,
     files:                  finalFiles,
@@ -439,6 +467,8 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
     readinessPayload:         readinessReport ? buildUiReadinessPayload(readinessReport) : null,
     preventionReport:         preventionReport || null,       // Stage 7 + 10.5 output
     preventionPayload:        preventionReport ? buildUiPreventionPayload(preventionReport) : null,
+    authenticityReport:       authenticityReport || null,     // Stage 13 output
+    authenticityPayload:      authenticityReport ? buildUiAuthenticityPayload(authenticityReport) : null,
     _advanced:                true,
   };
 }
