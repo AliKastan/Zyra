@@ -6,7 +6,7 @@ const { classifyComplexity } = require('../utils/complexity');
 const { withTimeout } = require('../utils/withTimeout');
 const { assertProviderAvailable } = require('./orchestrator');
 const { runPlanner } = require('./plannerService');
-const { runCoder, injectBackendSDK, injectEnvLoader, injectRuntimeErrorCatcher } = require('./coderService');
+const { runCoder, injectBackendSDK, injectEnvLoader, injectViewportNormalize, injectRuntimeErrorCatcher } = require('./coderService');
 const { runAdvancedPipeline, shouldUseAdvancedPipeline } = require('../generation/orchestrator');
 const { runReviewer } = require('./reviewerService');
 const { generateProject } = require('../generators/projectGenerator');
@@ -283,6 +283,9 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
       codeOutput = { ...codeOutput, files: injectBackendSDK(codeOutput.files, projectSlug) };
       await updateJob(jobId, { _usedBackend: true });
     }
+
+    // Inject viewport normalize into all HTML files (must be first — before app styles)
+    codeOutput = { ...codeOutput, files: injectViewportNormalize(codeOutput.files) };
 
     // Inject env vars loader into all HTML files (window.__ENV__ pattern)
     codeOutput = { ...codeOutput, files: injectEnvLoader(codeOutput.files, projectSlug) };

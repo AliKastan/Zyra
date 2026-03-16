@@ -34,6 +34,15 @@ Rules:
 - files: include only files that will actually be generated (8-14 for balanced SaaS)
 - required_modules: always "auth" for multi-user apps; add "billing" if monetized`;
 
+// ── Layout rules (injected into all coder prompts) ────────────────────────────
+
+const LAYOUT_RULES = `
+LAYOUT (non-negotiable):
+- html, body: width:100%; min-height:100vh; margin:0; padding:0
+- Root app container: width:100%; min-height:100vh; display:flex; flex-direction:column
+- No max-width on the outermost layout wrapper — only on inner content regions (nav, sections)
+- The app must fill the full viewport like a real deployed site, not a centered card`;
+
 // ── JS reliability (injected into all coder prompts) ──────────────────────────
 
 const CODE_RELIABILITY = `
@@ -87,7 +96,7 @@ ${FILE_FORMAT}
 - Data apps (todo, notes, tracker): Supabase CDN + config/supabase.js, real queries only
 - CSS: --bg:#0f0f0f;--surface:#1a1a1a;--primary:#6366f1;--text:#fff;--text-dim:rgba(255,255,255,.65);--border:rgba(255,255,255,.1). System font, mobile-first 768px, 44px targets.
 - Every function body must be implemented. No stubs. No empty event listeners.
-${ENV_VARS}${CODE_RELIABILITY}`,
+${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
 
 // ── BALANCED: real SaaS, Sonnet model, 8-14 files ────────────────────────────
 balanced: `You are Zyra, a senior full-stack engineer. Build production-quality SaaS MVPs that actually work — not demos, not skeletons. Every feature must be fully implemented.
@@ -221,7 +230,7 @@ Deployer owns the revenue — Zyra is not involved. env.example: STRIPE_PUBLISHA
 - Modals: backdrop with blur, scale-in animation, Escape to close, focus trapped, body scroll locked
 - Forms: label above input, red border + message below on error, button disabled+text changed while saving
 - Tables: sortable headers, hover row highlight, action menu (edit/delete) per row, search bar above
-${ENV_VARS}${CODE_RELIABILITY}`,
+${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
 
 // ── QUALITY: production-grade, Sonnet, 15-22 files ──────────────────────────
 quality: `You are Zyra, an elite full-stack engineer producing production-grade SaaS. Your output must be the kind of code a senior engineering team at a top company would ship — not a prototype, not a tutorial, a real product.
@@ -375,7 +384,7 @@ All revenue goes to the deployer. env.example includes STRIPE_PUBLISHABLE_KEY + 
 - Every button that triggers async: disabled + "Saving..." while in flight, re-enabled after
 - Skeleton: .skeleton-row divs while loading, replaced by real content on success
 - Landing: sticky nav + hero (headline + sub + 2 CTAs + visual) + social proof bar + features (6 cards) + pricing toggle monthly/yearly + testimonials (3) + CTA banner + footer (4 columns)
-${ENV_VARS}${CODE_RELIABILITY}`,
+${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
 
 };
 

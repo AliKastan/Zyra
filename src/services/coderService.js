@@ -343,6 +343,31 @@ async function runAutoFix(userPrompt, files, errors, mode, costTracker) {
   );
 }
 
+// ── Viewport normalize injection ──────────────────────────────────────────────
+
+/**
+ * Injects a minimal CSS reset into every HTML file so generated apps always
+ * fill the full iframe viewport — no default browser margins, no mystery gaps.
+ * Injected as the first child of <head> so the app's own styles can override.
+ */
+const VIEWPORT_NORMALIZE = `<style data-zyra="viewport">*,*::before,*::after{box-sizing:border-box}html{width:100%;height:100%;margin:0;padding:0}body{width:100%;min-height:100vh;margin:0;padding:0}</style>`;
+
+function injectViewportNormalize(files) {
+  return files.map((f) => {
+    if (!f.path.endsWith('.html')) return f;
+    let content = f.content || '';
+    if (content.includes('data-zyra="viewport"')) return f; // already injected
+    if (/<head(\s[^>]*)?\s*>/i.test(content)) {
+      content = content.replace(/(<head(\s[^>]*)?\s*>)/i, `$1\n${VIEWPORT_NORMALIZE}`);
+    } else if (content.includes('<body')) {
+      content = content.replace('<body', `${VIEWPORT_NORMALIZE}\n<body`);
+    } else {
+      content = VIEWPORT_NORMALIZE + '\n' + content;
+    }
+    return { ...f, content };
+  });
+}
+
 // ── Runtime error catcher injection ───────────────────────────────────────────
 
 /**
@@ -480,4 +505,4 @@ function enforceOutputLimits(data, maxFiles) {
   return { ...data, files };
 }
 
-module.exports = { runCoder, injectBackendSDK, injectEnvLoader, injectRuntimeErrorCatcher };
+module.exports = { runCoder, injectBackendSDK, injectEnvLoader, injectViewportNormalize, injectRuntimeErrorCatcher };

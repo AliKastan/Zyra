@@ -70,9 +70,9 @@ ${FILE_FORMAT}
 
 CSS REQUIREMENTS — write a complete, production-quality stylesheet:
 1. :root custom properties — all design tokens (colors, spacing, radii, shadows, typography)
-2. CSS reset — box-sizing: border-box, margin/padding reset, img max-width
+2. CSS reset — box-sizing: border-box; html,body { width:100%; min-height:100vh; margin:0; padding:0 } — app must fill the full viewport
 3. Base typography — html font-size, body font-family, line-height, color
-4. Layout — page shell, header, main, sidebar, footer grid/flex rules
+4. Layout — page shell uses width:100%; min-height:100vh; display:flex; flex-direction:column — NO max-width on the outermost wrapper, header, main, sidebar, footer grid/flex rules
 5. Every component class present in the HTML — styled completely (no stubs)
 6. Every variant and modifier class — e.g. .btn--primary, .card--featured
 7. All interactive states — :hover, :focus-visible, :active, :disabled, [aria-selected]

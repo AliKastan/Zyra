@@ -270,13 +270,15 @@ function generateCss(accent) {
 
 /* ── Reset ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 16px; scroll-behavior: smooth; }
+html { font-size: 16px; scroll-behavior: smooth; width: 100%; height: 100%; }
 body {
   font-family: var(--font);
   color: var(--text);
   background: var(--bg);
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
+  width: 100%;
+  min-height: 100vh;
 }
 a { text-decoration: none; color: inherit; }
 img { max-width: 100%; display: block; }
