@@ -7,10 +7,10 @@ const VALID_MODES = ['fast', 'balanced', 'quality'];
 
 /**
  * POST /api/generate
- * Body: { prompt: string, mode?: 'fast' | 'balanced' | 'quality' }
+ * Body: { prompt: string, mode?: 'fast' | 'balanced' | 'quality', sessionId?: string }
  */
 async function handleGenerate(req, res) {
-  const { prompt, mode = 'balanced' } = req.body;
+  const { prompt, mode = 'balanced', sessionId } = req.body;
 
   // ── Validate prompt ───────────────────────────────────────────────────────
   if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
@@ -53,7 +53,7 @@ async function handleGenerate(req, res) {
   const complexity = classifyComplexity(trimmed);
 
   try {
-    const jobId = await startGeneration(trimmed, mode, { userId });
+    const jobId = await startGeneration(trimmed, mode, { userId, sessionId: sessionId || userId });
     logger.info(`generateController: job ${jobId} started (mode=${mode}, complexity=${complexity.level})`);
 
     return res.status(202).json({

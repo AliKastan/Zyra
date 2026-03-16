@@ -22,7 +22,13 @@
     "test:readiness": "node test/readiness/readiness.test.js",
     "test:error-prevention": "node test/error-prevention/error-prevention.test.js",
     "test:authenticity": "node test/backend-authenticity/backend-authenticity.test.js",
-    "test": "node test/inference/requirements.test.js && node test/complexity/scorer.test.js && node test/generation/multipass.test.js && node test/file-generator/artifacts.test.js && node test/validator/validator.test.js && node test/repair/repair.test.js && node test/packaging/packaging.test.js && node test/design-system/design-system.test.js && node test/readiness/readiness.test.js && node test/error-prevention/error-prevention.test.js && node test/backend-authenticity/backend-authenticity.test.js"
+    "test:intent-memory": "node test/intent-memory/intent-memory.test.js",
+    "test:ranking": "node test/ranking/ranking.test.js",
+    "test:cost-optimizer": "node test/cost-optimizer/cost-optimizer.test.js",
+    "test:section-regeneration": "node test/section-regeneration/section-regeneration.test.js",
+    "test:business-logic": "node test/business-logic/business-logic.test.js",
+    "test:platform-aware": "node test/platform-aware/platform-aware.test.js",
+    "test": "node test/inference/requirements.test.js && node test/complexity/scorer.test.js && node test/generation/multipass.test.js && node test/file-generator/artifacts.test.js && node test/validator/validator.test.js && node test/repair/repair.test.js && node test/packaging/packaging.test.js && node test/design-system/design-system.test.js && node test/readiness/readiness.test.js && node test/error-prevention/error-prevention.test.js && node test/backend-authenticity/backend-authenticity.test.js && node test/intent-memory/intent-memory.test.js && node test/ranking/ranking.test.js && node test/cost-optimizer/cost-optimizer.test.js && node test/section-regeneration/section-regeneration.test.js && node test/business-logic/business-logic.test.js && node test/platform-aware/platform-aware.test.js"
   },
   "engines": {
     "node": ">=18.0.0"

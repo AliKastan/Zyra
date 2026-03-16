@@ -43,6 +43,12 @@ const { runDesignSystemStage }      = require('../lib/design-system');
 const { checkProductionReadiness, summarizeReadinessReport, buildUiReadinessPayload } = require('../lib/readiness');
 const { runErrorPreventionPreflight, runInFlightPreventionChecks, summarizePreventionReport, buildUiPreventionPayload } = require('../lib/error-prevention');
 const { checkBackendAuthenticity, summarizeAuthenticity, buildUiAuthenticityPayload } = require('../lib/backend-authenticity');
+const { rankSingleCandidate, summarizeRanking, buildUiRankingPayload }               = require('../lib/ranking');
+const { createOptimizerSession, buildUiCostPayload }                                 = require('../lib/cost-optimizer');
+let businessLogicRegistry;
+try { businessLogicRegistry = require('../lib/business-logic/module-registry'); } catch (_) { businessLogicRegistry = null; }
+let platformAware;
+try { platformAware = require('../lib/platform-aware'); } catch (_) { platformAware = null; }
 const { withTimeout }       = require('../utils/withTimeout');
 const { slugify }           = require('../utils/slugify');
 const limits                = require('../config/limits');
@@ -72,8 +78,66 @@ function shouldUseAdvancedPipeline(mode, complexity) {
  * @param {Function} [log]          - async (msg: string) => void — job log stream
  * @returns {Promise<import('./types').AdvancedGenerationResult>}
  */
-async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgress, log) {
+async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgress, log, options = {}) {
   const emit = async (msg) => { try { if (log) await log(msg); } catch (_) {} };
+
+  // Intent memory from Stage 0 (passed in from generationService)
+  const intentMemory = options.intentMemory || null;
+
+  // ── Cost Optimizer Session ─────────────────────────────────────────────────
+  // Non-fatal. Tracks token savings, model tier suggestions, and optimization
+  // strategies across the pipeline. Results returned as costOptimizationReport.
+  let optimizer = null;
+  try {
+    optimizer = createOptimizerSession({
+      mode,
+      complexityLevel: complexity?.level || 'medium',
+      prevIntentMemory:    options.prevIntentMemory    || null,
+      currentIntentMemory: options.currentIntentMemory || intentMemory || null,
+    });
+    // Static stages produce zero LLM cost — record as savings vs unoptimized baseline
+    optimizer.recordSkip('validation', 'static analysis — no LLM');
+    optimizer.recordSkip('complexity', 'local scoring — no LLM');
+    optimizer.recordSkip('ranking',    'static evaluation — no LLM');
+  } catch (optErr) {
+    logger.warn(`advancedPipeline: cost optimizer init failed (${optErr.message})`);
+  }
+
+  // ── Platform Detection ────────────────────────────────────────────────────
+  // Non-fatal. Detect target platform and select stack from user prompt.
+  // Results stored in job output for UI display and downstream hint injection.
+  let platformConfig = null;
+  let platformPayload = null;
+  try {
+    if (platformAware) {
+      platformConfig  = platformAware.buildPlatformConfig(userPrompt, intentMemory);
+      platformPayload = platformAware.buildUiPlatformPayload(platformConfig);
+      logger.info(`advancedPipeline: ${platformAware.summarizePlatformConfig(platformConfig)}`);
+    }
+  } catch (paErr) {
+    logger.warn(`advancedPipeline: platform detection failed (${paErr.message})`);
+  }
+
+  // ── Business Logic Module Selection ───────────────────────────────────────
+  // Non-fatal. Detect which business modules apply to this app. Results stored
+  // in job output for UI display and future prompt enrichment.
+  let businessModules = null;
+  let businessModulesPayload = null;
+  try {
+    if (businessLogicRegistry) {
+      const { modules, sources } = businessLogicRegistry.selectModules(
+        complexity?.appType || 'generic',
+        userPrompt,
+      );
+      businessModules        = modules;
+      businessModulesPayload = businessLogicRegistry.buildModulesPayload(modules, sources);
+      if (modules.length > 0) {
+        logger.info(`advancedPipeline: business modules selected: ${modules.join(', ')}`);
+      }
+    }
+  } catch (blErr) {
+    logger.warn(`advancedPipeline: business logic module selection failed (${blErr.message})`);
+  }
 
   // ── Stage 1: Deep Intent Analysis ──────────────────────────────────────────
   await emit('Analysing requirements...');
@@ -110,12 +174,37 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
     null,
     'complexityScorer',
   );
-  const scoredIntent = complexityReport
+  let scoredIntent = complexityReport
     ? mergeComplexityIntoSpec(enrichedIntent, complexityReport)
     : enrichedIntent;
   if (complexityReport) {
     logger.info(`advancedPipeline[1.8/7] complexity: score=${complexityReport.totalScore} tier="${complexityReport.complexityTier}" strategy="${complexityReport.recommendedStrategy.generationMode}"`);
     await emit(`Complexity: ${complexityReport.complexityTier} (${complexityReport.totalScore}/90)`);
+  }
+
+  // ── Stage 1.9: Intent Memory Enrichment ─────────────────────────────────────
+  // Merge session-level intent signals into the scored intent so downstream
+  // stages (blueprint, design system, error prevention) have the full picture.
+  if (intentMemory && intentMemory.promptCount > 1) {
+    const memoryHints = {
+      _intentMemory:    intentMemory,
+      _sessionFeatures: intentMemory.coreFeatures,
+      _sessionGoal:     intentMemory.appGoal,
+    };
+
+    // Promote session flags that the intent analyser may have missed
+    if (intentMemory.authRequired    && !scoredIntent.authRequired)    scoredIntent = { ...scoredIntent, authRequired: true, ...memoryHints };
+    if (intentMemory.billingRequired && !scoredIntent.billingRequired) scoredIntent = { ...scoredIntent, billingRequired: true };
+    if (intentMemory.adminRequired   && !scoredIntent.adminRequired)   scoredIntent = { ...scoredIntent, adminRequired: true };
+    if (intentMemory.mobileRequired  && scoredIntent.appType !== 'mobile') scoredIntent = { ...scoredIntent, ...memoryHints };
+
+    // Merge session design intent into scored intent
+    if (intentMemory.designIntent && !scoredIntent.designIntent) {
+      scoredIntent = { ...scoredIntent, designIntent: intentMemory.designIntent };
+    }
+
+    scoredIntent = { ...scoredIntent, ...memoryHints };
+    logger.info(`advancedPipeline[1.9/7] intent-memory: ${intentMemory.promptCount} prompts, features=[${intentMemory.coreFeatures.slice(0, 5).join(',')}]`);
   }
 
   // ── Stage 2: Product Specification ─────────────────────────────────────────
@@ -444,12 +533,40 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
       stack,
       complexityReport: complexityReport || null,
     });
-    logger.info(`advancedPipeline[13/13] authenticity: ${summarizeAuthenticity(authenticityReport)}`);
+    logger.info(`advancedPipeline[13/14] authenticity: ${summarizeAuthenticity(authenticityReport)}`);
     if (authenticityReport.status === 'fake_backend_detected') {
       await emit(`Authenticity: fake backend patterns detected (${authenticityReport.fakeBackendIssues.length} issue(s))`);
     }
   } catch (authErr) {
-    logger.warn(`advancedPipeline[13/13] authenticity check failed (${authErr.message})`);
+    logger.warn(`advancedPipeline[13/14] authenticity check failed (${authErr.message})`);
+  }
+
+  // ── Stage 14: Generation Ranking ──────────────────────────────────────────
+  // Scores the generated output across 7 quality dimensions and produces a
+  // structured RankingResult. In single-candidate mode (current default) this
+  // attaches quality scores to the output without changing file selection.
+  // Non-fatal — never blocks delivery.
+  let rankingResult = null;
+  try {
+    const rankingFiles = finalFiles instanceof Map
+      ? Object.fromEntries(finalFiles)
+      : (Array.isArray(finalFiles)
+          ? Object.fromEntries(finalFiles.map(f => [f.path || f.filename, f.content || '']))
+          : finalFiles);
+
+    rankingResult = rankSingleCandidate({
+      candidateId:      'candidate_a',
+      files:            rankingFiles,
+      blueprint:        enrichedBlueprint,
+      validationReport: validationReport   || null,
+      readinessReport:  readinessReport    || null,
+      authenticityReport: authenticityReport || null,
+      preventionReport: preventionReport   || null,
+      intent:           scoredIntent,
+    });
+    logger.info(`advancedPipeline[14/14] ranking: ${summarizeRanking(rankingResult)}`);
+  } catch (rankErr) {
+    logger.warn(`advancedPipeline[14/14] ranking failed (${rankErr.message})`);
   }
 
   return {
@@ -469,6 +586,14 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
     preventionPayload:        preventionReport ? buildUiPreventionPayload(preventionReport) : null,
     authenticityReport:       authenticityReport || null,     // Stage 13 output
     authenticityPayload:      authenticityReport ? buildUiAuthenticityPayload(authenticityReport) : null,
+    rankingResult:            rankingResult || null,           // Stage 14 output
+    rankingPayload:           rankingResult ? buildUiRankingPayload(rankingResult) : null,
+    costOptimizationReport:   optimizer ? optimizer.buildCostReport() : null,   // Cost optimizer
+    costOptimizationPayload:  optimizer ? buildUiCostPayload(optimizer.buildCostReport()) : null,
+    businessModules:          businessModules || [],                             // Business logic modules
+    businessModulesPayload:   businessModulesPayload || null,
+    platformConfig:           platformConfig || null,                            // Platform-aware detection
+    platformPayload:          platformPayload || null,
     _advanced:                true,
   };
 }

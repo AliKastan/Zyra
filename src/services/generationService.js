@@ -17,6 +17,7 @@ const {
   markJobTimedOut, isJobAborted,
 } = require('../storage/jobStore');
 const { saveProject } = require('../storage/projectStore');
+const { updateIntentMemory, getIntentSummary, buildUiIntentPayload } = require('../lib/intent-memory');
 const limits = require('../config/limits');
 const logger = require('../utils/logger');
 
@@ -84,7 +85,7 @@ function startHeartbeat(log, stageStart, intervalMs = 20_000) {
 // ── Public entry point ────────────────────────────────────────────────────────
 
 async function startGeneration(userPrompt, mode = 'balanced', options = {}) {
-  const { userId } = options;
+  const { userId, sessionId } = options;
 
   if (getActiveJobCount(userId) >= limits.MAX_CONCURRENT_JOBS) {
     const err = new Error('A generation is already in progress. Please wait for it to complete or cancel it.');
@@ -108,7 +109,7 @@ async function startGeneration(userPrompt, mode = 'balanced', options = {}) {
   } catch (_) {}
   logger.info(`generationService: job ${jobId} — mode="${mode}" complexity="${complexity.level}" appType="${complexity.appType}"${saasHint}`);
 
-  runPipeline(jobId, userPrompt, mode, complexity, startedAt, userId)
+  runPipeline(jobId, userPrompt, mode, complexity, startedAt, userId, sessionId)
     .catch((err) => logger.error(`generationService: unhandled error for job ${jobId}`, { error: err.message }))
     .finally(() => _removeActive(jobId, userId));
 
@@ -117,7 +118,7 @@ async function startGeneration(userPrompt, mode = 'balanced', options = {}) {
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 
-async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userId) {
+async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userId, sessionId) {
   const pipelineStart = startedAt ? new Date(startedAt).getTime() : Date.now();
   const deadline      = pipelineStart + limits.MAX_JOB_DURATION_MS;
   const cost          = createCostTracker();
@@ -133,6 +134,24 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
       throw new DeadlineError(`Generation exceeded maximum duration (${limits.MAX_JOB_DURATION_MS / 60000} min)`);
     }
     logger.debug(`[job:${jobId}] checkpoint: ${label}`);
+  }
+
+  // ── Stage 0: Intent Memory Update ────────────────────────────────────────
+  // Evolve the session's product vision before requirement normalisation.
+  // Non-fatal — pipeline continues even if intent memory fails.
+  let intentMemory = null;
+  let intentSummary = '';
+  const effectiveSessionId = sessionId || userId || jobId;
+  try {
+    const intentResult = updateIntentMemory(effectiveSessionId, userPrompt);
+    intentMemory  = intentResult.intentMemory;
+    intentSummary = getIntentSummary(intentMemory);
+    logger.info(`[job:${jobId}] intent: session="${effectiveSessionId}" prompts=${intentMemory.promptCount} features=[${intentMemory.coreFeatures.join(',')}]`);
+    if (intentResult.wasReset) {
+      logger.info(`[job:${jobId}] intent: session reset — new project started`);
+    }
+  } catch (imErr) {
+    logger.warn(`[job:${jobId}] intent memory update failed (${imErr.message}), continuing`);
   }
 
   try {
@@ -168,6 +187,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
         advResult = await runAdvancedPipeline(
           userPrompt, mode, complexity, cost, onProgress,
           async (msg) => { await log(msg); },
+          { intentMemory },
         );
       } finally {
         stopHeartbeat();
@@ -334,15 +354,17 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
     logger.info(`[job:${jobId}] cost: ${costSummary.calls} calls, ~${costSummary.totalTokens} tokens, ~$${costSummary.estimatedCostUSD}`);
 
     await updateJob(jobId, {
-      status:       'completed',
+      status:        'completed',
       projectSlug,
       projectDir,
-      filesWritten: written,
-      filesFailed:  failed,
+      filesWritten:  written,
+      filesFailed:   failed,
       review,
-      completedAt:  now(),
+      completedAt:   now(),
       duration,
-      cost:         costSummary,
+      cost:          costSummary,
+      intentPayload: intentMemory ? buildUiIntentPayload(intentMemory) : null,
+      sessionId:     effectiveSessionId,
     });
 
     logger.success(`generationService: job ${jobId} completed — "${projectSlug}" in ${duration}`);

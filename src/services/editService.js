@@ -35,6 +35,10 @@ const { env }    = require('../config/env');
 const limits     = require('../config/limits');
 const logger     = require('../utils/logger');
 
+// Section regeneration planning (non-fatal)
+let sectionRegen;
+try { sectionRegen = require('../lib/section-regeneration'); } catch (_) { sectionRegen = null; }
+
 // Shared concurrency guard with generationService
 const activeJobs = new Set();
 let chargeUsage;
@@ -119,6 +123,24 @@ async function runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, 
     await log(`Loaded ${allFiles.length} files`);
     await completeJobStage(jobId, 'loading');
 
+    // ── Section regeneration plan (non-fatal, planning only) ──────────────────
+    let sectionRegenReport = null;
+    let sectionRegenPayload = null;
+    if (sectionRegen) {
+      try {
+        const filesMap = Object.fromEntries(allFiles.map(f => [f.path, f.content]));
+        sectionRegenReport  = sectionRegen.runSectionRegeneration({
+          userPrompt,
+          currentFiles:   filesMap,
+          projectContext: { ...projectContext, existingFiles: filesMap },
+        });
+        sectionRegenPayload = sectionRegen.buildUiSectionRegenerationPayload(sectionRegenReport);
+        logger.info(`[edit:${jobId}] sectionRegen: ${sectionRegen.summarizeSectionRegeneration(sectionRegenReport)}`);
+      } catch (srErr) {
+        logger.warn(`[edit:${jobId}] sectionRegen planning failed (non-fatal): ${srErr.message}`);
+      }
+    }
+
     // ── Tier 0: local transform (0 model calls) ────────────────────────────────
     await checkpoint('before editing');
     await setJobStage(jobId, 'coding');
@@ -149,6 +171,7 @@ async function runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, 
         completedAt: now(), duration, cost: costSummary,
         editSummary: `Local transform: ${result.written.length} file(s) patched`,
         editTier: 0, editType,
+        sectionRegenPayload,
       });
       logger.success(`editService: job ${jobId} completed (local) — patched "${projectSlug}" in ${duration}`);
       return;
@@ -234,6 +257,7 @@ async function runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, 
       editTier:     tier,
       editType,
       editSummary:  `Modified ${written.length} file${written.length !== 1 ? 's' : ''}: ${written.join(', ')}`,
+      sectionRegenPayload,
     });
 
     logger.success(`editService: job ${jobId} completed — patched "${projectSlug}" in ${duration} (tier=${tier})`);
