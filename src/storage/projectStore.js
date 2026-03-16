@@ -1,8 +1,11 @@
 const path = require('path');
 const fse = require('fs-extra');
 const { now } = require('../utils/timestamps');
+const logger = require('../utils/logger');
 
-const PROJECTS_DIR = path.resolve(__dirname, '../../storage/projects');
+const PROJECTS_DIR   = path.resolve(__dirname, '../../storage/projects');
+const FILES_DIR      = path.resolve(__dirname, '../../storage/project-files');
+const GENERATED_DIR  = path.resolve(__dirname, '../../generated-projects');
 
 async function ensureProjectsDir() {
   await fse.ensureDir(PROJECTS_DIR);
@@ -67,4 +70,67 @@ async function deleteProject(slug) {
   if (await fse.pathExists(filePath)) await fse.remove(filePath);
 }
 
-module.exports = { saveProject, getProject, listProjects, updateProject, deleteProject };
+/**
+ * Persists all generated file contents for a project so they can be restored later.
+ * Stored separately from metadata to keep project JSON files small.
+ * @param {string} slug
+ * @param {Array<{path:string, content:string}>} files
+ */
+async function storeProjectFiles(slug, files) {
+  await fse.ensureDir(FILES_DIR);
+  const record = { slug, storedAt: now(), files };
+  // Write compact JSON — no spaces — to minimise file size
+  await fse.writeFile(path.join(FILES_DIR, `${slug}.json`), JSON.stringify(record), 'utf8');
+  logger.debug(`projectStore: stored ${files.length} files for "${slug}"`);
+}
+
+/**
+ * Returns true if stored file content exists for this slug.
+ */
+async function hasStoredFiles(slug) {
+  return fse.pathExists(path.join(FILES_DIR, `${slug}.json`));
+}
+
+/**
+ * Restores a project's files from persistent storage back to generated-projects/.
+ * Returns true on success, false if no stored files found.
+ * @param {string} slug
+ */
+async function restoreProjectFiles(slug) {
+  const filesPath = path.join(FILES_DIR, `${slug}.json`);
+  if (!(await fse.pathExists(filesPath))) return false;
+
+  let record;
+  try {
+    record = JSON.parse(await fse.readFile(filesPath, 'utf8'));
+  } catch (e) {
+    logger.warn(`projectStore: corrupt file record for "${slug}": ${e.message}`);
+    return false;
+  }
+
+  const files = record.files;
+  if (!Array.isArray(files) || files.length === 0) return false;
+
+  const projectDir = path.join(GENERATED_DIR, slug);
+  await fse.remove(projectDir);
+  await fse.ensureDir(projectDir);
+
+  let written = 0;
+  for (const file of files) {
+    if (!file.path || typeof file.content !== 'string') continue;
+    // Guard against path traversal
+    const fullPath = path.resolve(projectDir, file.path);
+    if (!fullPath.startsWith(projectDir + path.sep) && fullPath !== projectDir) continue;
+    await fse.ensureDir(path.dirname(fullPath));
+    await fse.writeFile(fullPath, file.content, 'utf8');
+    written++;
+  }
+
+  logger.info(`projectStore: restored ${written}/${files.length} files for "${slug}"`);
+  return written > 0;
+}
+
+module.exports = {
+  saveProject, getProject, listProjects, updateProject, deleteProject,
+  storeProjectFiles, hasStoredFiles, restoreProjectFiles,
+};

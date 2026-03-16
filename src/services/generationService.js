@@ -16,7 +16,7 @@ const {
   setJobStage, completeJobStage,
   markJobTimedOut, isJobAborted,
 } = require('../storage/jobStore');
-const { saveProject } = require('../storage/projectStore');
+const { saveProject, storeProjectFiles } = require('../storage/projectStore');
 const { updateIntentMemory, getIntentSummary, buildUiIntentPayload } = require('../lib/intent-memory');
 const limits = require('../config/limits');
 const logger = require('../utils/logger');
@@ -303,6 +303,11 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
       'File writing',
     );
     await log(`${written.length} files saved${failed.length ? `, ${failed.length} failed` : ''}`);
+
+    // Persist file contents so the project can be restored if disk artifacts are lost
+    storeProjectFiles(projectSlug, codeOutput.files).catch(e =>
+      logger.warn(`[job:${jobId}] storeProjectFiles failed (non-fatal): ${e.message}`)
+    );
 
     // ── Reviewing ─────────────────────────────────────────────────────────────
     await checkpoint('before reviewing');

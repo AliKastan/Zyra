@@ -124,12 +124,13 @@ function switchToConversation(convId) {
   updateDeployButton(currentSlug);
   syncEnvButton(currentSlug);
 
-  if (currentSlug && currentPreviewUrl) {
-    activatePreview({ url: currentPreviewUrl });
+  if (currentSlug) {
     loadCodeFileList(currentSlug);
-  } else if (currentSlug) {
-    loadCodeFileList(currentSlug);
+    // Always route through initiatePreview so the server can auto-restore missing files.
+    // For static projects the preview service responds immediately (sub-100ms).
     initiatePreview(currentSlug);
+    // Fire-and-forget: record that user opened this project
+    apiFetch(`/api/projects/${encodeURIComponent(currentSlug)}/open`, { method: 'POST' }).catch(() => {});
   } else {
     setPreviewState('empty');
     previewUrlBar.style.display = 'none';
@@ -1195,10 +1196,17 @@ function renderHistory() {
 function buildHistoryItemHtml(conv) {
   const time = formatRelTime(conv.updatedAt);
   const isActive = conv.id === activeConvId;
+
+  // Derive status badge from conversation state
+  let badge = '';
+  if (conv.projectSlug) {
+    badge = `<span class="history-badge history-badge--ready">Generated</span>`;
+  }
+
   return `<div class="history-item${isActive ? ' history-item--active' : ''}" data-conv-id="${escAttr(conv.id)}">
     <button class="history-item-btn" type="button">
       <span class="history-item-title">${escHtml(conv.title || 'Untitled project')}</span>
-      <span class="history-item-time">${escHtml(time)}</span>
+      <span class="history-item-meta">${badge}<span class="history-item-time">${escHtml(time)}</span></span>
     </button>
     <div class="history-item-actions">
       <button class="history-star-btn${conv.starred ? ' history-star-btn--active' : ''}" type="button" title="${conv.starred ? 'Unstar' : 'Star'}">
@@ -1262,11 +1270,13 @@ newChatBtn.addEventListener('click', () => {
 // ── Preview orchestration ─────────────────────────────────────────────────────
 async function initiatePreview(slug, _retryCount) {
   const retry = _retryCount || 0;
-  setPreviewState('loading', retry > 0 ? 'Retrying preview...' : 'Starting preview...', '');
+  setPreviewState('loading', retry > 0 ? 'Retrying...' : 'Loading preview...', '');
   stopPreviewPoll();
   try {
     const data = await apiFetch(`/api/preview/start/${slug}`, { method: 'POST' });
     const preview = data.preview;
+    // If files were restored from backup, show a brief message
+    if (data._restored) updateLoadingMessage('Project restored — starting preview...', '');
     if (preview.status === 'ready') {
       activatePreview(preview);
     } else if (preview.status === 'error') {
@@ -1280,11 +1290,13 @@ async function initiatePreview(slug, _retryCount) {
     }
   } catch (err) {
     if (err.expired || (err.message && err.message.toLowerCase().includes('not found'))) {
-      setPreviewState('error', 'Project not found', 'Project files are no longer available.', { showRegenerate: true });
+      setPreviewState('error', 'Project not found',
+        'No saved snapshot found for this project. Try regenerating it.',
+        { showRegenerate: true });
     } else if (retry < 1) {
       setTimeout(() => initiatePreview(slug, retry + 1), 2000);
     } else {
-      setPreviewState('error', 'Preview failed', err.message || 'Could not connect to preview server.');
+      setPreviewState('error', 'Preview unavailable', err.message || 'Could not connect to preview server.');
     }
   }
 }

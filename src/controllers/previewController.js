@@ -1,17 +1,34 @@
 const path = require('path');
 const fs = require('fs-extra');
 const previewService = require('../services/previewService');
+const { restoreProjectFiles, hasStoredFiles } = require('../storage/projectStore');
+const logger = require('../utils/logger');
 
 const ROOT = path.join(__dirname, '../../');
 const GENERATED_DIR = path.join(ROOT, 'generated-projects');
 
 async function startPreview(req, res) {
+  const { slug } = req.params;
   try {
-    const { slug } = req.params;
     const preview = await previewService.startPreview(slug);
     res.json({ success: true, preview });
   } catch (err) {
     if (err.message && err.message.includes('not found')) {
+      // Project directory is missing — attempt restore from persistent file storage
+      try {
+        const canRestore = await hasStoredFiles(slug);
+        if (canRestore) {
+          logger.info(`[preview] ${slug}: directory missing, attempting restore from file store`);
+          const restored = await restoreProjectFiles(slug);
+          if (restored) {
+            logger.info(`[preview] ${slug}: restore succeeded, starting preview`);
+            const preview = await previewService.startPreview(slug);
+            return res.json({ success: true, preview, _restored: true });
+          }
+        }
+      } catch (restoreErr) {
+        logger.warn(`[preview] ${slug}: restore attempt failed: ${restoreErr.message}`);
+      }
       return res.status(404).json({ error: 'Project files not found', expired: true });
     }
     res.status(500).json({ error: err.message });

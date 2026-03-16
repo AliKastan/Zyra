@@ -24,7 +24,7 @@ const { classifyEditType, hasStyleOnlyWords } = require('../utils/intentClassifi
 const { getEditTier, filterFilesForEdit, applyLocalTransform, TIER_BUDGETS } = require('../utils/editTier');
 const { writeFiles }        = require('../generators/fileWriter');
 const { createCostTracker } = require('../utils/costTracker');
-const { getProject, updateProject } = require('../storage/projectStore');
+const { getProject, updateProject, storeProjectFiles } = require('../storage/projectStore');
 const {
   createJob, updateJob, appendJobLog,
   setJobStage, completeJobStage,
@@ -225,6 +225,29 @@ async function runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, 
       written = result.written;
       failed  = result.failed;
       await log(`${written.length} file${written.length !== 1 ? 's' : ''} patched${failed.length ? `, ${failed.length} failed` : ''}`);
+    }
+
+    // Re-snapshot all project files so the persistent store stays current
+    if (changedFiles && changedFiles.length > 0) {
+      const { getProjectFiles } = require('../generators/projectGenerator');
+      getProjectFiles(projectSlug).then(result => {
+        if (!result || !result.files) return;
+        // Read file contents and store
+        const fse2 = require('fs-extra');
+        const path2 = require('path');
+        Promise.all(
+          _flattenFileTree(result.files).map(async (relPath) => {
+            try {
+              const fullPath = path2.join(result.projectDir, relPath);
+              const content = await fse2.readFile(fullPath, 'utf8');
+              return { path: relPath, content };
+            } catch (_) { return null; }
+          })
+        ).then(files => {
+          const valid = files.filter(Boolean);
+          if (valid.length > 0) storeProjectFiles(projectSlug, valid).catch(() => {});
+        }).catch(() => {});
+      }).catch(() => {});
     }
 
     // ── Update project metadata ───────────────────────────────────────────────
@@ -458,6 +481,16 @@ async function walk(dir, rootDir, result) {
       } catch (_) {}
     }
   }
+}
+
+/** Flatten a recursive file-tree array (from getProjectFiles) into relative path strings. */
+function _flattenFileTree(nodes) {
+  const paths = [];
+  for (const node of nodes || []) {
+    if (node.type === 'file') paths.push(node.path);
+    else if (node.type === 'dir') paths.push(..._flattenFileTree(node.children));
+  }
+  return paths;
 }
 
 module.exports = { startEdit, getActiveEditCount };
