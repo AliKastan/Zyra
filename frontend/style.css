@@ -1637,8 +1637,8 @@ textarea::placeholder { color: var(--text-muted); }
 /* Error */
 #state-error { gap: 0.75rem; }
 .error-icon {
-  width: 44px; height: 44px;
-  border-radius: 12px;
+  width: 56px; height: 56px;
+  border-radius: 50%;
   background: var(--danger-dim);
   border: 1px solid rgba(239,68,68,0.2);
   display: flex; align-items: center; justify-content: center;
@@ -1646,6 +1646,7 @@ textarea::placeholder { color: var(--text-muted); }
   font-weight: 700;
   color: var(--danger);
 }
+.error-icon svg { color: var(--danger); }
 .error-title { font-size: 0.9rem; font-weight: 600; color: var(--text); }
 .error-sub   { font-size: 0.79rem; color: var(--text-muted); max-width: 300px; text-align: center; }
 .preview-error-actions { display: flex; gap: 8px; margin-top: 2px; }
@@ -1788,7 +1789,7 @@ textarea::placeholder { color: var(--text-muted); }
 
 /* iframe */
 .frame-inner { flex: 1; overflow: hidden; }
-#preview-iframe { width: 100%; height: 100%; border: none; display: block; background: #fff; }
+#preview-iframe { width: 100%; height: 100%; border: none; display: block; background: #fff; opacity: 1; transition: opacity 0.35s ease; }
 
 /* ── Code view ─────────────────────────────────────────────────────────────── */
 .code-area { flex: 1; display: flex; overflow: hidden; }

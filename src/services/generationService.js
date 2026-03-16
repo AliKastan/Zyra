@@ -174,6 +174,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
     };
 
     let codeOutput;
+    let plan;
 
     if (shouldUseAdvancedPipeline(mode, complexity)) {
       // ── Advanced 7-stage pipeline (medium/complex + balanced/quality) ───────
@@ -218,7 +219,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
       await log(willSkip ? 'Quick planning...' : 'Planning app structure...');
 
       const planT0 = Date.now();
-      const plan   = await runPlanner(userPrompt, mode, complexity);
+      plan   = await runPlanner(userPrompt, mode, complexity);
       const planMs = Date.now() - planT0;
 
       logger.info(`[job:${jobId}] planner: source=${plan._source} files=${plan.files?.length} ms=${planMs}`);

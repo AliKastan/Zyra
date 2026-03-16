@@ -1260,8 +1260,9 @@ newChatBtn.addEventListener('click', () => {
 });
 
 // ── Preview orchestration ─────────────────────────────────────────────────────
-async function initiatePreview(slug) {
-  setPreviewState('loading', 'Starting preview...', '');
+async function initiatePreview(slug, _retryCount) {
+  const retry = _retryCount || 0;
+  setPreviewState('loading', retry > 0 ? 'Retrying preview...' : 'Starting preview...', '');
   stopPreviewPoll();
   try {
     const data = await apiFetch(`/api/preview/start/${slug}`, { method: 'POST' });
@@ -1269,15 +1270,21 @@ async function initiatePreview(slug) {
     if (preview.status === 'ready') {
       activatePreview(preview);
     } else if (preview.status === 'error') {
-      setPreviewState('error', 'Preview failed', preview.error || '');
+      if (retry < 1) {
+        setTimeout(() => initiatePreview(slug, retry + 1), 1500);
+      } else {
+        setPreviewState('error', 'Preview failed', preview.error || 'The preview could not be started.');
+      }
     } else {
       pollPreviewUntilReady(slug, preview.status);
     }
   } catch (err) {
     if (err.expired || (err.message && err.message.toLowerCase().includes('not found'))) {
       setPreviewState('error', 'Project not found', 'Project files are no longer available.', { showRegenerate: true });
+    } else if (retry < 1) {
+      setTimeout(() => initiatePreview(slug, retry + 1), 2000);
     } else {
-      setPreviewState('error', 'Preview failed', err.message);
+      setPreviewState('error', 'Preview failed', err.message || 'Could not connect to preview server.');
     }
   }
 }
@@ -1285,13 +1292,21 @@ async function initiatePreview(slug) {
 function pollPreviewUntilReady(slug, initialStatus) {
   const msgs = { installing: 'Installing dependencies...', starting: 'Starting server...' };
   updateLoadingMessage(msgs[initialStatus] || 'Starting...', '');
+  let pollErrors = 0;
   previewPollInterval = setInterval(async () => {
     try {
       const preview = await apiFetch(`/api/preview/status/${slug}`);
+      pollErrors = 0;
       if (preview.status === 'ready') { stopPreviewPoll(); activatePreview(preview); }
-      else if (preview.status === 'error') { stopPreviewPoll(); setPreviewState('error', 'Preview failed', preview.error || ''); }
+      else if (preview.status === 'error') {
+        stopPreviewPoll();
+        setPreviewState('error', 'Preview failed', preview.error || 'Server failed to start.');
+      }
       else updateLoadingMessage(msgs[preview.status] || 'Loading...', '');
-    } catch (_) {}
+    } catch (_) {
+      pollErrors++;
+      if (pollErrors >= 5) { stopPreviewPoll(); setPreviewState('error', 'Preview failed', 'Lost connection to preview server.'); }
+    }
   }, 1500);
 }
 
@@ -1303,12 +1318,42 @@ function activatePreview(preview) {
   if (conv) { conv.previewUrl = preview.url; saveAllData(); }
 
   const fullUrl = preview.url.startsWith('/') ? window.location.origin + preview.url : preview.url;
-  previewIframe.src = fullUrl;
+
+  // Show loading while iframe fetches content
+  setPreviewState('loading', 'Loading preview...', '');
+  if (currentTab !== 'preview') switchTab('preview');
+  previewUrlBar.style.display = '';
   browserUrlDisplay.textContent = fullUrl.replace(/^https?:\/\//, '');
   previewUrlText.textContent = fullUrl.replace(/^https?:\/\//, '');
-  previewUrlBar.style.display = '';
-  if (currentTab !== 'preview') switchTab('preview');
-  setPreviewState('frame');
+
+  // Fade iframe in on load
+  previewIframe.style.opacity = '0';
+  previewIframe.src = fullUrl;
+
+  const onLoad = () => {
+    setPreviewState('frame');
+    previewIframe.style.transition = 'opacity 0.35s ease';
+    previewIframe.style.opacity = '1';
+    previewIframe.removeEventListener('load', onLoad);
+    previewIframe.removeEventListener('error', onError);
+  };
+  const onError = () => {
+    // iframe error events are rare for same-origin; just show the frame anyway
+    setPreviewState('frame');
+    previewIframe.style.opacity = '1';
+    previewIframe.removeEventListener('load', onLoad);
+    previewIframe.removeEventListener('error', onError);
+  };
+  previewIframe.addEventListener('load', onLoad);
+  previewIframe.addEventListener('error', onError);
+
+  // Fallback: show frame after 8s regardless
+  setTimeout(() => {
+    if (stateLoading && !stateLoading.classList.contains('hidden')) {
+      setPreviewState('frame');
+      previewIframe.style.opacity = '1';
+    }
+  }, 8000);
 }
 
 function stopPreviewPoll() {
@@ -2842,7 +2887,7 @@ async function triggerRuntimeAutoFix(errorMsg) {
 
 window.addEventListener('message', (event) => {
   if (!event.data || event.data.type !== 'ZYRA_RUNTIME_ERROR') return;
-  const msg = event.data.message || '';
+  const msg = (event.data.error && event.data.error.message) || event.data.message || '';
   if (!isBreakingError(msg)) return;
 
   // Debounce — wait 2.5s for errors to settle before triggering fix

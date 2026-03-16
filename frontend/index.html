@@ -259,6 +259,7 @@
             <div class="loader-circle"></div>
           </div>
           <div id="loading-message" class="loading-message">Generating...</div>
+          <div id="loading-sub" class="loading-sub"></div>
         </div>
 
         <div class="preview-state hidden" id="state-frame">
@@ -313,11 +314,13 @@
         </div>
 
         <div class="preview-state hidden" id="state-error">
-          <div class="error-icon">!</div>
+          <div class="error-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
           <div id="preview-error-title" class="error-title">Preview failed</div>
           <div id="preview-error-msg" class="error-sub"></div>
           <div class="preview-error-actions">
-            <button id="retry-preview-btn" class="btn btn-secondary btn-sm" type="button">Retry</button>
+            <button id="retry-preview-btn" class="btn btn-primary btn-sm" type="button">Try again</button>
             <button id="regenerate-project-btn" class="btn btn-secondary btn-sm hidden" type="button">Regenerate</button>
           </div>
         </div>
