@@ -123,6 +123,15 @@
           <div class="glass-glider"></div>
         </div>
 
+        <!-- Scope picker — only shown when editing an existing project -->
+        <div class="scope-bar hidden" id="scope-bar">
+          <button class="scope-chip scope-chip--active" data-scope="auto" type="button">Full edit</button>
+          <button class="scope-chip" data-scope="ui" type="button">UI only</button>
+          <button class="scope-chip" data-scope="logic" type="button">Logic only</button>
+          <button class="scope-chip" data-scope="component" type="button">Component</button>
+          <button class="scope-chip" data-scope="page" type="button">Page</button>
+        </div>
+
         <div class="input-box">
           <textarea
             id="prompt-input"

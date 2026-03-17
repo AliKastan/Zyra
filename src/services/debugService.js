@@ -88,7 +88,8 @@ async function loadProjectFiles(projectDir) {
 /**
  * Start a standard debug job (Fix My App).
  */
-async function startDebug(projectSlug, signals = {}, mode = 'balanced') {
+async function startDebug(projectSlug, signals = {}, mode = 'balanced', options = {}) {
+  const { autoApply = false } = options;
   const jobId     = uuidv4();
   const startedAt = now();
 
@@ -100,11 +101,12 @@ async function startDebug(projectSlug, signals = {}, mode = 'balanced') {
     status: 'queued',
     startedAt,
     signals,
+    autoApply,
   });
 
   logger.info(`debugService: job ${jobId} — fixing "${projectSlug}" mode="${mode}"`);
 
-  runDebugPipeline(jobId, projectSlug, signals, mode, startedAt)
+  runDebugPipeline(jobId, projectSlug, signals, mode, startedAt, { autoApply })
     .catch((err) => logger.error(`debugService: unhandled error for job ${jobId}`, { error: err.message }));
 
   return jobId;
@@ -188,7 +190,8 @@ async function startVisualDebug(projectSlug, signals = {}, screenshotBase64 = nu
 
 // ── Standard debug pipeline ───────────────────────────────────────────────────
 
-async function runDebugPipeline(jobId, projectSlug, signals, mode, startedAt) {
+async function runDebugPipeline(jobId, projectSlug, signals, mode, startedAt, options = {}) {
+  const { autoApply = false } = options;
   const cost = createCostTracker();
 
   const log = async (msg) => {
@@ -235,7 +238,7 @@ async function runDebugPipeline(jobId, projectSlug, signals, mode, startedAt) {
         const debugResult = buildLocalResult(localBest, localIssues, ruleIssue, candidates, errorSummary);
         debugResult.patch = localPatch;
         cost.recordLocal('debug-local', localBest.type);
-        await completeDebug(jobId, projectSlug, debugResult, cost, startedAt, log);
+        await completeDebug(jobId, projectSlug, debugResult, cost, startedAt, log, { autoApply });
         return;
       }
     }
@@ -280,7 +283,7 @@ async function runDebugPipeline(jobId, projectSlug, signals, mode, startedAt) {
         const fallbackResult = buildLocalResult(localBest || null, localIssues, ruleIssue, candidates, errorSummary);
         fallbackResult.explanation += ` (AI diagnosis unavailable: ${maskString(err.message)})`;
         fallbackResult.diagnosedBy = 'local-fallback';
-        await completeDebug(jobId, projectSlug, fallbackResult, cost, startedAt, log);
+        await completeDebug(jobId, projectSlug, fallbackResult, cost, startedAt, log, { autoApply });
         return;
       }
       throw Object.assign(new Error(`AI debugger failed: ${maskString(err.message)}`), { type: 'failed' });
@@ -316,7 +319,7 @@ async function runDebugPipeline(jobId, projectSlug, signals, mode, startedAt) {
     };
 
     await log(`AI diagnosis: ${debugResult.rootCause} (confidence: ${Math.round(debugResult.confidence * 100)}%)`);
-    await completeDebug(jobId, projectSlug, debugResult, cost, startedAt, log);
+    await completeDebug(jobId, projectSlug, debugResult, cost, startedAt, log, { autoApply });
 
   } catch (err) {
     await failJob(jobId, err, startedAt);
@@ -542,23 +545,42 @@ function validatePatch(patch) {
   return valid.length > 0 ? valid : null;
 }
 
-async function completeDebug(jobId, projectSlug, debugResult, cost, startedAt, log) {
+async function completeDebug(jobId, projectSlug, debugResult, cost, startedAt, log, options = {}) {
+  const { autoApply = false } = options;
   const duration    = formatElapsed(startedAt);
   const costSummary = cost.summary();
 
-  await log(`Debug complete in ${duration} — ${debugResult.diagnosedBy} diagnosis`);
+  let autoApplied = false;
+  let autoApplyError = null;
+
+  // Auto-apply the patch if requested, patch exists, and confidence is sufficient
+  if (autoApply && debugResult.patch && debugResult.patch.length > 0 && debugResult.confidence >= 0.65) {
+    try {
+      await log(`Auto-applying fix (confidence: ${Math.round(debugResult.confidence * 100)}%)...`);
+      await applyDebugFix(projectSlug, debugResult.patch);
+      autoApplied = true;
+      await log(`Fix applied — ${debugResult.patch.length} file(s) patched`);
+    } catch (applyErr) {
+      autoApplyError = applyErr.message;
+      logger.warn(`[debug:${jobId}] auto-apply failed: ${applyErr.message}`);
+    }
+  }
+
+  await log(`Debug complete in ${duration} — ${debugResult.diagnosedBy} diagnosis${autoApplied ? ' (auto-applied)' : ''}`);
 
   await updateJob(jobId, {
     status:      'completed',
     projectSlug,
     debugMode:   'standard',
     debugResult,
+    autoApplied,
+    autoApplyError: autoApplyError || undefined,
     cost:        costSummary,
     completedAt: now(),
     duration,
   });
 
-  logger.success(`debugService: job ${jobId} completed for "${projectSlug}" in ${duration}`);
+  logger.success(`debugService: job ${jobId} completed for "${projectSlug}" in ${duration}${autoApplied ? ' (auto-applied)' : ''}`);
 }
 
 async function failJob(jobId, err, startedAt) {

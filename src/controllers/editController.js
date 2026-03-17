@@ -9,7 +9,7 @@ const logger               = require('../utils/logger');
 
 async function handleEdit(req, res) {
   const { slug } = req.params;
-  const { prompt, mode = 'balanced' } = req.body;
+  const { prompt, mode = 'balanced', scope = null } = req.body;
 
   if (!prompt || !prompt.trim()) {
     return res.status(400).json({ error: 'Prompt is required' });
@@ -45,7 +45,7 @@ async function handleEdit(req, res) {
 
   try {
     logger.info(`editController: starting edit for "${slug}" — "${prompt.trim().slice(0, 60)}"`);
-    const jobId = await startEdit(prompt.trim(), slug, mode, { userId });
+    const jobId = await startEdit(prompt.trim(), slug, mode, { userId, scope: scope || null });
     return res.status(202).json({ jobId });
   } catch (err) {
     logger.error('editController: failed to start edit', { error: err.message });

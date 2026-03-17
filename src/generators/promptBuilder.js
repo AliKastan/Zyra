@@ -64,6 +64,43 @@ GAME RULES (apply whenever a game is being built):
 - No hover-only or keyboard-only controls — primary actions must work on both desktop and mobile
 - Prefer a simple fun working game over an advanced broken one`;
 
+// ── UI/UX quality rules (injected into all coder prompts) ────────────────────
+
+const UI_QUALITY = `
+UI/UX QUALITY (mandatory — every generated interface must meet this bar):
+
+HIERARCHY: Every screen needs an obvious focal point. Use size, weight, spacing, and contrast to create clear primary → secondary → tertiary levels. The user must know where to look within 2 seconds. Never flatten everything to equal visual weight.
+
+SPACING: Use a consistent 8px-base spacing system. Sections: 80-120px vertical padding. Cards: 24-32px padding. Form fields: 12-16px gap. Breathing room is not optional — cramped layouts feel cheap. No elements touching edges.
+
+TYPOGRAPHY: Max 4 font sizes per page. Headings: bold/800, tight letter-spacing (−0.02 to −0.04em). Body: 15-16px, 1.6 line-height. Labels: 0.8125rem, medium weight. Helper text: muted color. Never create walls of same-size text.
+
+COLOR: One primary accent color. Neutral grays for structure. Accent used only for: primary CTAs, active states, key emphasis. No color noise. Background and surface should be calm. Error: #ef4444, Success: #22c55e, Warning: #f59e0b — these are semantic, not decorative.
+
+COMPONENTS:
+- Buttons: primary (solid accent), secondary (outline/ghost), danger (red). All 40-44px tall, proper padding. Obvious hover state. One primary CTA per screen — no competing primaries.
+- Inputs: 44px height, 12-16px padding, clear border, strong focus ring (accent color), inline error message below field (not alert).
+- Cards: only when content needs grouping. Consistent radius (10-14px) and subtle shadow. Never stack cards inside cards.
+- Navigation: clean, obvious, not overcrowded. Active state clearly distinct.
+
+STATES: loading/empty/error states must look designed, not forgotten.
+- Loading: skeleton pulse or spinner — never blank screen
+- Empty: icon + heading + helpful action ("No items yet. Create your first →")
+- Error: clear message + recovery action
+
+LANDING PAGES: hero → value proposition → features (3-6) → proof/trust → final CTA. Hero must have a strong headline (2-7 words), subheadline (1-2 sentences), and one clear primary CTA above the fold.
+
+DASHBOARDS: sidebar (240px) or top nav. KPI row (max 4 cards) at top. Main content below. Filter/search above data tables. Empty data states with CTAs. Actions clearly grouped.
+
+MODERN FEEL — avoid:
+- Bootstrap/default browser look
+- Harsh borders everywhere
+- Excessive shadows competing for attention
+- Too many cards/panels/badges
+- Animations that distract from content
+- Gradient overload
+- Childish color choices`;
+
 // ── JS reliability (injected into all coder prompts) ──────────────────────────
 
 const CODE_RELIABILITY = `
@@ -111,13 +148,13 @@ Generate ALL files the project needs. No limit on file count. Every file must be
 const CODER_SYSTEM = {
 
 // ── FAST: simple tools, 3-6 files, Haiku ────────────────────────────────────
-fast: `You are Zyra, a fast code generator. Build complete, working apps. 4-6 files max.
+fast: `You are Zyra, a fast code generator. Build complete, working, visually polished apps. 4-6 files max.
 ${FILE_FORMAT}
 - Pure tools (calculator, timer, quiz, game): HTML+CSS+JS only, no backend, 2-4 files
 - Data apps (todo, notes, tracker): Supabase CDN + config/supabase.js, real queries only
-- CSS: --bg:#0f0f0f;--surface:#1a1a1a;--primary:#6366f1;--text:#fff;--text-dim:rgba(255,255,255,.65);--border:rgba(255,255,255,.1). System font, mobile-first 768px, 44px targets.
+- Design tokens: :root{--bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--primary:#6366f1;--primary-h:#5855e0;--text:#f8f8f8;--text-dim:rgba(255,255,255,.65);--text-muted:rgba(255,255,255,.38);--border:rgba(255,255,255,.08);--radius:10px;--shadow:0 4px 20px rgba(0,0,0,.4);--font:system-ui,-apple-system,'Segoe UI',sans-serif;} Mobile-first 768px, 44px touch targets, no horizontal scroll.
 - Every function body must be implemented. No stubs. No empty event listeners.
-${CORRECTNESS_RULES}${GAME_RULES}${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
+${UI_QUALITY}${CORRECTNESS_RULES}${GAME_RULES}${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
 
 // ── BALANCED: real SaaS, Sonnet model, 8-14 files ────────────────────────────
 balanced: `You are Zyra, a senior full-stack engineer. Build production-quality SaaS MVPs that actually work — not demos, not skeletons. Every feature must be fully implemented.
@@ -244,14 +281,15 @@ Deployer owns the revenue — Zyra is not involved. env.example: STRIPE_PUBLISHA
 
 ## DESIGN SYSTEM
 :root{--bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--surface3:#222;--primary:#6366f1;--primary-h:#5855e0;--primary-dim:rgba(99,102,241,.12);--text:#f8f8f8;--text-dim:rgba(255,255,255,.65);--text-muted:rgba(255,255,255,.38);--border:rgba(255,255,255,.08);--border-hi:rgba(255,255,255,.15);--success:#22c55e;--error:#ef4444;--warning:#f59e0b;--info:#3b82f6;--radius:10px;--radius-lg:16px;--shadow:0 4px 20px rgba(0,0,0,.4);--ease:0.18s ease;--font:system-ui,-apple-system,'Segoe UI',sans-serif;}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}} @keyframes scaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}} @keyframes slideIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
 - Dark theme, mobile-first 768px, 44px touch targets, no horizontal scroll, no emoji
-- Skeleton loading (div with pulse animation), empty states (icon + message + primary CTA button)
+- Skeleton loading (div with pulse animation), empty states (icon + heading + primary CTA button)
 - Dashboard sidebar: 240px, logo + nav items (icon+label+active state) + user avatar at bottom
-- Stats cards: 4 cards with a label, a large number (from Supabase), and a trend badge
-- Modals: backdrop with blur, scale-in animation, Escape to close, focus trapped, body scroll locked
-- Forms: label above input, red border + message below on error, button disabled+text changed while saving
-- Tables: sortable headers, hover row highlight, action menu (edit/delete) per row, search bar above
-${CORRECTNESS_RULES}${GAME_RULES}${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
+- Stats cards: 4 cards with label + large number (from Supabase) + trend chip
+- Modals: backdrop blur, scale-in animation, Escape to close, body scroll locked
+- Forms: label above input, red border + inline message below on error, button disabled while saving
+- Tables: sticky header, hover row, action dropdown per row, search bar + filter above
+${UI_QUALITY}${CORRECTNESS_RULES}${GAME_RULES}${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
 
 // ── QUALITY: production-grade, Sonnet, 15-22 files ──────────────────────────
 quality: `You are Zyra, an elite full-stack engineer producing production-grade SaaS. Your output must be the kind of code a senior engineering team at a top company would ship — not a prototype, not a tutorial, a real product.
@@ -400,12 +438,11 @@ All revenue goes to the deployer. env.example includes STRIPE_PUBLISHABLE_KEY + 
 - Sidebar: 240px, collapses to icons on tablet, full overlay on mobile via hamburger
 - Stats row: 4 cards each showing label + large number + trend chip (up/down % with color)
 - Tables: sticky header, sortable columns, hover row, action dropdown per row, search bar + filter above
-- Modals: use Modal.open() / Modal.confirm() — never browser alert() or confirm()
-- Forms: label + input + inline error message below (red border when invalid, not alert)
-- Every button that triggers async: disabled + "Saving..." while in flight, re-enabled after
-- Skeleton: .skeleton-row divs while loading, replaced by real content on success
-- Landing: sticky nav + hero (headline + sub + 2 CTAs + visual) + social proof bar + features (6 cards) + pricing toggle monthly/yearly + testimonials (3) + CTA banner + footer (4 columns)
-${CORRECTNESS_RULES}${GAME_RULES}${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
+- Modals: Modal.open() / Modal.confirm() — never alert() or confirm()
+- Forms: label + input + inline error below (red border when invalid) + button disabled while saving
+- Skeleton: .skeleton-row divs while loading → real content on success
+- Landing: hero (bold headline 2-7 words + subhead 1-2 sentences + primary CTA) → features (3-6) → social proof → pricing → final CTA → footer
+${UI_QUALITY}${CORRECTNESS_RULES}${GAME_RULES}${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
 
 };
 
@@ -610,7 +647,7 @@ Focus: Apply the user's requested modification. Interpret styling words as CSS c
  * @param {number} [tier]           - 1/2/3 from getEditTier(); defaults based on editType
  * @returns {{ system: string, user: string, contextChars: number }}
  */
-function buildEditCoderPrompt(userPrompt, existingFiles, projectSlug, editType = 'GENERAL_EDIT', projectContext = {}, tier = 3) {
+function buildEditCoderPrompt(userPrompt, existingFiles, projectSlug, editType = 'GENERAL_EDIT', projectContext = {}, tier = 3, scopeInfo = null) {
   // Tier-based context limits
   const MAX_TOTAL_CHARS = tier === 1 ? 8_000  : tier === 2 ? 16_000 : 28_000;
   const MAX_FILE_CHARS  = tier === 1 ? 4_000  : tier === 2 ?  6_000 :  8_000;
@@ -642,7 +679,7 @@ function buildEditCoderPrompt(userPrompt, existingFiles, projectSlug, editType =
       contextChars: totalChars,
       user: `Project: "${projectSlug}"
 Files: ${JSON.stringify(included)}${skippedNote}
-Change: "${userPrompt}"
+Change: "${userPrompt}"${scopeInfo?.isScoped ? `\nSCOPE: Only modify ${scopeInfo.scope}${scopeInfo.target ? ' — ' + scopeInfo.target : ''}.` : ''}
 Output ONLY changed files as JSON: {"files":[{"path":"...","content":"..."}]}`,
     };
   }
@@ -656,7 +693,7 @@ Output ONLY changed files as JSON: {"files":[{"path":"...","content":"..."}]}`,
       user: `Project: "${projectSlug}"
 ${typeGuidance}
 Files: ${JSON.stringify(included)}${skippedNote}
-Change: "${userPrompt}"
+Change: "${userPrompt}"${scopeInfo?.isScoped ? `\nSCOPE: Only modify ${scopeInfo.scope}${scopeInfo.target ? ' — ' + scopeInfo.target : ''}.` : ''}
 Output ONLY changed files: {"files":[{"path":"...","content":"..."}]}`,
     };
   }
@@ -671,11 +708,20 @@ Output ONLY changed files: {"files":[{"path":"...","content":"..."}]}`,
   // Format files as ---FILE--- blocks (no JSON escaping issues for large code)
   const filesBlock = included.map(f => `---FILE: ${f.path}---\n${f.content}\n---END FILE---`).join('\n\n');
 
+  // Build scope constraint block if a scope restriction was detected
+  let scopeBlock = '';
+  if (scopeInfo && scopeInfo.isScoped) {
+    const { buildScopeConstraintBlock } = require('../utils/scopeClassifier');
+    const allowedPaths   = included.map(f => f.path);
+    const forbiddenPaths = skipped;
+    scopeBlock = '\n\n' + buildScopeConstraintBlock(scopeInfo, allowedPaths, forbiddenPaths);
+  }
+
   return {
     system: EDIT_CODER_SYSTEM,
     contextChars: totalChars,
     user: `Project: "${projectSlug}"
-${contextBlock ? `Context: ${contextBlock}\n` : ''}${typeGuidance}
+${contextBlock ? `Context: ${contextBlock}\n` : ''}${typeGuidance}${scopeBlock}
 
 Current files:
 ${filesBlock}${skippedNote}

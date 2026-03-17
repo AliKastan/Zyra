@@ -21,6 +21,7 @@ const { buildEditCoderPrompt } = require('../generators/promptBuilder');
 const { safeJsonParse }     = require('../utils/safeJsonParse');
 const { parseFileDelimited } = require('../utils/parseFileDelimited');
 const { classifyEditType, hasStyleOnlyWords } = require('../utils/intentClassifier');
+const { classifyScope, filterFilesByScope } = require('../utils/scopeClassifier');
 const { getEditTier, filterFilesForEdit, applyLocalTransform, TIER_BUDGETS } = require('../utils/editTier');
 const { writeFiles }        = require('../generators/fileWriter');
 const { createCostTracker } = require('../utils/costTracker');
@@ -55,7 +56,7 @@ class DeadlineError extends Error {
 // ── Public entry point ────────────────────────────────────────────────────────
 
 async function startEdit(userPrompt, projectSlug, mode = 'balanced', options = {}) {
-  const { userId } = options;
+  const { userId, scope: explicitScope } = options;
   const jobId     = uuidv4();
   const startedAt = now();
 
@@ -66,12 +67,13 @@ async function startEdit(userPrompt, projectSlug, mode = 'balanced', options = {
     isEdit: true,
     status: 'queued',
     startedAt,
+    explicitScope: explicitScope || null,
   });
 
   activeJobs.add(jobId);
   logger.info(`editService: job ${jobId} — editing "${projectSlug}" mode="${mode}"`);
 
-  runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, userId)
+  runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, userId, explicitScope || null)
     .catch((err) => logger.error(`editService: unhandled error for job ${jobId}`, { error: err.message }))
     .finally(() => activeJobs.delete(jobId));
 
@@ -80,7 +82,7 @@ async function startEdit(userPrompt, projectSlug, mode = 'balanced', options = {
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 
-async function runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, userId) {
+async function runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, userId, explicitScope = null) {
   const deadline = new Date(startedAt).getTime() + (limits.MAX_JOB_DURATION_MS || 600_000);
   const cost     = createCostTracker();
 
@@ -113,6 +115,19 @@ async function runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, 
     const tier      = getEditTier(editType);
     logger.info(`[edit:${jobId}] editType=${editType} tier=${tier} styleEdit=${styleEdit} generatedBy=${projectMeta.generatedBy}`);
     await log(`Edit: ${editType} tier=${tier}`);
+
+    // ── Scope classification ───────────────────────────────────────────────────
+    // Detect explicit scope restrictions in the prompt ("fix only UI", "rewrite only logic", etc.)
+    const scopeInfo = classifyScope(userPrompt);
+    // If the user passed an explicit scope (from the frontend scope picker), override
+    if (explicitScope && explicitScope !== 'auto') {
+      scopeInfo.scope     = explicitScope;
+      scopeInfo.isScoped  = true;
+    }
+    if (scopeInfo.isScoped) {
+      logger.info(`[edit:${jobId}] scope: ${scopeInfo.scope}${scopeInfo.target ? ' → ' + scopeInfo.target : ''}`);
+      await log(`Scope: ${scopeInfo.scope}${scopeInfo.target ? ' — ' + scopeInfo.target : ''}`);
+    }
 
     // ── Load existing project files ────────────────────────────────────────────
     await checkpoint('before loading');
@@ -179,11 +194,15 @@ async function runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, 
 
     // ── Tier 1–3: AI-assisted edit ─────────────────────────────────────────────
     // Filter files to only what this edit type actually needs
-    const targetFiles = filterFilesForEdit(allFiles, editType);
+    // Use scope-based filtering when an explicit scope constraint is detected
+    const targetFiles = scopeInfo.isScoped
+      ? filterFilesByScope(allFiles, scopeInfo, editType)
+      : filterFilesForEdit(allFiles, editType);
     await log(`Applying ${editType.toLowerCase().replace(/_/g, ' ')} (tier ${tier}, ${targetFiles.length}/${allFiles.length} files)...`);
 
     let changedFiles = await runEditCoder(
-      userPrompt, targetFiles, projectSlug, mode, cost, editType, projectContext, tier
+      userPrompt, targetFiles, projectSlug, mode, cost, editType, projectContext, tier,
+      { scopeInfo },  // pass scope info through opts
     );
 
     // ── Validate: reject literal style-word interpretation ───────────────────
@@ -279,6 +298,7 @@ async function runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, 
       cost:         costSummary,
       editTier:     tier,
       editType,
+      editScope:    scopeInfo.isScoped ? scopeInfo.scope : null,
       editSummary:  `Modified ${written.length} file${written.length !== 1 ? 's' : ''}: ${written.join(', ')}`,
       sectionRegenPayload,
     });
@@ -328,8 +348,9 @@ async function runEditCoder(userPrompt, existingFiles, projectSlug, mode, costTr
 
   logger.info(`editService: edit-coder model="${modelName}" claude="${claudeModel}" tier=${tier} maxTokens=${maxTokens} files=${existingFiles.length} editType=${editType}`);
 
+  const scopeInfo = opts?.scopeInfo || null;
   let { system, user, contextChars } = buildEditCoderPrompt(
-    userPrompt, existingFiles, projectSlug, editType, projectContext, tier
+    userPrompt, existingFiles, projectSlug, editType, projectContext, tier, scopeInfo
   );
 
   // Retry with reinforced anti-literal instruction (appended to keep prompt compact)

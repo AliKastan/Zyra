@@ -287,15 +287,23 @@ async function runAdvancedPipeline(userPrompt, mode, complexity, cost, onProgres
   // ── Stage 5: Code Generation ────────────────────────────────────────────────
   // medium/advanced/production_heavy → multi-pass (6 focused passes)
   // simple → legacy two-pass HTML→CSS/JS (kept for fast simple apps)
+  // Both paths are wrapped in a try/catch: if multi-pass fails, fall back to two-pass.
   const useMultiPass = complexityReport && complexityReport.complexityTier !== 'simple';
   let files, projectName;
 
   if (useMultiPass) {
     logger.info(`advancedPipeline[5/7] using multi-pass generation (tier="${complexityReport.complexityTier}")`);
-    const mpResult = await runMultiPassGeneration(enrichedBlueprint, scoredIntent, complexityReport, cost, onProgress, log);
-    files       = mpResult.files;
-    projectName = mpResult.projectName;
-    logger.info(`advancedPipeline[5/7] multi-pass: ${files.length} files across ${mpResult.passReports.length} passes`);
+    try {
+      const mpResult = await runMultiPassGeneration(enrichedBlueprint, scoredIntent, complexityReport, cost, onProgress, log);
+      files       = mpResult.files;
+      projectName = mpResult.projectName;
+      logger.info(`advancedPipeline[5/7] multi-pass: ${files.length} files across ${mpResult.passReports.length} passes`);
+    } catch (mpErr) {
+      logger.warn(`advancedPipeline[5/7] multi-pass failed (${mpErr.message}), falling back to two-pass`);
+      await emit('Switching to two-pass generation...');
+      ({ files, projectName } = await generateCode(enrichedBlueprint, cost, onProgress, log));
+      logger.info(`advancedPipeline[5/7] two-pass fallback: ${files.length} files generated`);
+    }
   } else {
     logger.info(`advancedPipeline[5/7] using two-pass generation (simple tier)`);
     ({ files, projectName } = await generateCode(enrichedBlueprint, cost, onProgress, log));

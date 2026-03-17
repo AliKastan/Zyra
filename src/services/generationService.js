@@ -8,6 +8,7 @@ const { assertProviderAvailable } = require('./orchestrator');
 const { runPlanner } = require('./plannerService');
 const { runCoder, injectBackendSDK, injectEnvLoader, injectViewportNormalize, injectRuntimeErrorCatcher } = require('./coderService');
 const { runAdvancedPipeline, shouldUseAdvancedPipeline } = require('../generation/orchestrator');
+const { generateFallback } = require('../generators/fallbackGenerator');
 const { runReviewer } = require('./reviewerService');
 const { generateProject } = require('../generators/projectGenerator');
 const { createCostTracker } = require('../utils/costTracker');
@@ -157,9 +158,6 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
   try {
     await log(`Job started — mode=${mode}, complexity=${complexity.level}, appType=${complexity.appType}`);
 
-    assertProviderAvailable('plan');
-    assertProviderAvailable('code');
-
     // ── Planning + Coding ─────────────────────────────────────────────────────
     await checkpoint('before planning');
     await setJobStage(jobId, 'planning');
@@ -176,89 +174,117 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
     let codeOutput;
     let plan;
 
-    if (shouldUseAdvancedPipeline(mode, complexity)) {
-      // ── Advanced 7-stage pipeline (medium/complex + balanced/quality) ───────
-      logger.info(`[job:${jobId}] using advanced pipeline`);
+    // Inner try/catch: any pipeline error (API down, parse failure, timeout, etc.)
+    // falls back to the template generator so the job ALWAYS completes with output.
+    // Cancellation and deadline errors are re-thrown — user explicitly stopped it.
+    try {
+      assertProviderAvailable('plan');
+      assertProviderAvailable('code');
 
-      const codingStart   = Date.now();
-      const stopHeartbeat = startHeartbeat(log, codingStart, 20_000);
+      if (shouldUseAdvancedPipeline(mode, complexity)) {
+        // ── Advanced 7-stage pipeline (medium/complex + balanced/quality) ───────
+        logger.info(`[job:${jobId}] using advanced pipeline`);
 
-      let advResult;
-      try {
-        advResult = await runAdvancedPipeline(
-          userPrompt, mode, complexity, cost, onProgress,
-          async (msg) => { await log(msg); },
-          { intentMemory },
-        );
-      } finally {
-        stopHeartbeat();
+        const codingStart   = Date.now();
+        const stopHeartbeat = startHeartbeat(log, codingStart, 20_000);
+
+        let advResult;
+        try {
+          advResult = await runAdvancedPipeline(
+            userPrompt, mode, complexity, cost, onProgress,
+            async (msg) => { await log(msg); },
+            { intentMemory },
+          );
+        } finally {
+          stopHeartbeat();
+        }
+
+        await completeJobStage(jobId, 'planning');
+        await updateJob(jobId, { plan: { _source: 'advanced', files: advResult.blueprint.fileList } });
+
+        await setJobStage(jobId, 'coding');
+        await updateJob(jobId, { progress: null });
+        await completeJobStage(jobId, 'coding');
+
+        codeOutput = {
+          projectName:  advResult.projectName,
+          files:        advResult.files,
+          _advanced:    true,
+          _blueprint:   advResult.blueprint,
+          _validation:  advResult.validationReport,
+          _repair:      advResult.repairReport,
+        };
+
+        const note = `Advanced pipeline complete — ${advResult.files.length} files (score: ${advResult.validationReport.score})`;
+        await log(note);
+
+      } else {
+        // ── Legacy pipeline (fast mode or simple prompts) ────────────────────────
+        const willSkip = complexity.level === 'simple' || mode === 'fast';
+        await log(willSkip ? 'Quick planning...' : 'Planning app structure...');
+
+        const planT0 = Date.now();
+        plan   = await runPlanner(userPrompt, mode, complexity);
+        const planMs = Date.now() - planT0;
+
+        logger.info(`[job:${jobId}] planner: source=${plan._source} files=${plan.files?.length} ms=${planMs}`);
+        if (plan._source === 'inline')   await log(`Using quick plan — ${plan.files?.length} files (${planMs}ms)`);
+        if (plan._source === 'fallback') await log(`Using fallback plan (${planMs}ms)`);
+        if (plan._source === 'api')      await log(`Planning complete — ${plan.files?.length} files (${planMs}ms)`);
+
+        await completeJobStage(jobId, 'planning');
+        await updateJob(jobId, { plan });
+
+        await checkpoint('before coding');
+        await setJobStage(jobId, 'coding');
+
+        const { TEMPLATE_TYPES } = require('../generators/templateSystem');
+        const isWebsitePrompt = /website|web site|landing|homepage|home page|page for|site for/i.test(userPrompt);
+        const isTemplate = willSkip &&
+          (TEMPLATE_TYPES.has(complexity.appType) || (complexity.appType === 'generic' && isWebsitePrompt)) &&
+          mode !== 'quality';
+        await log(isTemplate ? 'Building from template...' : 'Generating project files...');
+
+        const codingStart   = Date.now();
+        const stopHeartbeat = isTemplate ? () => {} : startHeartbeat(log, codingStart, 20_000);
+
+        try {
+          codeOutput = await runCoder(
+            userPrompt,
+            plan,
+            mode,
+            async (attempt) => { await log(`Retry ${attempt} — adjusting approach...`); },
+            cost,
+            complexity,
+            onProgress,
+          );
+        } finally {
+          stopHeartbeat();
+        }
+
+        await updateJob(jobId, { progress: null });
+        await completeJobStage(jobId, 'coding');
       }
 
-      await completeJobStage(jobId, 'planning');
-      await updateJob(jobId, { plan: { _source: 'advanced', files: advResult.blueprint.fileList } });
+    } catch (pipelineErr) {
+      // Re-throw intentional stops — these are not failures
+      if (pipelineErr instanceof CancelledError || pipelineErr instanceof DeadlineError) throw pipelineErr;
 
-      await setJobStage(jobId, 'coding');
-      await updateJob(jobId, { progress: null });
-      await completeJobStage(jobId, 'coding');
+      // Everything else: log it and fall back to the template generator.
+      // generateFallback never throws — it always produces a working landing page.
+      logger.warn(`[job:${jobId}] pipeline error — using fallback (${pipelineErr.message})`);
+      await log('Encountered an issue — generating from template...');
+      codeOutput = generateFallback(userPrompt, null);
+      await completeJobStage(jobId, 'planning').catch(() => {});
+      await setJobStage(jobId, 'coding').catch(() => {});
+      await completeJobStage(jobId, 'coding').catch(() => {});
+    }
 
-      codeOutput = {
-        projectName:  advResult.projectName,
-        files:        advResult.files,
-        _advanced:    true,
-        _blueprint:   advResult.blueprint,
-        _validation:  advResult.validationReport,
-        _repair:      advResult.repairReport,
-      };
-
-      const note = `Advanced pipeline complete — ${advResult.files.length} files (score: ${advResult.validationReport.score})`;
-      await log(note);
-
-    } else {
-      // ── Legacy pipeline (fast mode or simple prompts) ────────────────────────
-      const willSkip = complexity.level === 'simple' || mode === 'fast';
-      await log(willSkip ? 'Quick planning...' : 'Planning app structure...');
-
-      const planT0 = Date.now();
-      plan   = await runPlanner(userPrompt, mode, complexity);
-      const planMs = Date.now() - planT0;
-
-      logger.info(`[job:${jobId}] planner: source=${plan._source} files=${plan.files?.length} ms=${planMs}`);
-      if (plan._source === 'inline')   await log(`Using quick plan — ${plan.files?.length} files (${planMs}ms)`);
-      if (plan._source === 'fallback') await log(`Using fallback plan (${planMs}ms)`);
-      if (plan._source === 'api')      await log(`Planning complete — ${plan.files?.length} files (${planMs}ms)`);
-
-      await completeJobStage(jobId, 'planning');
-      await updateJob(jobId, { plan });
-
-      await checkpoint('before coding');
-      await setJobStage(jobId, 'coding');
-
-      const { TEMPLATE_TYPES } = require('../generators/templateSystem');
-      const isWebsitePrompt = /website|web site|landing|homepage|home page|page for|site for/i.test(userPrompt);
-      const isTemplate = willSkip &&
-        (TEMPLATE_TYPES.has(complexity.appType) || (complexity.appType === 'generic' && isWebsitePrompt)) &&
-        mode !== 'quality';
-      await log(isTemplate ? 'Building from template...' : 'Generating project files...');
-
-      const codingStart   = Date.now();
-      const stopHeartbeat = isTemplate ? () => {} : startHeartbeat(log, codingStart, 20_000);
-
-      try {
-        codeOutput = await runCoder(
-          userPrompt,
-          plan,
-          mode,
-          async (attempt) => { await log(`Retry ${attempt} — adjusting approach...`); },
-          cost,
-          complexity,
-          onProgress,
-        );
-      } finally {
-        stopHeartbeat();
-      }
-
-      await updateJob(jobId, { progress: null });
-      await completeJobStage(jobId, 'coding');
+    // Final safety net: if codeOutput is still empty for any reason, use fallback
+    if (!codeOutput || !Array.isArray(codeOutput.files) || codeOutput.files.length === 0) {
+      logger.warn(`[job:${jobId}] codeOutput empty after all attempts — last-resort fallback`);
+      await log('Using last-resort fallback...');
+      codeOutput = generateFallback(userPrompt, null);
     }
 
     if (!codeOutput._advanced) {
@@ -308,6 +334,29 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
     storeProjectFiles(projectSlug, codeOutput.files).catch(e =>
       logger.warn(`[job:${jobId}] storeProjectFiles failed (non-fatal): ${e.message}`)
     );
+
+    // ── Post-generation auto-debug (non-blocking, non-fatal) ─────────────────
+    // Runs a quick static check on the written files; if significant issues are
+    // found, fires an auto-fix job so the preview loads cleanly.
+    try {
+      const { validateGeneratedCode } = require('../utils/codeValidator');
+      const staticErrors = validateGeneratedCode(codeOutput.files || []);
+      const criticalErrors = staticErrors.filter(e => e.type === 'syntax' || e.type === 'error');
+      if (criticalErrors.length > 0) {
+        logger.info(`[job:${jobId}] post-gen static check: ${criticalErrors.length} issue(s) — starting auto-fix`);
+        const { startDebug } = require('./debugService');
+        const errorSignals = criticalErrors.slice(0, 10).map(e => ({
+          message: e.message,
+          source:  e.file,
+          level:   'error',
+        }));
+        startDebug(projectSlug, { consoleErrors: errorSignals, previewState: 'post_gen', trigger: 'post_gen' }, 'fast', { autoApply: true })
+          .then(debugJobId => logger.info(`[job:${jobId}] post-gen auto-fix job: ${debugJobId}`))
+          .catch(e => logger.warn(`[job:${jobId}] post-gen auto-fix start failed (non-fatal): ${e.message}`));
+      }
+    } catch (postDebugErr) {
+      logger.warn(`[job:${jobId}] post-gen debug check failed (non-fatal): ${postDebugErr.message}`);
+    }
 
     // ── Reviewing ─────────────────────────────────────────────────────────────
     await checkpoint('before reviewing');

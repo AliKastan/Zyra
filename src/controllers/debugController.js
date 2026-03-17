@@ -222,6 +222,38 @@ async function handleStartVisual(req, res) {
   }
 }
 
+// ── POST /:slug/auto  (automatic fix — analyze + apply in one shot) ─────────
+
+async function handleAutoFix(req, res) {
+  const { slug } = req.params;
+  if (!slug?.trim()) return res.status(400).json({ error: 'Project slug is required' });
+
+  const {
+    consoleErrors   = [],
+    previewState    = 'unknown',
+    userDescription = null,
+    mode            = 'fast',
+    trigger         = 'manual',  // 'runtime' | 'preview_fail' | 'post_gen' | 'manual'
+  } = req.body || {};
+
+  const signals = {
+    consoleErrors:   Array.isArray(consoleErrors) ? consoleErrors.slice(0, 20) : [],
+    previewState:    String(previewState || 'unknown').slice(0, 50),
+    userDescription: userDescription ? String(userDescription).slice(0, 500) : null,
+    trigger,
+  };
+
+  logger.info(`debugController: auto-fix — "${slug}" trigger="${trigger}" errors=${signals.consoleErrors.length}`);
+
+  try {
+    const jobId = await startDebug(slug, signals, String(mode), { autoApply: true });
+    return res.status(202).json({ jobId });
+  } catch (err) {
+    logger.error('debugController: auto-fix failed to start', { error: err.message, slug });
+    return res.status(500).json({ error: err.message || 'Failed to start auto-fix' });
+  }
+}
+
 module.exports = {
   handleStartDebug,
   handleGetDebugSession,
@@ -230,4 +262,5 @@ module.exports = {
   handleStartHeal,
   handleStartIncident,
   handleStartVisual,
+  handleAutoFix,
 };

@@ -3325,6 +3325,38 @@ textarea::placeholder { color: var(--text-muted); }
   .example-chip { font-size: 0.75rem; padding: 5px 10px; }
 }
 
+/* ── Scope bar ──────────────────────────────────────────────────────────── */
+.scope-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0 2px 8px;
+}
+.scope-bar.hidden { display: none; }
+
+.scope-chip {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border, rgba(255,255,255,.1));
+  background: transparent;
+  color: var(--text-dim, rgba(255,255,255,.6));
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.scope-chip:hover {
+  background: rgba(255,255,255,.06);
+  color: var(--text, #f8f8f8);
+}
+.scope-chip--active {
+  background: rgba(99,102,241,.15);
+  border-color: rgba(99,102,241,.5);
+  color: #a5b4fc;
+}
+
 /* ── Reduced motion ────────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

@@ -118,6 +118,11 @@ function switchToConversation(convId) {
 
   currentSlug       = conv.projectSlug || null;
   currentPreviewUrl = conv.previewUrl  || null;
+  // Show/hide scope bar based on whether this conversation has a project
+  if (scopeBar) scopeBar.classList.toggle('hidden', !currentSlug);
+  // Reset scope to auto when switching conversations
+  currentScope = 'auto';
+  if (scopeChips) scopeChips.forEach(c => c.classList.toggle('scope-chip--active', c.dataset.scope === 'auto'));
 
   renderAllMessages();
   renderHistory();
@@ -223,6 +228,7 @@ let currentPreviewUrl   = null;
 let previewPollInterval = null;
 let currentDevice       = 'desktop';
 let currentTab          = 'preview';
+let currentScope        = 'auto'; // 'auto' | 'ui' | 'logic' | 'component' | 'page'
 
 // ── Generation timer helpers ──────────────────────────────────────────────────
 function formatElapsedMs(ms) {
@@ -266,6 +272,8 @@ const charCount       = $('char-count');
 const generateBtn     = $('generate-btn');
 const promptError     = $('prompt-error');
 const modeBar         = $('mode-bar');
+const scopeBar        = $('scope-bar');
+const scopeChips      = scopeBar ? scopeBar.querySelectorAll('.scope-chip') : [];
 const convThread      = $('conv-thread');
 const convWelcome     = $('conv-welcome');
 const newChatBtn      = $('new-chat-btn');
@@ -304,6 +312,14 @@ modeBar.addEventListener('change', (e) => {
   const radio = e.target.closest('input[type="radio"]');
   if (!radio) return;
   currentMode = radio.dataset.mode;
+});
+
+// ── Scope chip click handler ──────────────────────────────────────────────────
+scopeChips.forEach(chip => {
+  chip.addEventListener('click', () => {
+    currentScope = chip.dataset.scope || 'auto';
+    scopeChips.forEach(c => c.classList.toggle('scope-chip--active', c === chip));
+  });
 });
 
 // ── Prompt input ──────────────────────────────────────────────────────────────
@@ -698,6 +714,7 @@ async function startEdit(prompt, projectSlug) {
     mode: currentMode,
     isEdit: true,
     editSlug: projectSlug,
+    editScope: currentScope !== 'auto' ? currentScope : null,
     timestamp: Date.now(),
   });
   startGenerationTimer(asstMsgId);
@@ -706,12 +723,13 @@ async function startEdit(prompt, projectSlug) {
   promptInput.value = '';
   promptInput.dispatchEvent(new Event('input'));
 
-  setPreviewState('loading', 'Applying changes...', '');
+  const scopeLabel = { ui: 'UI only', logic: 'Logic only', component: 'Component', page: 'Page' }[currentScope] || '';
+  setPreviewState('loading', scopeLabel ? `Updating ${scopeLabel}...` : 'Applying changes...', '');
 
   try {
     const data = await apiFetch(`/api/edit/${encodeURIComponent(projectSlug)}`, {
       method: 'POST',
-      body: JSON.stringify({ prompt, mode: currentMode }),
+      body: JSON.stringify({ prompt, mode: currentMode, scope: currentScope !== 'auto' ? currentScope : null }),
     });
     currentJobId = data.jobId;
     startPolling(currentJobId);
@@ -725,7 +743,7 @@ async function startEdit(prompt, projectSlug) {
         updateLoadingMessage('Retrying edit...', '');
         const data = await apiFetch(`/api/edit/${encodeURIComponent(projectSlug)}`, {
           method: 'POST',
-          body: JSON.stringify({ prompt, mode: currentMode }),
+          body: JSON.stringify({ prompt, mode: currentMode, scope: currentScope !== 'auto' ? currentScope : null }),
         });
         currentJobId = data.jobId;
         startPolling(currentJobId);
@@ -819,11 +837,16 @@ async function pollJob(jobId) {
 
         if (slug) {
           currentSlug = slug;
+          // Show scope bar when a project is active
+          if (scopeBar) scopeBar.classList.toggle('hidden', !currentSlug);
           updateDeployButton(slug);
           syncEnvButton(slug);
           loadCodeFileList(slug);
 
           if (job.isEdit) {
+            // Reset scope to "Full edit" after edit completion
+            currentScope = 'auto';
+            if (scopeChips) scopeChips.forEach(c => c.classList.toggle('scope-chip--active', c.dataset.scope === 'auto'));
             // Edit: refresh the existing preview iframe without re-initialising the server
             if (currentTab !== 'preview') switchTab('preview');
             if (previewIframe.src) {
@@ -1255,6 +1278,10 @@ newChatBtn.addEventListener('click', () => {
   currentJobId    = null;
   currentSlug     = null;
   currentPreviewUrl = null;
+  // Reset scope to auto and hide the scope bar when starting a new project
+  currentScope = 'auto';
+  if (scopeBar) scopeBar.classList.add('hidden');
+  if (scopeChips) scopeChips.forEach(c => c.classList.toggle('scope-chip--active', c.dataset.scope === 'auto'));
   updateDeployButton(null);
 
   createNewConversation();
@@ -1283,7 +1310,8 @@ async function initiatePreview(slug, _retryCount) {
       if (retry < 1) {
         setTimeout(() => initiatePreview(slug, retry + 1), 1500);
       } else {
-        setPreviewState('error', 'Preview failed', preview.error || 'The preview could not be started.');
+        // Before showing error — attempt auto-debug repair
+        triggerPreviewFailureDebug(slug, preview.error || 'The preview could not be started.');
       }
     } else {
       pollPreviewUntilReady(slug, preview.status);
@@ -1296,8 +1324,67 @@ async function initiatePreview(slug, _retryCount) {
     } else if (retry < 1) {
       setTimeout(() => initiatePreview(slug, retry + 1), 2000);
     } else {
-      setPreviewState('error', 'Preview unavailable', err.message || 'Could not connect to preview server.');
+      // Before showing error — attempt auto-debug repair
+      triggerPreviewFailureDebug(slug, err.message || 'Could not connect to preview server.');
     }
+  }
+}
+
+async function triggerPreviewFailureDebug(slug, errorMsg) {
+  if (!slug || _runtimeFixPending) {
+    setPreviewState('error', 'Preview failed', errorMsg || 'Could not start preview.');
+    return;
+  }
+  _runtimeFixPending = true;
+  _runtimeFixCooldown = Date.now() + 60_000;
+
+  updateLoadingMessage('Zyra is repairing...', 'Preview failed — attempting auto-fix');
+
+  try {
+    const { jobId } = await apiFetch(`/api/debug/${encodeURIComponent(slug)}/auto`, {
+      method: 'POST',
+      body: JSON.stringify({
+        consoleErrors:  [{ message: String(errorMsg).slice(0, 300), level: 'error', source: 'preview' }],
+        previewState:   'error',
+        trigger:        'preview_fail',
+        mode:           'fast',
+      }),
+    });
+
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      if (attempts > 20) {
+        clearInterval(poll);
+        _runtimeFixPending = false;
+        setPreviewState('error', 'Preview failed', errorMsg || 'Could not start preview.');
+        return;
+      }
+      try {
+        const { job } = await apiFetch(`/api/debug/${encodeURIComponent(slug)}/session/${jobId}`);
+        if (job.status === 'completed') {
+          clearInterval(poll);
+          _runtimeFixPending = false;
+          if (job.autoApplied) {
+            showToast('Fixed automatically', 'success');
+            setTimeout(() => initiatePreview(slug, 0), 500);
+          } else {
+            setPreviewState('error', 'Preview failed', errorMsg || 'Could not start preview.');
+          }
+        } else if (['failed', 'cancelled', 'timed_out'].includes(job.status)) {
+          clearInterval(poll);
+          _runtimeFixPending = false;
+          setPreviewState('error', 'Preview failed', errorMsg || 'Could not start preview.');
+        }
+      } catch (_) {
+        clearInterval(poll);
+        _runtimeFixPending = false;
+        setPreviewState('error', 'Preview failed', errorMsg || 'Could not start preview.');
+      }
+    }, 2500);
+  } catch (_) {
+    _runtimeFixPending = false;
+    setPreviewState('error', 'Preview failed', errorMsg || 'Could not start preview.');
   }
 }
 
@@ -2854,58 +2941,98 @@ function canAutoFix() {
   return true;
 }
 
-async function triggerRuntimeAutoFix(errorMsg) {
+async function triggerRuntimeAutoFix(errors) {
   if (!canAutoFix()) return;
   _runtimeFixPending = true;
-  _runtimeFixCooldown = Date.now() + 30_000; // 30s cooldown
+  _runtimeFixCooldown = Date.now() + 45_000; // 45s cooldown
 
-  showToast('Polishing code...', 'info');
+  // Show subtle "analyzing" state in preview — don't disrupt user
+  const loadingEl = $('state-loading');
+  const frameEl   = $('state-frame');
+  updateLoadingMessage('Zyra is analyzing...', 'Detected an issue — attempting self-repair');
+  if (loadingEl) loadingEl.classList.remove('hidden');
+  if (frameEl)   frameEl.classList.add('hidden');
 
-  const fixPrompt = `Fix this JavaScript runtime error silently: ${errorMsg.slice(0, 200)}`;
+  const errorList = Array.isArray(errors) ? errors : [{ message: String(errors), level: 'error' }];
 
   try {
-    const { jobId } = await apiFetch(`/api/edit/${encodeURIComponent(currentSlug)}`, {
+    const { jobId } = await apiFetch(`/api/debug/${encodeURIComponent(currentSlug)}/auto`, {
       method: 'POST',
-      body: JSON.stringify({ prompt: fixPrompt, mode: 'fast' }),
+      body: JSON.stringify({
+        consoleErrors: errorList.slice(0, 10),
+        previewState:  'runtime_error',
+        trigger:       'runtime',
+        mode:          'fast',
+      }),
     });
 
     // Poll for completion
     let attempts = 0;
     const poll = setInterval(async () => {
       attempts++;
-      if (attempts > 40) { clearInterval(poll); _runtimeFixPending = false; return; }
+      if (attempts > 30) {
+        clearInterval(poll);
+        _runtimeFixPending = false;
+        // restore preview as-is
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (frameEl)   frameEl.classList.remove('hidden');
+        return;
+      }
       try {
-        const job = await apiFetch(`/api/jobs/${jobId}`);
+        const { job } = await apiFetch(`/api/debug/${encodeURIComponent(currentSlug)}/session/${jobId}`);
         if (job.status === 'completed') {
           clearInterval(poll);
           _runtimeFixPending = false;
-          // Refresh iframe silently
-          if (previewIframe.src) {
-            const src = previewIframe.src;
-            previewIframe.src = '';
-            setTimeout(() => { previewIframe.src = src; }, 300);
+          if (job.autoApplied) {
+            // Reload the preview with the fix applied
+            showToast('Fixed automatically', 'success');
+            if (previewIframe && previewIframe.src) {
+              const src = previewIframe.src;
+              previewIframe.src = '';
+              setTimeout(() => {
+                previewIframe.src = src;
+                setPreviewState('frame');
+              }, 300);
+            } else {
+              initiatePreview(currentSlug);
+            }
+          } else {
+            // No patch was applied — restore iframe
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (frameEl)   frameEl.classList.remove('hidden');
           }
-          showToast('Code polished', 'success');
         } else if (['failed', 'cancelled', 'timed_out'].includes(job.status)) {
           clearInterval(poll);
           _runtimeFixPending = false;
+          if (loadingEl) loadingEl.classList.add('hidden');
+          if (frameEl)   frameEl.classList.remove('hidden');
         }
       } catch (_) { clearInterval(poll); _runtimeFixPending = false; }
-    }, 1500);
+    }, 2000);
   } catch (_) {
     _runtimeFixPending = false;
+    if (loadingEl) loadingEl.classList.add('hidden');
+    if (frameEl)   frameEl.classList.remove('hidden');
   }
 }
 
 window.addEventListener('message', (event) => {
   if (!event.data || event.data.type !== 'ZYRA_RUNTIME_ERROR') return;
-  const msg = (event.data.error && event.data.error.message) || event.data.message || '';
-  if (!isBreakingError(msg)) return;
 
-  // Debounce — wait 2.5s for errors to settle before triggering fix
+  // New batched format: { type, errors: [...] }
+  // Legacy format: { type, error: { message } }
+  const errors = Array.isArray(event.data.errors)
+    ? event.data.errors
+    : event.data.error
+      ? [{ message: (event.data.error.message || ''), level: 'error' }]
+      : [];
+
+  const breaking = errors.filter(e => isBreakingError(e.message));
+  if (breaking.length === 0) return;
+
   if (_runtimeErrTimer) clearTimeout(_runtimeErrTimer);
   _runtimeErrTimer = setTimeout(() => {
-    triggerRuntimeAutoFix(msg);
+    triggerRuntimeAutoFix(breaking);
   }, 2500);
 });
 

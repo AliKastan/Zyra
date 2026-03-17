@@ -7,6 +7,7 @@ const {
   handleStartHeal,
   handleStartIncident,
   handleStartVisual,
+  handleAutoFix,
 } = require('../controllers/debugController');
 
 // Standard Fix My App
@@ -23,5 +24,8 @@ router.post('/:slug/incident',       handleStartIncident);
 
 // Visual Bug Debugger
 router.post('/:slug/visual',         handleStartVisual);
+
+// Automatic fix (analyze + auto-apply)
+router.post('/:slug/auto',           handleAutoFix);
 
 module.exports = router;
