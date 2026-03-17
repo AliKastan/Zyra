@@ -1694,18 +1694,35 @@ textarea::placeholder { color: var(--text-muted); }
 .zyra-toast--warning { background: #8A2E1A; }
 
 /* ── Device wrapper & frames ───────────────────────────────────────────────── */
+
+/*
+ * CRITICAL: #state-frame MUST stay position:absolute so that inset:0
+ * (inherited from .preview-state) fills the entire .preview-content-area.
+ * Any position:relative override will collapse it to content size.
+ */
 #state-frame {
   padding: 0;
+  /* Override .preview-state flex centering — content fills, not centers */
   align-items: stretch;
-  justify-content: center;
+  justify-content: flex-start;
   background: transparent;
+  /* Ensure absolute positioning is NOT overridden anywhere */
+  position: absolute;
 }
 
-.device-wrapper { display: flex; flex-direction: column; overflow: hidden; }
+.device-wrapper {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
 
-/* Desktop — edge-to-edge, no floating card */
+/* ── Desktop: fills the entire preview canvas ── */
 .device-wrapper[data-device="desktop"] {
-  width: 100%; height: 100%;
+  /* Stretch to fill #state-frame completely */
+  flex: 1 1 auto;
+  width: 100%;
   border-radius: 0;
   border: none;
   box-shadow: none;
@@ -1715,37 +1732,58 @@ textarea::placeholder { color: var(--text-muted); }
 .device-wrapper[data-device="desktop"] .browser-chrome   { display: flex; }
 .device-wrapper[data-device="desktop"] .phone-notch-bar  { display: none; }
 .device-wrapper[data-device="desktop"] .phone-home-bar   { display: none; }
-.device-wrapper[data-device="desktop"] .frame-inner      { height: calc(100% - 40px); }
+/* frame-inner takes all remaining height after the 40px browser chrome */
+.device-wrapper[data-device="desktop"] .frame-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
 
-/* Tablet */
+/* ── Tablet: centered device frame with padding ── */
 .device-wrapper[data-device="tablet"] {
-  width: 768px; max-width: calc(100% - 2.5rem); height: calc(100% - 2.5rem);
+  width: 768px;
+  max-width: calc(100% - 2.5rem);
+  height: calc(100% - 2.5rem);
   border-radius: 12px;
   border: 1px solid var(--border-mid);
   box-shadow: var(--shadow-xl);
   overflow: hidden;
   background: #fff;
   margin: 1.25rem auto;
+  flex-shrink: 0;
 }
 .device-wrapper[data-device="tablet"] .browser-chrome   { display: flex; }
 .device-wrapper[data-device="tablet"] .phone-notch-bar  { display: none; }
 .device-wrapper[data-device="tablet"] .phone-home-bar   { display: none; }
-.device-wrapper[data-device="tablet"] .frame-inner      { height: calc(100% - 40px); }
+.device-wrapper[data-device="tablet"] .frame-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
 
-/* Mobile */
+/* ── Mobile: phone frame ── */
 .device-wrapper[data-device="mobile"] {
-  width: 390px; max-width: calc(100% - 2.5rem); height: calc(100% - 2.5rem); max-height: 800px;
+  width: 390px;
+  max-width: calc(100% - 2.5rem);
+  height: calc(100% - 2.5rem);
+  max-height: 800px;
   border-radius: 46px;
   border: 10px solid #0A0A0F;
   box-shadow: 0 0 0 1.5px rgba(255,255,255,0.08), inset 0 0 0 1px rgba(255,255,255,0.04), 0 32px 80px rgba(0,0,0,0.7), 0 0 40px rgba(255,255,255,0.05);
   overflow: hidden;
   background: #0A0A0F;
-  margin: 0 auto;
+  margin: auto;
+  flex-shrink: 0;
 }
 .device-wrapper[data-device="mobile"] .browser-chrome   { display: none; }
 .device-wrapper[data-device="mobile"] .phone-notch-bar  { display: flex; }
 .device-wrapper[data-device="mobile"] .phone-home-bar   { display: flex; }
-.device-wrapper[data-device="mobile"] .frame-inner      { height: calc(100% - 28px - 20px); background: #fff; }
+.device-wrapper[data-device="mobile"] .frame-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: #fff;
+  position: relative;
+}
 
 /* Browser chrome bar */
 .browser-chrome {
@@ -1805,9 +1843,26 @@ textarea::placeholder { color: var(--text-muted); }
 }
 .home-indicator { width: 90px; height: 4px; background: rgba(255,255,255,0.22); border-radius: 2px; }
 
-/* iframe */
-.frame-inner { flex: 1; overflow: hidden; }
-#preview-iframe { width: 100%; height: 100%; border: none; display: block; background: #fff; opacity: 1; transition: opacity 0.35s ease; }
+/* iframe host + iframe — absolute fill for guaranteed full coverage */
+.frame-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+#preview-iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 100%;
+  min-height: 100%;
+  border: 0;
+  display: block;
+  background: #fff;
+  opacity: 1;
+  transition: opacity 0.35s ease;
+}
 
 /* ── Code view ─────────────────────────────────────────────────────────────── */
 .code-area { flex: 1; display: flex; overflow: hidden; }
@@ -3098,10 +3153,8 @@ textarea::placeholder { color: var(--text-muted); }
   background: rgba(255,255,255,0.06);
 }
 
-/* Preview state-frame needs relative positioning for the overlay */
-#state-frame {
-  position: relative;
-}
+/* #state-frame must remain position:absolute (from .preview-state) to fill the canvas.
+   Any overlay children should be position:absolute within .device-wrapper instead. */
 
 /* Toggle button active state */
 .vpad-toggle-btn.vpad-on {

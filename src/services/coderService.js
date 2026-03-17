@@ -346,18 +346,26 @@ async function runAutoFix(userPrompt, files, errors, mode, costTracker) {
 // ── Viewport normalize injection ──────────────────────────────────────────────
 
 /**
- * Injects a minimal CSS reset into every HTML file so generated apps always
- * fill the full iframe viewport — no default browser margins, no mystery gaps.
- * Injected as the first child of <head> so the app's own styles can override.
+ * Injected as the LAST child of <head> so it wins over app styles.
+ * Uses !important on the critical fill properties so generated app CSS
+ * cannot accidentally shrink the viewport.
  */
-const VIEWPORT_NORMALIZE = `<style data-zyra="viewport">*,*::before,*::after{box-sizing:border-box}html{width:100%;height:100%;margin:0;padding:0}body{width:100%;min-height:100vh;margin:0;padding:0}</style>`;
+const VIEWPORT_NORMALIZE = `<style data-zyra="viewport">` +
+  `*,*::before,*::after{box-sizing:border-box}` +
+  `html{width:100%!important;height:100%!important;margin:0!important;padding:0!important;overflow-x:hidden}` +
+  `body{width:100%!important;min-height:100vh!important;margin:0!important;padding:0!important;overflow-x:hidden}` +
+  `</style>`;
 
 function injectViewportNormalize(files) {
   return files.map((f) => {
     if (!f.path.endsWith('.html')) return f;
     let content = f.content || '';
     if (content.includes('data-zyra="viewport"')) return f; // already injected
-    if (/<head(\s[^>]*)?\s*>/i.test(content)) {
+    // Inject BEFORE </head> so it comes after all app styles and wins specificity
+    if (/<\/head>/i.test(content)) {
+      content = content.replace(/<\/head>/i, `${VIEWPORT_NORMALIZE}\n</head>`);
+    } else if (/<head(\s[^>]*)?\s*>/i.test(content)) {
+      // Fallback: no closing head tag — inject after opening head
       content = content.replace(/(<head(\s[^>]*)?\s*>)/i, `$1\n${VIEWPORT_NORMALIZE}`);
     } else if (content.includes('<body')) {
       content = content.replace('<body', `${VIEWPORT_NORMALIZE}\n<body`);

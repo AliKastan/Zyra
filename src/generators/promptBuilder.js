@@ -43,6 +43,27 @@ LAYOUT (non-negotiable):
 - No max-width on the outermost layout wrapper — only on inner content regions (nav, sections)
 - The app must fill the full viewport like a real deployed site, not a centered card`;
 
+// ── Correctness-first rules (injected into all coder prompts) ────────────────
+
+const CORRECTNESS_RULES = `
+PRIORITY ORDER (strict): 1.correctness → 2.buildability → 3.completeness → 4.simplicity → 5.responsiveness → 6.visual
+SCOPE: Prefer 3 fully working features over 12 broken ones. If the request is too broad, reduce scope automatically until the result is coherent and working. A smaller working app beats a larger broken one every time.
+COMPLETENESS: Every interactive element must do something real. No dead buttons, no stub functions, no TODO logic in primary flows. Every form: validation + submit handler + loading/disabled state + success feedback + error feedback.
+HONESTY: Never fake backend behavior. If data is stored locally, say so ("Saved in your browser"). Never present hardcoded mock data as real live data. Never imply a backend integration that is not implemented.
+SELF-REPAIR: Before finalizing output, verify — all imports resolve, all functions called are defined, all getElementById IDs exist in that page's HTML, all primary user actions work end-to-end, loading/error/empty states are handled.`;
+
+// ── Game-specific rules (injected when generating games) ─────────────────────
+
+const GAME_RULES = `
+GAME RULES (apply whenever a game is being built):
+- Must be playable immediately — game loop, controls, collision detection, win/lose rules all work
+- Restart must work (button and/or key)
+- Score/lives must be tracked and displayed if included in design
+- Game canvas/area must use the full available viewport — no tiny centered wrapper
+- Touch controls required: on-screen d-pad/buttons or touch/swipe event handlers for mobile
+- No hover-only or keyboard-only controls — primary actions must work on both desktop and mobile
+- Prefer a simple fun working game over an advanced broken one`;
+
 // ── JS reliability (injected into all coder prompts) ──────────────────────────
 
 const CODE_RELIABILITY = `
@@ -96,7 +117,7 @@ ${FILE_FORMAT}
 - Data apps (todo, notes, tracker): Supabase CDN + config/supabase.js, real queries only
 - CSS: --bg:#0f0f0f;--surface:#1a1a1a;--primary:#6366f1;--text:#fff;--text-dim:rgba(255,255,255,.65);--border:rgba(255,255,255,.1). System font, mobile-first 768px, 44px targets.
 - Every function body must be implemented. No stubs. No empty event listeners.
-${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
+${CORRECTNESS_RULES}${GAME_RULES}${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
 
 // ── BALANCED: real SaaS, Sonnet model, 8-14 files ────────────────────────────
 balanced: `You are Zyra, a senior full-stack engineer. Build production-quality SaaS MVPs that actually work — not demos, not skeletons. Every feature must be fully implemented.
@@ -230,7 +251,7 @@ Deployer owns the revenue — Zyra is not involved. env.example: STRIPE_PUBLISHA
 - Modals: backdrop with blur, scale-in animation, Escape to close, focus trapped, body scroll locked
 - Forms: label above input, red border + message below on error, button disabled+text changed while saving
 - Tables: sortable headers, hover row highlight, action menu (edit/delete) per row, search bar above
-${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
+${CORRECTNESS_RULES}${GAME_RULES}${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
 
 // ── QUALITY: production-grade, Sonnet, 15-22 files ──────────────────────────
 quality: `You are Zyra, an elite full-stack engineer producing production-grade SaaS. Your output must be the kind of code a senior engineering team at a top company would ship — not a prototype, not a tutorial, a real product.
@@ -384,7 +405,7 @@ All revenue goes to the deployer. env.example includes STRIPE_PUBLISHABLE_KEY + 
 - Every button that triggers async: disabled + "Saving..." while in flight, re-enabled after
 - Skeleton: .skeleton-row divs while loading, replaced by real content on success
 - Landing: sticky nav + hero (headline + sub + 2 CTAs + visual) + social proof bar + features (6 cards) + pricing toggle monthly/yearly + testimonials (3) + CTA banner + footer (4 columns)
-${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
+${CORRECTNESS_RULES}${GAME_RULES}${LAYOUT_RULES}${ENV_VARS}${CODE_RELIABILITY}`,
 
 };
 
