@@ -71,7 +71,9 @@ const CHUNK_SYSTEM_BASE = `Mobile game file generator. Generate exactly ONE file
 MANDATORY OUTPUT FORMAT — start immediately with the file block (no other text):
 ---FILE: path/to/file.ext---
 [complete, working file content — no TODOs, no placeholders]
----END FILE---`;
+---END FILE---
+
+VISUAL RULE: Derive ONE coherent visual style from the game's theme. Do NOT default to dark-bg + purple + red-accent — that is the generic AI game look. Choose something intentional that fits this specific game. Use a consistent 2-3 color palette across all files. No random gradients on every element. No glow on every text. Menus must feel like they belong to THIS game.`;
 
 const CORE_GAME_RULES = `
 MOBILE GAME RULES (for game.js and any file containing game logic):
@@ -82,7 +84,8 @@ MOBILE GAME RULES (for game.js and any file containing game logic):
 - Resize: function resizeCanvas(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;} window.addEventListener('resize',resizeCanvas); resizeCanvas();
 - Score: let score=0; let bestScore=parseInt(localStorage.getItem('zyra_best')||'0',10);
 - Restart: function restartGame(){score=0;enemies=[];gameState='playing';}
-- JS rules: let (not const) for mutable state; null-guard all DOM ops; try/catch around localStorage/audio`;
+- JS rules: let (not const) for mutable state; null-guard all DOM ops; try/catch around localStorage/audio
+- Visual: use the CSS vars (--bg, --primary, --accent, --text) defined in style.css — never hardcode raw hex values in JS canvas draws; read them via getComputedStyle if needed or match the chosen palette`;
 
 const HTML_RULES = `
 HTML RULES:
@@ -93,9 +96,12 @@ HTML RULES:
 
 const CSS_RULES = `
 CSS RULES:
-- body { margin:0; padding:0; overflow:hidden; background:#0d0d1a; touch-action:none; -webkit-user-select:none; user-select:none; }
+- body { margin:0; padding:0; overflow:hidden; background:var(--bg,#111); touch-action:none; -webkit-user-select:none; user-select:none; }
 - canvas { display:block; width:100%; height:100%; }
-- HUD elements: position:absolute, min 44px touch targets`;
+- HUD elements: position:absolute, min 44px touch targets
+- :root { --bg; --primary; --accent; --text; --radius:10px; --font:system-ui,sans-serif } — derive from THIS game's theme, not a generic dark-purple default
+- Use ONE visual style consistently: pick a direction (gritty/casual/retro/cozy/minimal) and apply it to all elements
+- 2-3 core colors max. Same palette for buttons, HUD, overlays, menus. No random gradients on every element`;
 
 /**
  * Returns file-specific requirements for the per-file prompt.

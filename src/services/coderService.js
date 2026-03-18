@@ -227,17 +227,14 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
   const appType = complexity?.appType || plan?._appType || 'generic';
   const level   = complexity?.level || 'simple';
 
-  // Detect if this app needs backend (auth, persistence, multi-user)
-  const needsBackend = /\b(save|store|login|sign.?up|sign.?in|auth|user|account|database|todo|task|note|post|comment|cart|order|profile|message|chat|feed|bookmark|follow|like|vote|review|rating)\b/i.test(userPrompt);
-
   // Template-hybrid path: for marketing/landing page types OR prompts that
   // clearly ask for a website/page (not a functional app with custom logic).
+  // Note: Zyra generates offline-first mobile games — no backend/Stripe/Supabase assumptions.
   const isWebsitePrompt = /website|web site|landing|homepage|home page|page for|site for/i.test(userPrompt);
   const useTemplate = (
     (TEMPLATE_TYPES.has(appType) || (appType === 'generic' && isWebsitePrompt)) &&
     level === 'simple' &&
-    mode !== 'quality' &&
-    !needsBackend
+    mode !== 'quality'
   );
 
   if (useTemplate) {

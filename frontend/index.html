@@ -114,22 +114,18 @@
       <!-- Input area -->
       <div class="sidebar-input hidden" id="sidebar-input">
         <div class="mode-bar" id="mode-bar">
-          <input type="radio" name="generation-mode" id="mode-fast" data-mode="fast" />
-          <label for="mode-fast" title="Quick playable prototype — 3-5 files, core mechanic only">Fast</label>
-          <input type="radio" name="generation-mode" id="mode-standard" data-mode="balanced" checked />
-          <label for="mode-standard" title="Full mobile game — all screens, touch controls, scoring, polish">Standard</label>
-          <input type="radio" name="generation-mode" id="mode-quality" data-mode="quality" />
-          <label for="mode-quality" title="Complete game project — progression, juice effects, audio hooks, full polish">Quality</label>
+          <input type="radio" name="generation-mode" id="mode-2d" data-mode="balanced" checked />
+          <label for="mode-2d" title="Full 2D mobile game — touch controls, game loop, all screens, scoring">2D Game</label>
+          <input type="radio" name="generation-mode" id="mode-3d" data-mode="fast" />
+          <label for="mode-3d" title="Simple 3D game — experimental, limited scope, low-poly mobile-safe">3D Game</label>
           <div class="glass-glider"></div>
         </div>
 
         <!-- Scope picker — only shown when editing an existing project -->
         <div class="scope-bar hidden" id="scope-bar">
           <button class="scope-chip scope-chip--active" data-scope="auto" type="button">Full edit</button>
-          <button class="scope-chip" data-scope="ui" type="button">UI only</button>
-          <button class="scope-chip" data-scope="logic" type="button">Logic only</button>
-          <button class="scope-chip" data-scope="component" type="button">Component</button>
-          <button class="scope-chip" data-scope="page" type="button">Page</button>
+          <button class="scope-chip" data-scope="logic" type="button">Gameplay</button>
+          <button class="scope-chip" data-scope="ui" type="button">Visuals</button>
         </div>
 
         <div class="input-box">
@@ -171,10 +167,6 @@
         <div class="preview-controls">
           <button id="vpad-toggle-btn" class="icon-btn vpad-toggle-btn hidden" title="Virtual gamepad" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="10" r="1.5" fill="currentColor"/><circle cx="12" cy="14" r="1.5" fill="currentColor"/><circle cx="16" cy="12" r="1.5" fill="currentColor"/></svg>
-          </button>
-          <button id="keys-btn" class="keys-btn hidden" type="button">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-            Keys
           </button>
           <div class="device-btns" id="device-btns">
             <button class="device-btn" data-device="desktop" title="Desktop" type="button">
@@ -359,67 +351,6 @@
       <span>Preview</span>
     </button>
   </nav>
-
-<!-- ── Backend Config Panel ────────────────────────────────────────────────── -->
-<div class="env-overlay hidden" id="env-overlay" role="dialog" aria-modal="true" aria-label="Backend Config">
-  <div class="env-panel">
-    <div class="env-panel-header">
-      <div class="env-panel-title">Backend Config</div>
-      <button class="env-close-btn" id="env-close-btn" type="button" aria-label="Close">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-
-    <!-- Tabs -->
-    <div class="env-tabs">
-      <button class="env-tab env-tab--active" id="tab-btn-variables" data-tab="variables" type="button">Variables</button>
-      <button class="env-tab" id="tab-btn-integrations" data-tab="integrations" type="button">Integrations</button>
-    </div>
-
-    <!-- Variables tab — Railway-style raw editor -->
-    <div class="env-tab-pane" id="tab-pane-variables">
-      <div class="env-var-toolbar">
-        <button class="env-paste-toggle-btn" id="env-paste-toggle" type="button">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
-          Paste .env
-        </button>
-        <button class="env-add-btn" id="env-add-btn" type="button">+ Add Variable</button>
-      </div>
-
-      <!-- .env paste area (hidden by default) -->
-      <div class="env-paste-area hidden" id="env-paste-area">
-        <textarea id="env-paste-input" class="env-paste-input" placeholder="Paste your .env file content:&#10;&#10;SUPABASE_URL=https://xyz.supabase.co&#10;SUPABASE_ANON_KEY=eyJhbGci...&#10;STRIPE_PUBLISHABLE_KEY=pk_test_..." spellcheck="false" rows="6"></textarea>
-        <div class="env-paste-actions">
-          <button class="env-paste-cancel-btn" id="env-paste-cancel" type="button">Cancel</button>
-          <button class="env-paste-import-btn" id="env-paste-import" type="button">Import Variables</button>
-        </div>
-      </div>
-
-      <!-- Variable rows -->
-      <div id="env-var-rows" class="env-var-rows"></div>
-      <div class="env-var-empty hidden" id="env-var-empty">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".35"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-        <span>No variables yet — add one or paste a .env file</span>
-      </div>
-    </div>
-
-    <!-- Integrations tab -->
-    <div class="env-tab-pane hidden" id="tab-pane-integrations">
-      <p class="env-desc">Detected services for this project. Click to expand and add keys.</p>
-      <div id="integrations-list" class="integrations-list">
-        <div class="integrations-loading" id="integrations-loading">Loading integrations...</div>
-      </div>
-    </div>
-
-    <div class="env-footer">
-      <div class="env-privacy-note">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Stored on your server only. Never shared.
-      </div>
-      <button class="env-save-btn" id="env-save-btn" type="button" disabled>Save &amp; Reload Preview</button>
-    </div>
-  </div>
-</div>
 
 <!-- ── Debug Modal ────────────────────────────────────────────────────────── -->
 <div class="debug-overlay hidden" id="debug-overlay" role="dialog" aria-modal="true" aria-label="Fix My Game">

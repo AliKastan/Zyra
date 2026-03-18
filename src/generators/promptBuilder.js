@@ -12,6 +12,34 @@
 
 const { buildGenreRuleBlock } = require('./genreRules');
 
+// ── Visual identity guidance ──────────────────────────────────────────────────
+
+const VISUAL_IDENTITY = `
+VISUAL IDENTITY — design for this specific game, not a generic template:
+
+Derive ONE visual style from the game's concept and theme. Apply it to everything consistently.
+Do NOT default to dark-bg + purple primary + red accent — that is the generic AI game look.
+
+Style directions by game mood (choose the one that fits, then commit to it):
+  action/gritty   → near-black bg, muted red or orange primary, lean sparse UI
+  casual/cheerful → warm off-white bg, bold warm primary, friendly round UI
+  retro arcade    → very dark bg, ONE neon accent color, crisp sharp text
+  cozy/chill      → earthy muted bg, soft warm highlights, relaxed feel
+  candy/playful   → vivid saturated bg, high contrast accent, energetic
+  ocean/calm      → deep blue bg, cool teal or cyan accent, clean minimal HUD
+  minimal/sharp   → near-white or near-black bg, single strong accent, nothing extra
+
+Implementation rules:
+- Define :root { --bg; --primary; --accent; --text; --radius:10px; --font:system-ui,sans-serif; }
+  Use these variables everywhere — never scatter raw hex values through the code
+- 2-3 core colors max — a neutral bg, one primary, one accent. More = visual noise
+- No glow or drop-shadow unless it directly serves the chosen style (not on every element)
+- No random gradients — use flat or very subtle gradients only when the style genuinely calls for it
+- Every screen (menu, HUD, gameplay, game-over) must use the SAME palette. No mid-game style shifts
+- Buttons: solid fill + consistent border-radius. Tappable, not a Dribbble shot
+- Menus must feel like they belong to THIS game, not a generic game template
+- Taste check: would a human indie developer look at this and think it looks coherent and intentional?`;
+
 // ── Planner ───────────────────────────────────────────────────────────────────
 
 const PLANNER_SYSTEM = `Mobile game designer. Output raw JSON only — no prose, no markdown.
@@ -44,7 +72,7 @@ Rules:
 const MOBILE_LAYOUT = `
 MOBILE LAYOUT (non-negotiable):
 - <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-- body { margin:0; padding:0; overflow:hidden; background:#000; touch-action:none; -webkit-user-select:none; user-select:none; }
+- body { margin:0; padding:0; overflow:hidden; background:var(--bg,#111); touch-action:none; -webkit-user-select:none; user-select:none; }
 - canvas { display:block; width:100%; height:100%; }
 - Game must fill the entire phone screen — no centered card, no scroll, no dead whitespace
 - For portrait games: canvas height = window.innerHeight, canvas width = window.innerWidth
@@ -121,12 +149,12 @@ PERFORMANCE — mobile CPU/GPU is limited:
 - Pool objects (reuse from array) instead of creating new ones every frame
 - No external image loading required — use canvas drawing (shapes, gradients, ctx.fillText)
 
-VISUAL STYLE — games must look designed, not default:
-- Choose ONE visual style direction and apply consistently: neon arcade / cartoon casual / minimalist clean / soft pastel
-- Background: dark gradient, subtle pattern, or solid color — never plain white
-- Player and entities: filled shapes with color — use ctx.fillStyle, ctx.strokeStyle, ctx.arc, ctx.fillRect
-- Score/UI text: bold, readable, contrasting color against game background
-- Buttons: rounded rectangles, large enough for thumbs, with visual pressed state
+VISUAL STYLE — derive from this game's theme, stay consistent:
+- Use the visual identity defined in the system prompt — same palette for all screens
+- Player and entities: canvas shapes using --primary / --accent — ctx.fillStyle, ctx.arc, ctx.fillRect
+- Score/UI text: bold, readable, high contrast — consistent weight hierarchy throughout
+- Buttons: solid fill using --primary, consistent --radius, 44px+ touch targets — same style everywhere
+- Do NOT add glow, gradient, or shadow to every element — use effects only where they serve the style
 
 AUDIO — optional but encouraged:
 - Use Web Audio API for sound effects (beep tones are fine — no external audio files needed)
@@ -199,17 +227,7 @@ index.html   — game shell: canvas element, HUD overlay divs, mobile meta tags
 css/style.css — mobile reset, canvas fill, HUD positioning, button styles
 js/game.js   — complete game: loop, entities, collision, score, input, states
 
-## DESIGN TOKENS (use these CSS variables)
-:root {
-  --bg: #0d0d1a;
-  --surface: rgba(255,255,255,0.08);
-  --primary: #6c63ff;
-  --accent: #ff6b6b;
-  --text: #f0f0f0;
-  --text-dim: rgba(240,240,240,0.6);
-  --radius: 12px;
-  --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
-}
+${VISUAL_IDENTITY}
 ${MOBILE_GAME_RULES}${CORRECTNESS_RULES}${MOBILE_LAYOUT}${CODE_RELIABILITY}`,
 
 // ── BALANCED: full mobile game with all screens and polish ────────────────────
@@ -235,22 +253,6 @@ js/game.js      — main game: init, game loop (update+draw), entities, collisio
 js/input.js     — input handler: pointer events for tap/swipe/joystick, keyboard fallback
 js/ui.js        — UI screens: renderMenu(), renderPause(), renderGameOver(), renderHUD(), updateScore()
 README.md       — how to run locally, controls guide, game description
-
-## DESIGN TOKENS
-:root {
-  --bg: #0d0d1a;
-  --bg2: #1a1a2e;
-  --surface: rgba(255,255,255,0.07);
-  --primary: #6c63ff;
-  --primary-glow: rgba(108,99,255,0.35);
-  --accent: #ff6b6b;
-  --success: #51cf66;
-  --warning: #ffd43b;
-  --text: #f0f0f0;
-  --text-dim: rgba(240,240,240,0.55);
-  --radius: 14px;
-  --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
-}
 
 ## VIRTUAL JOYSTICK PATTERN (for movement-based games):
 \`\`\`js
@@ -297,6 +299,7 @@ canvas.addEventListener('pointerup', e => {
   else handleSwipe(dy > 0 ? 'down' : 'up');
 });
 \`\`\`
+${VISUAL_IDENTITY}
 ${MOBILE_GAME_RULES}${CORRECTNESS_RULES}${MOBILE_LAYOUT}${CODE_RELIABILITY}`,
 
 // ── QUALITY: polished mobile game with full progression and juice ──────────────
@@ -322,42 +325,20 @@ js/audio.js      — audio: Web Audio API, playSound(type), sounds for hit/score
 js/storage.js    — persistence: saveBestScore(), loadBestScore(), saveSettings(), loadSettings()
 README.md        — game description, controls, how to run, customization notes
 
-## JUICE EFFECTS (add at least 3 of these):
-- Screen shake on player damage: \`shakeAmount = 8; shakeDecay = 0.85;\`
-- Score pop: float "+N" text up from score position with fade
-- Death particles: spawn 8-12 small squares at entity position, scatter outward
-- Enemy hit flash: set entity.flashTimer = 0.1, draw with white tint while > 0
-- Button scale: CSS transform scale(1.05) on :active, scale(0.95) on click
-- Transition fade: fade canvas opacity when switching between states
+## GAME FEEL (choose 1-2 that serve this game's style — do not add all of them):
+- Input feedback: button scale on :active (scale 0.96), subtle bg color shift on press
+- Score feedback: brief "+N" float text (small, quick, fades in 0.4s — not distracting)
+- Hit feedback: entity flash for 0.1s on damage (simple fillStyle override)
+- Screen shake: only for significant impacts — shakeAmount = 6; shakeDecay = 0.8;
+- State transition: brief canvas opacity fade when switching states (0.15s)
+Rule: effects must serve feedback, not decorate. If an effect doesn't tell the player something useful, leave it out.
 
 ## PROGRESSION (implement at least one of these):
 - Difficulty ramp: increase enemy speed / spawn rate every 10 seconds
 - Wave system: enemies-per-wave increases, show "Wave N" between waves
 - Unlock: after reaching score milestone, unlock a new power or game speed
 
-## DESIGN TOKENS
-:root {
-  --bg: #0d0d1a;
-  --bg2: #1a1a2e;
-  --bg3: #16213e;
-  --surface: rgba(255,255,255,0.07);
-  --surface2: rgba(255,255,255,0.12);
-  --primary: #6c63ff;
-  --primary-glow: rgba(108,99,255,0.4);
-  --accent: #ff6b6b;
-  --accent2: #ffd43b;
-  --success: #51cf66;
-  --danger: #ff4757;
-  --text: #f0f0f0;
-  --text-dim: rgba(240,240,240,0.55);
-  --text-muted: rgba(240,240,240,0.3);
-  --radius: 14px;
-  --radius-sm: 8px;
-  --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
-}
-@keyframes pulse { 0%,100%{opacity:.6} 50%{opacity:1} }
-@keyframes scaleIn { from{opacity:0;transform:scale(.9)} to{opacity:1;transform:scale(1)} }
-@keyframes floatUp { from{opacity:1;transform:translateY(0)} to{opacity:0;transform:translateY(-40px)} }
+${VISUAL_IDENTITY}
 ${MOBILE_GAME_RULES}${CORRECTNESS_RULES}${MOBILE_LAYOUT}${CODE_RELIABILITY}`,
 
 };
@@ -505,14 +486,15 @@ CORE RULES:
 - Maintain all touch controls — never remove mobile input handling
 
 CRITICAL — DESIGN INTENT:
-When the user gives a stylistic or aesthetic instruction, you MUST interpret it as a CSS/code modification. NEVER turn style words into visible page content, headlines, titles, or section names.
+When the user gives a stylistic or aesthetic instruction, you MUST interpret it as a CSS/code modification. NEVER turn style words into visible text, titles, or labels in the game.
 Examples of correct interpretation:
-  - "make it black and white" → change CSS color variables to grayscale values; DO NOT add text like "Black and White Design"
+  - "make it black and white" → change CSS :root color vars to grayscale; DO NOT add text "Black and White"
   - "make it minimal" → simplify CSS, reduce decorative elements; DO NOT rename the game
-  - "use a blue palette" → update CSS color variables to blue tones; DO NOT add a "Blue Palette" heading
-  - "dark mode" → change background/text colors to dark values; DO NOT add "Dark Mode" as a title
-  - "more modern" → update typography, spacing, border-radius; DO NOT change game content
-The original game's purpose, mechanics, and content must be preserved through all style edits.
+  - "use a blue palette" → update --bg, --primary, --accent vars to blue tones; DO NOT add a heading
+  - "dark theme" → change background/text colors; DO NOT add "Dark Theme" as a label
+  - "more retro" → update fonts, add pixel-feel via CSS; DO NOT change game mechanics or content
+  - "cartoon style" → update colors and border-radius in CSS; DO NOT add cartoon characters as text
+The original game's mechanics, touch controls, and game loop must be preserved through all style edits.
 
 OUTPUT FORMAT — use this EXACT format, no JSON, no markdown fences:
 ---FILE: path/to/file.ext---
@@ -524,34 +506,34 @@ Output only changed files. Start immediately with the first ---FILE--- block.`;
 // Edit-type-specific guidance injected into the user prompt
 const EDIT_TYPE_GUIDANCE = {
   THEME_CHANGE: `Edit type: THEME_CHANGE
-Focus: Update the visual theme. Change CSS custom properties, color values, background gradients. Preserve all game mechanics and functionality unchanged.`,
+Focus: Update the game's visual theme. Change CSS custom properties (--bg, --primary, --accent), color values. Preserve all gameplay mechanics, touch controls, and game logic unchanged.`,
 
   COLOR_CHANGE: `Edit type: COLOR_CHANGE
-Focus: Update colors only. Find CSS variables and hard-coded color values. Do not alter HTML content, layout, or JavaScript game logic.`,
+Focus: Update colors only. Find :root CSS variables and hard-coded color values in CSS and canvas draw calls. Do not alter HTML structure, layout, or JavaScript game logic.`,
 
   TYPOGRAPHY_CHANGE: `Edit type: TYPOGRAPHY_CHANGE
-Focus: Update typography only. Modify font-family, font-size, font-weight, line-height. Do not alter HTML content or JavaScript.`,
+Focus: Update typography only. Modify font-family, font-size, font-weight for HUD, menus, and buttons. Do not alter game logic or mechanics.`,
 
   LAYOUT_CHANGE: `Edit type: LAYOUT_CHANGE
-Focus: Update layout, spacing, or structure. Modify CSS properties and HTML structure as needed. Preserve all game content and mechanics.`,
+Focus: Update HUD layout, screen layout, or element positioning. Modify CSS and HTML structure as needed. Preserve all game mechanics and touch control zones.`,
 
   COMPONENT_CHANGE: `Edit type: COMPONENT_CHANGE
-Focus: Add, remove, or style a specific UI component or game element. Target only the relevant code. Preserve all unrelated content and functionality.`,
+Focus: Modify a specific game element (player, enemy, HUD, button, overlay, menu). Target only the relevant code. Preserve all unrelated gameplay and functionality.`,
 
   COPY_CHANGE: `Edit type: COPY_CHANGE
-Focus: Update visible text content only. Change the specified text in HTML or canvas draw calls. Do not alter CSS, JavaScript logic, or game mechanics.`,
+Focus: Update visible text content only. Change the specified text in HTML or canvas ctx.fillText calls. Do not alter CSS, JavaScript game logic, or mechanics.`,
 
   FUNCTIONAL_FIX: `Edit type: FUNCTIONAL_FIX
-Focus: Fix broken or misbehaving functionality. Update JavaScript logic, event handlers, or game state. Do not alter visual design or content unless directly related to the fix.`,
+Focus: Fix broken or misbehaving game functionality. Update JavaScript game logic, event handlers, or game state machine. Do not alter visual design unless directly related to the fix.`,
 
   BUG_FIX_REQUEST: `Edit type: BUG_FIX_REQUEST
-Focus: Find and fix the reported bug. Identify the root cause in the code and apply a targeted fix. Do not refactor unrelated code or change the design.`,
+Focus: Find and fix the reported bug. Identify the root cause in the game code and apply a targeted fix. Do not refactor unrelated code or change the visual design.`,
 
   NEW_FEATURE: `Edit type: NEW_FEATURE
-Focus: Add the requested new feature or functionality. Integrate it cleanly with the existing code, matching the project's current style and conventions. Ensure touch controls are included for any new interactive elements.`,
+Focus: Add the requested new game feature or mechanic. Integrate it cleanly with the existing game loop and state machine. Ensure touch controls are included for any new interactive elements.`,
 
   GENERAL_EDIT: `Edit type: GENERAL_EDIT
-Focus: Apply the user's requested modification. Interpret styling words as CSS changes, not as page content. Preserve the game's original mechanics and existing content.`,
+Focus: Apply the user's requested modification. This is a mobile game — interpret styling words as CSS/canvas changes, not as page content. Preserve the game's original mechanics and existing content.`,
 };
 
 /**

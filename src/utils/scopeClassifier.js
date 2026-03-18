@@ -20,19 +20,19 @@ const SCOPE_RULES = [
   {
     scope: 'ui',
     patterns: [
-      /\b(only|just)\b.{0,30}\b(ui|design|visual|look|style|appearance|css|styling|theme|colors?|layout|front.?end|interface)\b/i,
-      /\b(ui|design|visual|style|appearance|css|styling|theme|colors?|layout)\b.{0,20}\b(only|just|alone)\b/i,
-      /\b(improve|fix|update|change|rework|redo|rewrite)\b.{0,20}\b(only|just)\b.{0,20}\b(ui|design|visual|look|css|style)\b/i,
+      /\b(only|just)\b.{0,30}\b(visual|visuals|look|style|appearance|css|styling|theme|colors?|layout|graphics?)\b/i,
+      /\b(visual|style|appearance|css|styling|theme|colors?|layout)\b.{0,20}\b(only|just|alone)\b/i,
+      /\b(improve|fix|update|change|rework|redo|rewrite)\b.{0,20}\b(only|just)\b.{0,20}\b(visual|look|css|style|appearance)\b/i,
     ],
     allowedExtensions: ['.css', '.scss', '.less'],
-    extraAllowed: ['style', 'styles'],  // also match files with 'style' in name
+    extraAllowed: ['style', 'styles'],
   },
   {
     scope: 'logic',
     patterns: [
-      /\b(only|just)\b.{0,30}\b(logic|backend|javascript|js|functions?|code|business logic|functionality|behavior)\b/i,
-      /\b(logic|backend|javascript|functions?|business logic)\b.{0,20}\b(only|just|alone)\b/i,
-      /\b(rewrite|fix|update)\b.{0,20}\b(only|just)\b.{0,30}\b(logic|backend|js|functions?|code)\b/i,
+      /\b(only|just)\b.{0,30}\b(gameplay|logic|mechanics?|javascript|js|functions?|code|behavior|physics|movement|collision)\b/i,
+      /\b(gameplay|logic|mechanics?|javascript|functions?|behavior)\b.{0,20}\b(only|just|alone)\b/i,
+      /\b(rewrite|fix|update)\b.{0,20}\b(only|just)\b.{0,30}\b(gameplay|logic|mechanics?|js|functions?|code)\b/i,
     ],
     allowedExtensions: ['.js', '.ts', '.jsx', '.tsx'],
     extraAllowed: [],
@@ -40,9 +40,9 @@ const SCOPE_RULES = [
   {
     scope: 'component',
     patterns: [
-      /\b(only|just)\b.{0,40}\b(button|nav(?:bar|igation)?|header|footer|modal|card|form|sidebar|dropdown|menu|table|list|hero|banner|badge|chip|tab|tooltip)\b/i,
-      /\b(fix|improve|update|restyle|rework)\b.{0,20}\b(only|just)\b.{0,30}\b(button|nav|header|footer|modal|card|form|sidebar)\b/i,
-      /\b(this|the)\s+\b(button|nav(?:bar|igation)?|header|footer|modal|card|form|sidebar|dropdown|menu|table|hero)\b.{0,20}\b(only|just|alone)\b/i,
+      /\b(only|just)\b.{0,40}\b(player|enemy|enemies|hud|button|menu|overlay|joystick|score|health|timer|wave|particle|obstacle|platform|powerup)\b/i,
+      /\b(fix|improve|update|restyle|rework)\b.{0,20}\b(only|just)\b.{0,30}\b(player|enemy|hud|button|menu|overlay|joystick|score|health)\b/i,
+      /\b(this|the)\s+\b(player|enemy|hud|button|menu|overlay|joystick|score|health|timer)\b.{0,20}\b(only|just|alone)\b/i,
     ],
     allowedExtensions: ['.html', '.css', '.js'],
     extraAllowed: [],
@@ -50,11 +50,11 @@ const SCOPE_RULES = [
   {
     scope: 'page',
     patterns: [
-      /\b(only|just)\b.{0,40}\b(page|screen|view|route)\b/i,
-      /\b(login|register|dashboard|settings|home|landing|profile|admin|about|contact)\b.{0,20}\b(page|screen|view)\b/i,
-      /\b(page|screen|view)\b.{0,20}\b(only|just|alone)\b/i,
+      /\b(only|just)\b.{0,40}\b(screen|game.?over|pause|main.?menu|settings|tutorial|loading)\b/i,
+      /\b(game.?over|pause|main.?menu|settings|tutorial)\b.{0,20}\b(screen|only|just|alone)\b/i,
+      /\b(screen)\b.{0,20}\b(only|just|alone)\b/i,
     ],
-    allowedExtensions: ['.html'],
+    allowedExtensions: ['.html', '.js'],
     extraAllowed: [],
   },
   {
@@ -72,8 +72,8 @@ const SCOPE_RULES = [
 function extractTarget(prompt, scope) {
   const lower = prompt.toLowerCase();
 
-  const COMPONENT_NAMES = ['button', 'navbar', 'navigation', 'header', 'footer', 'modal', 'card', 'form', 'sidebar', 'dropdown', 'menu', 'table', 'hero', 'banner', 'badge', 'tab', 'tooltip', 'nav'];
-  const PAGE_NAMES = ['login', 'register', 'dashboard', 'settings', 'home', 'landing', 'profile', 'admin', 'about', 'contact', 'signup', 'checkout', 'billing'];
+  const COMPONENT_NAMES = ['button', 'player', 'enemy', 'hud', 'score', 'health', 'menu', 'overlay', 'joystick', 'particle', 'projectile', 'platform', 'obstacle', 'powerup', 'timer', 'wave'];
+  const PAGE_NAMES = ['menu', 'gameover', 'game over', 'pause', 'settings', 'tutorial', 'loading'];
   const QUALIFIERS = ['the', 'this', 'that', 'my', 'a', 'an'];
 
   if (scope === 'component') {
@@ -215,10 +215,10 @@ function buildScopeConstraintBlock(scopeInfo, allowedFilePaths, forbiddenFilePat
   const { scope, target } = scopeInfo;
 
   const scopeLabel = {
-    ui:        'UI and visual styling (CSS only)',
-    logic:     'JavaScript logic and functionality only',
-    component: target ? `the ${target} component` : 'the specified component',
-    page:      target ? `the ${target}` : 'the specified page',
+    ui:        'visual styling only (CSS — colors, layout, appearance)',
+    logic:     'gameplay logic only (JavaScript — mechanics, rules, behavior)',
+    component: target ? `the ${target}` : 'the specified game element',
+    page:      target ? `the ${target}` : 'the specified game screen',
     function:  target ? `the ${target} function` : 'the specified function',
   }[scope] || scope;
 

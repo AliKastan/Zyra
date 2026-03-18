@@ -127,7 +127,6 @@ function switchToConversation(convId) {
   renderAllMessages();
   renderHistory();
   updateDeployButton(currentSlug);
-  syncEnvButton(currentSlug);
 
   if (currentSlug) {
     loadCodeFileList(currentSlug);
@@ -293,7 +292,6 @@ const refreshPreviewBtn  = $('refresh-preview-btn');
 const openTabBtn         = $('open-tab-btn');
 const retryPreviewBtn       = $('retry-preview-btn');
 const regenerateProjectBtn  = $('regenerate-project-btn');
-const keysBtn            = $('keys-btn');
 // fix-my-app-btn is wired in the Fix My Game section below
 
 // Code
@@ -839,7 +837,6 @@ async function pollJob(jobId) {
           // Show scope bar when a project is active
           if (scopeBar) scopeBar.classList.toggle('hidden', !currentSlug);
           updateDeployButton(slug);
-          syncEnvButton(slug);
           loadCodeFileList(slug);
 
           if (job.isEdit) {
@@ -1071,7 +1068,6 @@ function buildAssistantEl(msg) {
 
   } else if (msg.status === 'failed' || msg.status === 'interrupted') {
     const hint = getErrorHint(msg.error);
-    const showFast = msg.mode !== 'fast' && !msg.isEdit;
     bodyHtml = `
       <div class="msg-error-card">
         <div class="msg-error-title">${msg.isEdit ? 'Edit failed' : 'Generation failed'}</div>
@@ -1080,14 +1076,13 @@ function buildAssistantEl(msg) {
       </div>
       <div class="msg-actions">
         <button class="msg-btn" data-action="regen" data-prompt="${escAttr(msg.userPrompt || '')}">Try again</button>
-        ${showFast ? `<button class="msg-btn msg-btn--ghost" data-action="regen-fast" data-prompt="${escAttr(msg.userPrompt || '')}">Try in Fast mode</button>` : ''}
       </div>`;
 
   } else if (msg.status === 'cancelled') {
     bodyHtml = `<p class="msg-text msg-text--muted">Cancelled.</p>`;
 
   } else if (msg.status === 'timed_out') {
-    const hint = 'Try Fast mode for a quicker result, or simplify your prompt.';
+    const hint = 'Simplify your prompt or try again — complex requests sometimes take longer.';
     bodyHtml = `
       <div class="msg-error-card">
         <div class="msg-error-title">Generation timed out</div>
@@ -1095,7 +1090,6 @@ function buildAssistantEl(msg) {
       </div>
       <div class="msg-actions">
         <button class="msg-btn" data-action="regen" data-prompt="${escAttr(msg.userPrompt || '')}">Try again</button>
-        ${msg.mode !== 'fast' ? `<button class="msg-btn msg-btn--ghost" data-action="regen-fast" data-prompt="${escAttr(msg.userPrompt || '')}">Try in Fast mode</button>` : ''}
       </div>`;
   }
 
@@ -1167,20 +1161,6 @@ function handleMsgAction(btn) {
   }
   if (action === 'regen' && prompt) {
     handlePromptSubmit(prompt);
-  }
-  if (action === 'regen-fast' && prompt) {
-    // Force fast mode for the retry
-    const prev = currentMode;
-    currentMode = 'fast';
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'fast'));
-    handlePromptSubmit(prompt);
-    // Restore mode if generation doesn't start (e.g. auth gate)
-    setTimeout(() => {
-      if (!currentJobId) {
-        currentMode = prev;
-        document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === prev));
-      }
-    }, 100);
   }
 }
 
@@ -1816,438 +1796,6 @@ async function apiFetch(path, opts = {}) {
 
 function escHtml(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escAttr(s)  { return String(s).replace(/"/g,'&quot;'); }
-
-// ── Backend Config / Integrations Panel ──────────────────────────────────────
-
-const envOverlay = $('env-overlay');
-const envVarRows = $('env-var-rows');
-const envAddBtn  = $('env-add-btn');
-const envSaveBtn = $('env-save-btn');
-const envVarEmpty = $('env-var-empty');
-
-let envDirty = false;
-let activeEnvTab = 'variables'; // 'variables' | 'integrations'
-let integrationsLoaded = false;
-
-const EYE_ICON   = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
-const TRASH_ICON = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
-
-// ── Open / close ──────────────────────────────────────────────────────────────
-
-function openEnvPanel(defaultTab = 'variables') {
-  if (!envOverlay) return;
-  envOverlay.classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
-  switchEnvTab(defaultTab);
-  if (defaultTab === 'variables') loadVarsTab();
-}
-
-function closeEnvPanel() {
-  if (!envOverlay) return;
-  envOverlay.classList.add('hidden');
-  document.body.style.overflow = '';
-  hidePasteArea();
-}
-
-if ($('env-close-btn')) $('env-close-btn').addEventListener('click', closeEnvPanel);
-if (envOverlay) envOverlay.addEventListener('click', (e) => { if (e.target === envOverlay) closeEnvPanel(); });
-if (keysBtn) keysBtn.addEventListener('click', () => openEnvPanel('variables'));
-
-// ── Tab switching ─────────────────────────────────────────────────────────────
-
-function switchEnvTab(tab) {
-  activeEnvTab = tab;
-  document.querySelectorAll('.env-tab').forEach((btn) => {
-    btn.classList.toggle('env-tab--active', btn.dataset.tab === tab);
-  });
-  const varPane  = $('tab-pane-variables');
-  const intPane  = $('tab-pane-integrations');
-  if (varPane)  varPane.classList.toggle('hidden', tab !== 'variables');
-  if (intPane) intPane.classList.toggle('hidden', tab !== 'integrations');
-
-  if (tab === 'variables' && !envDirty) loadVarsTab();
-  if (tab === 'integrations' && !integrationsLoaded) loadIntegrationsPane();
-}
-
-document.querySelectorAll('.env-tab').forEach((btn) => {
-  btn.addEventListener('click', () => switchEnvTab(btn.dataset.tab));
-});
-
-// ── Variables tab — Railway-style raw editor ──────────────────────────────────
-
-async function loadVarsTab() {
-  if (!currentSlug || !envVarRows) return;
-  envVarRows.innerHTML = '';
-  envDirty = false;
-  if (envSaveBtn) envSaveBtn.disabled = true;
-  refreshEmptyState();
-
-  try {
-    const data = await apiFetch(`/api/projects/${currentSlug}/env`);
-    for (const { key, masked } of (data.vars || [])) addVarRow(key, masked, true);
-  } catch (_) {}
-  refreshEmptyState();
-}
-
-function addVarRow(key = '', value = '', masked = false) {
-  if (!envVarRows) return;
-  const row = document.createElement('div');
-  row.className = 'env-var-row';
-  row.innerHTML = `
-    <div class="env-var-key-cell">
-      <input class="env-key-input" type="text" placeholder="VARIABLE_NAME" value="${escAttr(key)}" autocomplete="off" spellcheck="false">
-    </div>
-    <div class="env-var-val-cell">
-      <div class="env-val-wrapper">
-        <input class="env-val-input" type="password" placeholder="value" value="${escAttr(value)}" autocomplete="off" spellcheck="false" data-masked="${masked}">
-        <button class="env-show-btn" type="button" title="Show/hide">${EYE_ICON}</button>
-      </div>
-    </div>
-    <button class="env-del-btn" type="button" title="Remove">${TRASH_ICON}</button>`;
-
-  const keyInput = row.querySelector('.env-key-input');
-  const valInput = row.querySelector('.env-val-input');
-
-  keyInput.addEventListener('input', () => {
-    const p = keyInput.selectionStart;
-    keyInput.value = keyInput.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
-    keyInput.setSelectionRange(p, p);
-    markDirty();
-  });
-  valInput.addEventListener('focus', () => {
-    if (valInput.dataset.masked === 'true') { valInput.value = ''; valInput.dataset.masked = 'false'; }
-  });
-  valInput.addEventListener('input', markDirty);
-  row.querySelector('.env-show-btn').addEventListener('click', () => {
-    valInput.type = valInput.type === 'password' ? 'text' : 'password';
-    valInput.dataset.masked = 'false';
-  });
-  row.querySelector('.env-del-btn').addEventListener('click', () => {
-    row.style.opacity = '0'; row.style.transition = 'opacity .12s';
-    setTimeout(() => { row.remove(); refreshEmptyState(); markDirty(); }, 120);
-  });
-
-  envVarRows.appendChild(row);
-  if (!key) keyInput.focus();
-  refreshEmptyState();
-}
-
-function refreshEmptyState() {
-  if (!envVarEmpty) return;
-  const empty = !envVarRows || envVarRows.children.length === 0;
-  envVarEmpty.classList.toggle('hidden', !empty);
-}
-
-function markDirty() {
-  envDirty = true;
-  if (envSaveBtn) envSaveBtn.disabled = false;
-}
-
-if (envAddBtn) {
-  envAddBtn.addEventListener('click', () => {
-    addVarRow('', '', false);
-    markDirty();
-  });
-}
-
-// ── .env paste import ─────────────────────────────────────────────────────────
-
-function hidePasteArea() {
-  const area = $('env-paste-area');
-  if (area) area.classList.add('hidden');
-  const toggle = $('env-paste-toggle');
-  if (toggle) toggle.classList.remove('active');
-}
-
-if ($('env-paste-toggle')) {
-  $('env-paste-toggle').addEventListener('click', () => {
-    const area = $('env-paste-area');
-    if (!area) return;
-    const hidden = area.classList.toggle('hidden');
-    $('env-paste-toggle').classList.toggle('active', !hidden);
-    if (!hidden) $('env-paste-input')?.focus();
-  });
-}
-if ($('env-paste-cancel')) $('env-paste-cancel').addEventListener('click', hidePasteArea);
-
-if ($('env-paste-import')) {
-  $('env-paste-import').addEventListener('click', () => {
-    const text = $('env-paste-input')?.value?.trim() || '';
-    if (!text) return;
-    const existingKeys = new Set(
-      [...(envVarRows?.querySelectorAll('.env-key-input') || [])].map((el) => el.value.toUpperCase())
-    );
-    let added = 0;
-    for (const line of text.split('\n')) {
-      const clean = line.trim();
-      if (!clean || clean.startsWith('#')) continue;
-      const eqIdx = clean.indexOf('=');
-      if (eqIdx < 1) continue;
-      const k = clean.slice(0, eqIdx).trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
-      const v = clean.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
-      if (!k) continue;
-      if (existingKeys.has(k)) {
-        // update existing row value
-        const rows = envVarRows?.querySelectorAll('.env-var-row') || [];
-        for (const row of rows) {
-          const ki = row.querySelector('.env-key-input');
-          if (ki?.value === k) {
-            const vi = row.querySelector('.env-val-input');
-            if (vi) { vi.value = v; vi.dataset.masked = 'false'; }
-            break;
-          }
-        }
-      } else {
-        addVarRow(k, v, false);
-        existingKeys.add(k);
-        added++;
-      }
-    }
-    if ($('env-paste-input')) $('env-paste-input').value = '';
-    hidePasteArea();
-    markDirty();
-  });
-}
-
-// ── Integrations tab ──────────────────────────────────────────────────────────
-
-async function loadIntegrationsPane() {
-  if (!currentSlug) return;
-  integrationsLoaded = true;
-
-  const list    = $('integrations-list');
-  const loading = $('integrations-loading');
-  if (!list) return;
-  if (loading) { loading.style.display = ''; loading.textContent = 'Loading integrations...'; }
-
-  try {
-    const intData = await apiFetch(`/api/projects/${currentSlug}/integrations`);
-    if (loading) loading.style.display = 'none';
-    renderIntegrations(list, intData.integrations || []);
-  } catch (_) {
-    if (loading) { loading.style.display = ''; loading.textContent = 'Failed to load integrations.'; }
-  }
-}
-
-const STATUS_LABELS = { configured: 'Configured', partial: 'Partial', missing: 'Missing' };
-const CATEGORY_LABELS = {
-  database: 'Database', auth: 'Auth', payments: 'Payments',
-  ai: 'AI', email: 'Email', storage: 'Storage',
-  analytics: 'Analytics', sms: 'SMS', maps: 'Maps', other: 'Other',
-};
-
-function renderIntegrations(container, integrations) {
-  const byCategory = {};
-  for (const intg of integrations) {
-    const cat = intg.category || 'other';
-    if (!byCategory[cat]) byCategory[cat] = [];
-    byCategory[cat].push(intg);
-  }
-  [...container.children].forEach((el) => { if (el.id !== 'integrations-loading') el.remove(); });
-
-  if (!integrations.length) {
-    const empty = document.createElement('div');
-    empty.className = 'integrations-empty';
-    empty.textContent = 'No integrations detected for this project.';
-    container.appendChild(empty);
-    return;
-  }
-
-  for (const [cat, items] of Object.entries(byCategory)) {
-    const group = document.createElement('div');
-    group.className = 'intg-category-group';
-    const catLabel = document.createElement('div');
-    catLabel.className = 'intg-category-label';
-    catLabel.textContent = CATEGORY_LABELS[cat] || cat;
-    group.appendChild(catLabel);
-    for (const intg of items) group.appendChild(buildIntegrationCard(intg));
-    container.appendChild(group);
-  }
-}
-
-function buildIntegrationCard(intg) {
-  const card = document.createElement('div');
-  card.className = `intg-card intg-card--${intg.status}`;
-  card.dataset.id = intg.id;
-
-  const header = document.createElement('div');
-  header.className = 'intg-card-header';
-  header.innerHTML = `
-    <div class="intg-card-left">
-      <span class="intg-card-name">${escHtml(intg.label)}</span>
-      <span class="intg-status-badge intg-status--${escAttr(intg.status)}">${escHtml(STATUS_LABELS[intg.status] || intg.status)}</span>
-    </div>
-    <button class="intg-toggle-btn" type="button" aria-expanded="false">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><polyline points="6 9 12 15 18 9"/></svg>
-    </button>`;
-  card.appendChild(header);
-
-  const body = document.createElement('div');
-  body.className = 'intg-card-body hidden';
-
-  if (intg.description) {
-    const desc = document.createElement('p');
-    desc.className = 'intg-card-desc';
-    desc.textContent = intg.description;
-    body.appendChild(desc);
-  }
-  if (intg.billingNote) {
-    const note = document.createElement('div');
-    note.className = 'intg-billing-note';
-    note.textContent = intg.billingNote;
-    body.appendChild(note);
-  }
-
-  // Vars — clicking "Add to Variables" switches to Variables tab and pre-fills
-  const varsList = document.createElement('div');
-  varsList.className = 'intg-vars-list';
-  for (const varDef of intg.vars) {
-    const vr = document.createElement('div');
-    vr.className = 'intg-var-row';
-    const statusIcon = varDef.isSet
-      ? `<span class="intg-var-status intg-var-status--ok" title="Set">&#x2713;</span>`
-      : `<span class="intg-var-status intg-var-status--empty"></span>`;
-    const req = varDef.required ? `<span class="intg-var-required">required</span>` : `<span class="intg-var-optional">optional</span>`;
-    vr.innerHTML = `
-      <div class="intg-var-meta">${statusIcon}<span class="intg-var-key">${escHtml(varDef.key)}</span>${req}</div>
-      ${varDef.hint ? `<div class="intg-var-hint">${escHtml(varDef.hint)}</div>` : ''}
-      ${!varDef.isSet ? `<button class="intg-add-var-btn" type="button" data-key="${escAttr(varDef.key)}">Add to Variables</button>` : ''}`;
-    if (!varDef.isSet) {
-      vr.querySelector('.intg-add-var-btn').addEventListener('click', () => {
-        switchEnvTab('variables');
-        loadVarsTab().then(() => {
-          const existing = [...(envVarRows?.querySelectorAll('.env-key-input') || [])].find((el) => el.value === varDef.key);
-          if (existing) {
-            existing.closest('.env-var-row')?.querySelector('.env-val-input')?.focus();
-          } else {
-            addVarRow(varDef.key, '', false);
-          }
-          markDirty();
-        });
-      });
-    }
-    varsList.appendChild(vr);
-  }
-  body.appendChild(varsList);
-
-  if (intg.sqlFiles?.length) {
-    const sqlRow = document.createElement('div');
-    sqlRow.className = 'intg-sql-row';
-    sqlRow.innerHTML = `<span class="intg-sql-hint">Run setup SQL in Supabase SQL Editor:</span><button class="intg-copy-sql-btn" type="button" data-slug="${escAttr(currentSlug||'')}" data-file="${escAttr(intg.sqlFiles[0])}">Copy SQL</button>`;
-    sqlRow.querySelector('.intg-copy-sql-btn').addEventListener('click', handleCopySql);
-    body.appendChild(sqlRow);
-  }
-
-  if (intg.setupGuide?.length) {
-    const guide = document.createElement('div');
-    guide.className = 'intg-guide';
-    guide.innerHTML = `<button class="intg-guide-toggle" type="button">
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      Setup guide
-      <svg class="intg-guide-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><polyline points="6 9 12 15 18 9"/></svg>
-    </button>
-    <ol class="intg-guide-steps hidden">${intg.setupGuide.map((s) => `<li>${escHtml(s)}</li>`).join('')}</ol>`;
-    guide.querySelector('.intg-guide-toggle').addEventListener('click', () => {
-      const steps = guide.querySelector('.intg-guide-steps');
-      const chevron = guide.querySelector('.intg-guide-chevron');
-      const open = steps.classList.toggle('hidden');
-      chevron.style.transform = open ? '' : 'rotate(180deg)';
-    });
-    body.appendChild(guide);
-  }
-
-  if (intg.docsUrl) {
-    const link = document.createElement('a');
-    link.className = 'intg-docs-link';
-    link.href = intg.docsUrl; link.target = '_blank'; link.rel = 'noopener noreferrer';
-    link.textContent = 'View docs';
-    body.appendChild(link);
-  }
-
-  card.appendChild(body);
-
-  header.querySelector('.intg-toggle-btn').addEventListener('click', () => {
-    const open = body.classList.toggle('hidden');
-    header.querySelector('.intg-toggle-btn').setAttribute('aria-expanded', String(!open));
-    card.classList.toggle('intg-card--open', !open);
-  });
-
-  if (intg.status !== 'configured') {
-    body.classList.remove('hidden');
-    header.querySelector('.intg-toggle-btn').setAttribute('aria-expanded', 'true');
-    card.classList.add('intg-card--open');
-  }
-
-  return card;
-}
-
-async function handleCopySql(e) {
-  const btn = e.currentTarget;
-  const { slug, file } = btn.dataset;
-  if (!slug || !file) return;
-  try {
-    const data = await apiFetch(`/api/preview/file/${encodeURIComponent(slug)}/${file}`);
-    const sql = data.content || '';
-    if (!sql) { btn.textContent = 'Not found'; setTimeout(() => { btn.textContent = 'Copy SQL'; }, 2000); return; }
-    await navigator.clipboard.writeText(sql);
-    btn.textContent = 'Copied!'; btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = 'Copy SQL'; btn.classList.remove('copied'); }, 2200);
-  } catch (_) { btn.textContent = 'Error'; setTimeout(() => { btn.textContent = 'Copy SQL'; }, 2000); }
-}
-
-// ── Save ──────────────────────────────────────────────────────────────────────
-
-if (envSaveBtn) {
-  envSaveBtn.addEventListener('click', async () => {
-    if (!currentSlug || !envVarRows) return;
-    const vars = [];
-    envVarRows.querySelectorAll('.env-var-row').forEach((row) => {
-      const key    = row.querySelector('.env-key-input')?.value?.trim();
-      const valEl  = row.querySelector('.env-val-input');
-      const masked = valEl?.dataset?.masked === 'true';
-      if (!key || masked) return; // skip blank keys and unchanged masked values
-      vars.push({ key, value: valEl?.value || '' });
-    });
-
-    envSaveBtn.textContent = 'Saving...';
-    envSaveBtn.disabled = true;
-    try {
-      await apiFetch(`/api/projects/${currentSlug}/env`, {
-        method: 'POST', body: JSON.stringify({ vars }),
-      });
-      envDirty = false;
-      integrationsLoaded = false; // force reload on next integrations tab open
-      updateEnvBadge(vars.length > 0);
-      envSaveBtn.textContent = 'Saved!';
-      setTimeout(() => {
-        envSaveBtn.textContent = 'Save & Reload Preview';
-        closeEnvPanel();
-        const iframe = $('preview-iframe');
-        if (iframe?.src) { const s = iframe.src; iframe.src = ''; iframe.src = s; }
-      }, 600);
-    } catch (_) {
-      envSaveBtn.textContent = 'Error — try again';
-      envSaveBtn.disabled = false;
-      setTimeout(() => { envSaveBtn.textContent = 'Save & Reload Preview'; }, 2200);
-    }
-  });
-}
-
-function updateEnvBadge(hasVars) {
-  if (keysBtn) keysBtn.classList.toggle('has-vars', hasVars);
-}
-
-function syncEnvButton(slug) {
-  if (!keysBtn) return;
-  if (slug) {
-    keysBtn.classList.remove('hidden');
-    integrationsLoaded = false;
-    apiFetch(`/api/projects/${slug}/env`).then((d) => updateEnvBadge((d.vars||[]).length > 0)).catch(() => {});
-  } else {
-    keysBtn.classList.add('hidden');
-    updateEnvBadge(false);
-  }
-}
 
 // ── Fix My Game ───────────────────────────────────────────────────────────────
 

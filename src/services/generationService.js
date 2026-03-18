@@ -7,7 +7,7 @@ const { assessComplexity } = require('../generators/complexityLimiter');
 const { withTimeout } = require('../utils/withTimeout');
 const { assertProviderAvailable } = require('./orchestrator');
 const { runPlanner } = require('./plannerService');
-const { runCoder, injectBackendSDK, injectEnvLoader, injectViewportNormalize, injectRuntimeErrorCatcher } = require('./coderService');
+const { runCoder, injectViewportNormalize, injectRuntimeErrorCatcher } = require('./coderService');
 const { runAdvancedPipeline, shouldUseAdvancedPipeline } = require('../generation/orchestrator');
 const { generateFallback } = require('../generators/fallbackGenerator');
 const { runReviewer } = require('./reviewerService');
@@ -320,18 +320,8 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
     const rawSlug     = codeOutput.projectName || slugify(userPrompt);
     const projectSlug = slugify(rawSlug) || `project-${jobId.slice(0, 8)}`;
 
-    // Inject ZyraApp SDK into HTML files if backend is needed
-    if (codeOutput._needsBackend) {
-      await log('Injecting backend SDK...');
-      codeOutput = { ...codeOutput, files: injectBackendSDK(codeOutput.files, projectSlug) };
-      await updateJob(jobId, { _usedBackend: true });
-    }
-
     // Inject viewport normalize into all HTML files (must be first — before app styles)
     codeOutput = { ...codeOutput, files: injectViewportNormalize(codeOutput.files) };
-
-    // Inject env vars loader into all HTML files (window.__ENV__ pattern)
-    codeOutput = { ...codeOutput, files: injectEnvLoader(codeOutput.files, projectSlug) };
 
     // Inject runtime error catcher into all HTML files
     codeOutput = { ...codeOutput, files: injectRuntimeErrorCatcher(codeOutput.files) };
