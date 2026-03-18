@@ -685,13 +685,13 @@ async function startGeneration(prompt, isPrefill = false) {
         return;
       }
     }
-    // Provider unavailable or credits exhausted — non-blocking: load dev fallback instead
+    // Quota/billing block from server — show clean message, keep workspace usable
     if (err.code === 'CREDITS_EXHAUSTED' || err.httpStatus === 402) {
       stopGenerationTimer();
       setGenerating(false);
-      updateMessage(asstMsgId, { status: 'failed', error: "We couldn't finish this build right now. Your workspace is still available." });
-      showToast("Generation couldn't complete. Preview fallback loaded so you can keep testing.", 'warning');
-      _loadDevFallback(currentMode);
+      updateMessage(asstMsgId, { status: 'failed', error: 'Generation is unavailable right now. Please try again in a moment.' });
+      showToast('Generation is unavailable right now. Please try again.', 'warning');
+      setPreviewState('empty');
       activeMessageId = null;
       return;
     }
@@ -885,13 +885,9 @@ async function pollJob(jobId) {
         const isExpired = errMsg.toLowerCase().includes('not found') || errMsg.toLowerCase().includes('expired');
         const errorTitle = isCancelled ? 'Cancelled' : job.isEdit ? 'Edit failed' : 'Generation failed';
 
-        if (!isCancelled && !job.isEdit) {
-          // Non-cancelled generation failure: show toast + fallback preview so the workspace stays usable
-          showToast("Generation couldn't complete. Preview fallback loaded so you can keep testing.", 'warning');
-          _loadDevFallback(currentMode);
-        } else {
-          setPreviewState('error', errorTitle, errMsg, { showRegenerate: isExpired });
-        }
+        setPreviewState('error', errorTitle,
+          isCancelled ? '' : 'Generation is unavailable right now. Please try again in a moment.',
+          { showRegenerate: isExpired });
       }
     }
   } catch (err) {

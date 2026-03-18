@@ -4,6 +4,13 @@
  * Enforces credit limits and feature gates at the Express route level.
  * Fails OPEN when billing is not configured (allows requests through).
  *
+ * Private-beta flag: DISABLE_APP_BILLING_FOR_PRIVATE_BETA=true
+ *   Skips ALL of Zyra's own credit/subscription checks so every authenticated
+ *   user who passed the access-code gate can generate freely.
+ *   Does NOT affect external AI provider limits — those are enforced by the
+ *   providers themselves and are never intercepted here.
+ *   To re-enable billing: remove the flag (or set it to false) and redeploy.
+ *
  * Internal testers / admins bypass the quota gate entirely when
  * ENABLE_INTERNAL_TEST_ACCESS=true and the user matches the allowlist/role.
  * All bypasses are audit-logged. Public users are never affected.
@@ -54,6 +61,16 @@ setInterval(() => {
  * Attaches req.billingUsage and req.userPlan for downstream use.
  */
 async function enforceQuota(req, res, next) {
+  // ── Private-beta bypass ───────────────────────────────────────────────────
+  // When enabled, Zyra's own credit/subscription gate is fully disabled.
+  // The access-code gate and auth remain in force — this only removes the
+  // internal paywall. To re-enable: remove env var or set to false.
+  if (process.env.DISABLE_APP_BILLING_FOR_PRIVATE_BETA === 'true') {
+    logger.info(`[quota] Private-beta mode: billing gate skipped for ${req.user?.email || req.user?.id}`);
+    req.userPlan = 'beta';
+    return next();
+  }
+
   if (process.env.BILLING_BYPASS === "true") return next();
   if (!isBillingConfigured()) return next();
 
