@@ -1329,9 +1329,9 @@ async function initiatePreview(slug, _retryCount) {
     }
   } catch (err) {
     if (err.expired || (err.message && err.message.toLowerCase().includes('not found'))) {
-      setPreviewState('error', 'Project not found',
-        'No saved snapshot found for this project. Try regenerating it.',
-        { showRegenerate: true });
+      setPreviewState('error', 'Preview unavailable',
+        'The preview could not be restored. Your project files may still be saved — try View Code or Download.',
+        { showRegenerate: true, showFileFallback: true, slug });
     } else if (retry < 1) {
       setTimeout(() => initiatePreview(slug, retry + 1), 2000);
     } else {
@@ -1483,6 +1483,29 @@ function setPreviewState(state, title, sub, opts = {}) {
     // Show regenerate button only when files are gone / expired
     const showRegen = opts.showRegenerate || false;
     regenerateProjectBtn.classList.toggle('hidden', !showRegen);
+    // Show file-fallback buttons (View Code + Download) when project may still have stored files
+    const showFallback = opts.showFileFallback || false;
+    const viewCodeFallbackBtn = $('view-code-fallback-btn');
+    const downloadFallbackBtn = $('download-fallback-btn');
+    if (viewCodeFallbackBtn) viewCodeFallbackBtn.classList.toggle('hidden', !showFallback);
+    if (downloadFallbackBtn) downloadFallbackBtn.classList.toggle('hidden', !showFallback);
+    // Wire fallback buttons if slug provided
+    if (showFallback && opts.slug) {
+      if (viewCodeFallbackBtn) {
+        viewCodeFallbackBtn.onclick = () => {
+          switchTab('code');
+          loadCodeFileListWithFallback(opts.slug);
+        };
+      }
+      if (downloadFallbackBtn) {
+        downloadFallbackBtn.onclick = () => {
+          const a = document.createElement('a');
+          a.href = `/api/download/${encodeURIComponent(opts.slug)}`;
+          a.download = `${opts.slug}.zip`;
+          a.click();
+        };
+      }
+    }
   }
 }
 
@@ -1611,45 +1634,86 @@ $('handoff-copy-btn')?.addEventListener('click', () => {
 $('handoff-close-btn')?.addEventListener('click', closeHandoffPanel);
 
 // ── Code view ─────────────────────────────────────────────────────────────────
+
+/**
+ * Loads the code file list with automatic fallback to stored-file backup.
+ * Delegates to loadCodeFileList which already has the full fallback logic.
+ */
+async function loadCodeFileListWithFallback(slug) {
+  return loadCodeFileList(slug);
+}
+
+function renderAndWireCodeFileList(slug, nodes) {
+  const fileCount = countFiles(nodes);
+  if (!fileCount) { codeFileList.innerHTML = '<div class="empty-state">No files.</div>'; return; }
+
+  const titleEl = codeFileList.closest('.code-file-sidebar')?.querySelector('.code-sidebar-title');
+  if (titleEl) titleEl.textContent = `Files (${fileCount})`;
+
+  codeFileList.innerHTML = renderFileTree(nodes, slug, 0);
+
+  codeFileList.querySelectorAll('.code-file-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      codeFileList.querySelectorAll('.code-file-item').forEach((i) => i.classList.remove('active'));
+      item.classList.add('active');
+      loadFileContent(item.dataset.slug, item.dataset.path);
+    });
+  });
+
+  codeFileList.querySelectorAll('.code-dir-item').forEach((dir) => {
+    dir.addEventListener('click', () => {
+      const key = dir.dataset.dirKey;
+      const children = codeFileList.querySelector(`.code-dir-children[data-dir-key="${key}"]`);
+      if (!children) return;
+      const collapsed = children.classList.toggle('collapsed');
+      dir.classList.toggle('collapsed', collapsed);
+    });
+  });
+
+  const firstFile = codeFileList.querySelector('.code-file-item');
+  if (firstFile) firstFile.click();
+}
+
 async function loadCodeFileList(slug) {
   codeFileList.innerHTML = '<div class="empty-state">Loading...</div>';
   try {
     const data = await apiFetch(`/api/projects/${slug}/files`);
     const nodes = data.files || [];
-    const fileCount = countFiles(nodes);
-    if (!fileCount) { codeFileList.innerHTML = '<div class="empty-state">No files.</div>'; return; }
-
-    // Update sidebar title with file count
-    const titleEl = codeFileList.closest('.code-file-sidebar')?.querySelector('.code-sidebar-title');
-    if (titleEl) titleEl.textContent = `Files (${fileCount})`;
-
-    codeFileList.innerHTML = renderFileTree(nodes, slug, 0);
-
-    // File click handlers
-    codeFileList.querySelectorAll('.code-file-item').forEach((item) => {
-      item.addEventListener('click', () => {
-        codeFileList.querySelectorAll('.code-file-item').forEach((i) => i.classList.remove('active'));
-        item.classList.add('active');
-        loadFileContent(item.dataset.slug, item.dataset.path);
-      });
-    });
-
-    // Folder toggle handlers
-    codeFileList.querySelectorAll('.code-dir-item').forEach((dir) => {
-      dir.addEventListener('click', () => {
-        const key = dir.dataset.dirKey;
-        const children = codeFileList.querySelector(`.code-dir-children[data-dir-key="${key}"]`);
-        if (!children) return;
-        const collapsed = children.classList.toggle('collapsed');
-        dir.classList.toggle('collapsed', collapsed);
-      });
-    });
-
-    // Auto-select first file
-    const firstFile = codeFileList.querySelector('.code-file-item');
-    if (firstFile) firstFile.click();
+    renderAndWireCodeFileList(slug, nodes);
   } catch (err) {
-    codeFileList.innerHTML = `<div class="empty-state">${escHtml(err.message)}</div>`;
+    // Backend auto-restores from backup; if this still fails, try stored-files fallback
+    try {
+      const data = await apiFetch(`/api/projects/${slug}/stored-files`);
+      const files = data.files || [];
+      if (!files.length) { codeFileList.innerHTML = '<div class="empty-state">No files.</div>'; return; }
+
+      window._storedFileContents = window._storedFileContents || {};
+      for (const f of files) window._storedFileContents[`${slug}/${f.path}`] = f.content;
+
+      const nodes = files.map(f => ({ type: 'file', path: f.path }));
+      const titleEl = codeFileList.closest('.code-file-sidebar')?.querySelector('.code-sidebar-title');
+      if (titleEl) titleEl.textContent = `Files (${files.length}) — from backup`;
+
+      codeFileList.innerHTML = renderFileTree(nodes, slug, 0);
+      codeFileList.querySelectorAll('.code-file-item').forEach((item) => {
+        item.addEventListener('click', () => {
+          codeFileList.querySelectorAll('.code-file-item').forEach((i) => i.classList.remove('active'));
+          item.classList.add('active');
+          const key = `${item.dataset.slug}/${item.dataset.path}`;
+          const content = window._storedFileContents?.[key];
+          if (content !== undefined) {
+            codeFileName.textContent = item.dataset.path;
+            codeText.textContent = content;
+          } else {
+            loadFileContent(item.dataset.slug, item.dataset.path);
+          }
+        });
+      });
+      const first = codeFileList.querySelector('.code-file-item');
+      if (first) first.click();
+    } catch (_) {
+      codeFileList.innerHTML = `<div class="empty-state">${escHtml(err.message)}</div>`;
+    }
   }
 }
 

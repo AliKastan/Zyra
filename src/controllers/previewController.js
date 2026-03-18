@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs-extra');
 const previewService = require('../services/previewService');
-const { restoreProjectFiles, hasStoredFiles } = require('../storage/projectStore');
+const { restoreProjectFiles, hasStoredFiles, getStoredFiles } = require('../storage/projectStore');
 const logger = require('../utils/logger');
 
 const ROOT = path.join(__dirname, '../../');
@@ -67,7 +67,17 @@ async function getFileContent(req, res) {
     }
 
     if (!(await fs.pathExists(fullPath))) {
-      return res.status(404).json({ error: 'File not found' });
+      // Disk file missing — try restoring project from backup
+      const restored = await restoreProjectFiles(slug).catch(() => false);
+      if (!restored || !(await fs.pathExists(fullPath))) {
+        // If restore failed, try serving from stored backup directly
+        const storedFiles = await getStoredFiles(slug);
+        if (storedFiles) {
+          const stored = storedFiles.find(f => f.path === filePath);
+          if (stored) return res.json({ content: stored.content, path: filePath, _fromBackup: true });
+        }
+        return res.status(404).json({ error: 'File not found' });
+      }
     }
 
     const stat = await fs.stat(fullPath);
@@ -82,3 +92,4 @@ async function getFileContent(req, res) {
 }
 
 module.exports = { startPreview, getPreviewStatus, stopPreview, listPreviews, getFileContent };
+

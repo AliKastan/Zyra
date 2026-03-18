@@ -130,7 +130,69 @@ async function restoreProjectFiles(slug) {
   return written > 0;
 }
 
+/**
+ * Returns the stored files array directly from backup JSON.
+ * Does NOT write to disk — for inline code view when disk files are missing.
+ * Returns null if no backup exists.
+ * @param {string} slug
+ * @returns {Promise<Array<{path:string, content:string}>|null>}
+ */
+async function getStoredFiles(slug) {
+  const filesPath = path.join(FILES_DIR, `${slug}.json`);
+  if (!(await fse.pathExists(filesPath))) return null;
+  try {
+    const record = JSON.parse(await fse.readFile(filesPath, 'utf8'));
+    return Array.isArray(record.files) && record.files.length > 0 ? record.files : null;
+  } catch (e) {
+    logger.warn(`projectStore: getStoredFiles failed for "${slug}": ${e.message}`);
+    return null;
+  }
+}
+
+/**
+ * Reads all file contents from generated-projects/{slug}/ and stores them
+ * to project-files/{slug}.json as a durable backup.
+ * Safe to call at any time; silently no-ops if dir doesn't exist.
+ * @param {string} slug
+ * @returns {Promise<boolean>} true if backup was written
+ */
+async function backfillProjectFiles(slug) {
+  const projectDir = path.join(GENERATED_DIR, slug);
+  if (!(await fse.pathExists(projectDir))) return false;
+
+  const files = [];
+  async function walk(dir) {
+    const entries = await fse.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full);
+      } else {
+        const relPath = path.relative(projectDir, full).replace(/\\/g, '/');
+        // Skip binary files and large files
+        const stat = await fse.stat(full);
+        if (stat.size > 500_000) continue;
+        try {
+          const content = await fse.readFile(full, 'utf8');
+          files.push({ path: relPath, content });
+        } catch (_) { /* skip unreadable */ }
+      }
+    }
+  }
+
+  try {
+    await walk(projectDir);
+    if (files.length === 0) return false;
+    await storeProjectFiles(slug, files);
+    return true;
+  } catch (e) {
+    logger.warn(`projectStore: backfillProjectFiles failed for "${slug}": ${e.message}`);
+    return false;
+  }
+}
+
 module.exports = {
   saveProject, getProject, listProjects, updateProject, deleteProject,
   storeProjectFiles, hasStoredFiles, restoreProjectFiles,
+  getStoredFiles, backfillProjectFiles,
 };

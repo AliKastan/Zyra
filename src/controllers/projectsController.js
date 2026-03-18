@@ -7,6 +7,8 @@ const {
   updateProject,
   restoreProjectFiles,
   hasStoredFiles,
+  getStoredFiles,
+  backfillProjectFiles,
 } = require('../storage/projectStore');
 const { getProjectFiles, listProjects } = require('../generators/projectGenerator');
 const { now } = require('../utils/timestamps');
@@ -46,6 +48,8 @@ async function handleGetProject(req, res) {
 
 /**
  * GET /api/projects/:name/files
+ * Returns the file tree for a project.
+ * Auto-restores from backup if disk files are missing.
  */
 async function handleGetProjectFiles(req, res) {
   const { name } = req.params;
@@ -56,9 +60,42 @@ async function handleGetProjectFiles(req, res) {
   }
 
   try {
-    const result = await getProjectFiles(name);
+    let result = await getProjectFiles(name);
+
+    if (!result) {
+      // Disk files missing — try to restore from stored backup
+      const restored = await restoreProjectFiles(name).catch(() => false);
+      if (restored) result = await getProjectFiles(name).catch(() => null);
+    }
+
     if (!result) return res.status(404).json({ error: `Project "${name}" not found` });
     return res.json(result);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * GET /api/projects/:name/stored-files
+ * Returns files directly from the persistent backup store (no disk needed).
+ * Used as a fallback when preview is unavailable but we still want to show code.
+ */
+async function handleGetStoredFiles(req, res) {
+  const { name } = req.params;
+  if (!/^[a-z0-9-]+$/.test(name)) return res.status(400).json({ error: 'Invalid project name' });
+
+  try {
+    const files = await getStoredFiles(name);
+    if (!files) {
+      // No backup — try to build one from disk now
+      const backedUp = await backfillProjectFiles(name).catch(() => false);
+      if (backedUp) {
+        const retried = await getStoredFiles(name);
+        if (retried) return res.json({ files: retried, _source: 'backfill' });
+      }
+      return res.status(404).json({ error: `No stored files found for "${name}"` });
+    }
+    return res.json({ files, _source: 'backup' });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -130,5 +167,5 @@ async function handleRestoreProject(req, res) {
 
 module.exports = {
   handleListProjects, handleGetProject, handleGetProjectFiles, handleDeleteProject,
-  handleOpenProject, handleRestoreProject,
+  handleOpenProject, handleRestoreProject, handleGetStoredFiles,
 };

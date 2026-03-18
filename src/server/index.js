@@ -7,6 +7,7 @@ const SERVER_START_TIME = new Date().toISOString();
 const { env, validateEnv } = require('../config/env');
 const { recoverStaleJobs } = require('../storage/jobStore');
 const previewService = require('../services/previewService');
+const { startBackfill } = require('../startup/backfillProjectFiles');
 const logger = require('../utils/logger');
 const app = require('./app');
 
@@ -21,6 +22,9 @@ const server = app.listen(env.PORT, '0.0.0.0', async () => {
   logger.info(`Dashboard: http://localhost:${env.PORT}`);
   logger.info(`Health:    http://localhost:${env.PORT}/api/health`);
   logger.info(`Routing:   planner=${env.DEFAULT_PLANNER_MODEL}, coder=${env.DEFAULT_CODER_MODEL}, reviewer=${env.DEFAULT_REVIEW_MODEL}`);
+
+  // Backfill stored-file backups for any project that doesn't have one yet.
+  startBackfill();
 
   // Recover any jobs that were left in an active state from a previous run.
   // These are orphaned — the process that owned them is gone.

@@ -264,7 +264,9 @@ async function runEditPipeline(jobId, userPrompt, projectSlug, mode, startedAt, 
           })
         ).then(files => {
           const valid = files.filter(Boolean);
-          if (valid.length > 0) storeProjectFiles(projectSlug, valid).catch(() => {});
+          if (valid.length > 0) storeProjectFiles(projectSlug, valid).catch(e =>
+            logger.warn(`editService: storeProjectFiles failed for "${projectSlug}": ${e.message}`)
+          );
         }).catch(() => {});
       }).catch(() => {});
     }

@@ -347,10 +347,11 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
     );
     await log(`${written.length} files saved${failed.length ? `, ${failed.length} failed` : ''}`);
 
-    // Persist file contents so the project can be restored if disk artifacts are lost
-    storeProjectFiles(projectSlug, codeOutput.files).catch(e =>
-      logger.warn(`[job:${jobId}] storeProjectFiles failed (non-fatal): ${e.message}`)
-    );
+    // Persist file contents so the project can be restored if disk artifacts are lost.
+    // This is critical for project durability — log prominently on failure.
+    storeProjectFiles(projectSlug, codeOutput.files)
+      .then(() => logger.debug(`[job:${jobId}] project-files backup saved for "${projectSlug}"`))
+      .catch(e => logger.error(`[job:${jobId}] CRITICAL: storeProjectFiles failed — project "${projectSlug}" has no backup: ${e.message}`));
 
     // ── Post-generation auto-debug (non-blocking, non-fatal) ─────────────────
     // Runs a quick static check on the written files; if significant issues are
