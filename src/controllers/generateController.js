@@ -7,7 +7,7 @@ const VALID_MODES = ['2d', '3d', 'balanced', 'quality'];
 
 /**
  * POST /api/generate
- * Body: { prompt: string, mode?: 'fast' | 'balanced' | 'quality', sessionId?: string }
+ * Body: { prompt: string, mode?: '2d' | '3d' | 'balanced' | 'quality', sessionId?: string }
  */
 async function handleGenerate(req, res) {
   const { prompt, mode = 'balanced', sessionId } = req.body;

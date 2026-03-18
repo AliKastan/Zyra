@@ -14,8 +14,8 @@ async function handleEdit(req, res) {
   if (!prompt || !prompt.trim()) {
     return res.status(400).json({ error: 'Prompt is required' });
   }
-  if (!['fast', 'balanced', 'quality'].includes(mode)) {
-    return res.status(400).json({ error: 'Invalid mode. Use fast, balanced, or quality.' });
+  if (!['2d', '3d', 'balanced', 'quality'].includes(mode)) {
+    return res.status(400).json({ error: 'Invalid mode. Use 2d, 3d, balanced, or quality.' });
   }
   if (!/^[a-z0-9-]+$/.test(slug)) {
     return res.status(400).json({ error: 'Invalid project slug' });

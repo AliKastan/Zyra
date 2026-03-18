@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Internal Access — Zyra</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=5" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #0e0e18;
+      color: #e8e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 24px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .page-header {
+      width: 100%;
+      max-width: 640px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .page-header a {
+      color: rgba(232,232,240,.4);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .page-header a:hover { color: rgba(232,232,240,.7); }
+    .page-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      color: #e8e8f0;
+    }
+    .page-sub {
+      font-size: 12px;
+      color: rgba(232,232,240,.4);
+      margin-top: 2px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 640px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: rgba(232,232,240,.4);
+      margin-bottom: 16px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .status-badge.granted {
+      background: rgba(74,222,128,.12);
+      color: #4ade80;
+      border: 1px solid rgba(74,222,128,.25);
+    }
+    .status-badge.denied {
+      background: rgba(248,113,113,.1);
+      color: #f87171;
+      border: 1px solid rgba(248,113,113,.2);
+    }
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .field-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 9px 0;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      gap: 16px;
+    }
+    .field-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .field-label {
+      font-size: 12px;
+      color: rgba(232,232,240,.45);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .field-value {
+      font-size: 13px;
+      color: #e8e8f0;
+      text-align: right;
+      word-break: break-all;
+    }
+    .field-value.dim { color: rgba(232,232,240,.35); font-style: italic; }
+    .field-value.green { color: #4ade80; }
+    .field-value.red   { color: #f87171; }
+    .field-value.amber { color: #fbbf24; }
+
+    .reason-box {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: rgba(232,232,240,.7);
+      margin-top: 4px;
+      line-height: 1.55;
+    }
+
+    .method-chip {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      background: rgba(139,92,246,.18);
+      color: #a78bfa;
+      border: 1px solid rgba(139,92,246,.25);
+    }
+
+    .warning-box {
+      background: rgba(251,191,36,.07);
+      border: 1px solid rgba(251,191,36,.18);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: rgba(251,191,36,.85);
+      margin-bottom: 16px;
+      max-width: 640px;
+      width: 100%;
+      line-height: 1.55;
+    }
+
+    .reload-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 8px;
+      padding: 8px 16px;
+      color: rgba(232,232,240,.7);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background .15s;
+    }
+    .reload-btn:hover { background: rgba(255,255,255,.1); }
+
+    #loading {
+      color: rgba(232,232,240,.35);
+      font-size: 14px;
+      margin-top: 48px;
+    }
+    #error-state {
+      color: #f87171;
+      font-size: 14px;
+      margin-top: 48px;
+      text-align: center;
+    }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Internal Access Status</div>
+    <div class="page-sub">Server-side entitlement check for your account</div>
+  </div>
+  <div style="margin-left:auto;">
+    <a href="/app">Back to app</a>
+  </div>
+</div>
+
+<div id="loading">Checking access status...</div>
+<div id="error-state" class="hidden"></div>
+
+<div id="content" class="hidden" style="width:100%;max-width:640px;">
+
+  <div id="not-tester-warning" class="warning-box hidden">
+    You are not on the internal test allowlist. Billing rules apply normally to your account.
+    Contact an admin to be added.
+  </div>
+
+  <!-- Access result card -->
+  <div class="card">
+    <div class="card-title">Access Decision</div>
+    <div id="status-badge" class="status-badge denied">
+      <span class="status-dot"></span>
+      <span id="status-text">Checking...</span>
+    </div>
+    <div class="reason-box" id="reason-text"></div>
+    <div style="margin-top:10px;" id="method-wrap" class="hidden">
+      <span class="field-label">Method: </span>
+      <span class="method-chip" id="method-text"></span>
+    </div>
+  </div>
+
+  <!-- User card -->
+  <div class="card">
+    <div class="card-title">Current User</div>
+    <div class="field-row">
+      <span class="field-label">Email</span>
+      <span class="field-value" id="user-email">—</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">User ID</span>
+      <span class="field-value dim" id="user-id">—</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Role (app_metadata)</span>
+      <span class="field-value" id="user-role">—</span>
+    </div>
+  </div>
+
+  <!-- Config card -->
+  <div class="card">
+    <div class="card-title">Server Configuration</div>
+    <div class="field-row">
+      <span class="field-label">Internal access enabled</span>
+      <span class="field-value" id="cfg-enabled">—</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Email allowlist size</span>
+      <span class="field-value" id="cfg-email-count">—</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Allowed roles</span>
+      <span class="field-value" id="cfg-roles">—</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Staging bypass</span>
+      <span class="field-value" id="cfg-staging">—</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Current environment</span>
+      <span class="field-value" id="cfg-env">—</span>
+    </div>
+  </div>
+
+  <button class="reload-btn" onclick="loadStatus()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    Refresh
+  </button>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script>
+async function loadStatus() {
+  const loadingEl = document.getElementById('loading');
+  const errorEl   = document.getElementById('error-state');
+  const contentEl = document.getElementById('content');
+
+  loadingEl.classList.remove('hidden');
+  errorEl.classList.add('hidden');
+  contentEl.classList.add('hidden');
+
+  try {
+    const token = window._zyraAuth?.getToken?.() || '';
+    if (!token) {
+      errorEl.textContent = 'Not signed in. Please sign in to check your access status.';
+      errorEl.classList.remove('hidden');
+      loadingEl.classList.add('hidden');
+      return;
+    }
+
+    const res = await fetch('/api/internal/access-status', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401) {
+      errorEl.textContent = 'Session expired. Please sign in again.';
+      errorEl.classList.remove('hidden');
+      loadingEl.classList.add('hidden');
+      return;
+    }
+    const data = await res.json();
+
+    // User
+    document.getElementById('user-email').textContent = data.user?.email || '—';
+    document.getElementById('user-id').textContent    = data.user?.id    || '—';
+    const role = data.user?.role;
+    const roleEl = document.getElementById('user-role');
+    if (role) { roleEl.textContent = role; roleEl.className = 'field-value amber'; }
+    else { roleEl.textContent = 'none'; roleEl.className = 'field-value dim'; }
+
+    // Access decision
+    const badge = document.getElementById('status-badge');
+    const text  = document.getElementById('status-text');
+    const reason = document.getElementById('reason-text');
+    const methodWrap = document.getElementById('method-wrap');
+    const methodText = document.getElementById('method-text');
+
+    if (data.access.granted) {
+      badge.className = 'status-badge granted';
+      text.textContent = 'Internal Access Granted';
+      document.getElementById('not-tester-warning').classList.add('hidden');
+    } else {
+      badge.className = 'status-badge denied';
+      text.textContent = 'Billing Rules Apply (no bypass)';
+      document.getElementById('not-tester-warning').classList.remove('hidden');
+    }
+    reason.textContent = data.access.reason || '—';
+    if (data.access.method) {
+      methodText.textContent = data.access.method;
+      methodWrap.classList.remove('hidden');
+    } else {
+      methodWrap.classList.add('hidden');
+    }
+
+    // Config
+    const cfg = data.config;
+    const cfgEnabled = document.getElementById('cfg-enabled');
+    cfgEnabled.textContent = cfg.enabled ? 'Yes' : 'No';
+    cfgEnabled.className = cfg.enabled ? 'field-value green' : 'field-value red';
+
+    document.getElementById('cfg-email-count').textContent =
+      cfg.emailAllowlistSize > 0 ? cfg.emailAllowlistSize + ' email(s) configured' : 'None configured';
+
+    document.getElementById('cfg-roles').textContent =
+      cfg.allowedRoles?.length ? cfg.allowedRoles.join(', ') : 'None';
+
+    const cfgStaging = document.getElementById('cfg-staging');
+    cfgStaging.textContent = cfg.bypassOnStaging ? 'Enabled' : 'Disabled';
+    cfgStaging.className = cfg.bypassOnStaging ? 'field-value amber' : 'field-value dim';
+
+    document.getElementById('cfg-env').textContent = cfg.currentEnv || '—';
+
+    loadingEl.classList.add('hidden');
+    contentEl.classList.remove('hidden');
+
+  } catch (err) {
+    errorEl.textContent = 'Failed to load access status: ' + err.message;
+    errorEl.classList.remove('hidden');
+    loadingEl.classList.add('hidden');
+  }
+}
+
+// Wait for auth to be ready before loading
+window.addEventListener('zyra-auth-ready', loadStatus);
+// Fallback: if auth fires before listener, try after a tick
+setTimeout(() => {
+  if (window._zyraAuth?.getToken?.()) loadStatus();
+}, 500);
+</script>
+
+</body>
+</html>

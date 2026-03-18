@@ -3,12 +3,17 @@
  *
  * Enforces credit limits and feature gates at the Express route level.
  * Fails OPEN when billing is not configured (allows requests through).
+ *
+ * Internal testers / admins bypass the quota gate entirely when
+ * ENABLE_INTERNAL_TEST_ACCESS=true and the user matches the allowlist/role.
+ * All bypasses are audit-logged. Public users are never affected.
  */
 
 const { isBillingConfigured, getSupabaseAdmin } = require('../lib/supabaseAdmin');
 const { checkCredits, ensureProfile }            = require('../billing/meter');
 const { PLAN_FEATURES, RATE_LIMITS }             = require('../config/billing');
 const { effectivePlan }                          = require('../billing/accessControl');
+const { checkInternalAccess }                    = require('../config/internalAccess');
 const logger = require('../utils/logger');
 
 // ── In-memory rate limiter (per userId) ──────────────────────────────────────
@@ -54,6 +59,19 @@ async function enforceQuota(req, res, next) {
 
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  // ── Internal test access bypass ──────────────────────────────────────────
+  // Checked before any DB calls — fast path for internal testers.
+  // Public users are never affected (checkInternalAccess returns false for them).
+  const internalCheck = checkInternalAccess(req.user);
+  if (internalCheck.granted) {
+    logger.info(`[quota] Internal access granted for ${req.user.email} — reason: ${internalCheck.reason}`);
+    req.internalTestAccess = true;
+    req.internalTestReason = internalCheck.reason;
+    req.internalTestMethod = internalCheck.method;
+    req.userPlan = 'internal';
+    return next();
+  }
 
   try {
     // Bootstrap profile on first use

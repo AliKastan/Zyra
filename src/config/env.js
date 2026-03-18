@@ -3,6 +3,12 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env.local') });
 
 const env = {
+  // Internal test access (optional — see src/config/internalAccess.js)
+  ENABLE_INTERNAL_TEST_ACCESS:    process.env.ENABLE_INTERNAL_TEST_ACCESS    || 'false',
+  INTERNAL_TEST_EMAILS:           process.env.INTERNAL_TEST_EMAILS           || '',
+  INTERNAL_TEST_ROLES:            process.env.INTERNAL_TEST_ROLES            || 'admin,internal_tester',
+  INTERNAL_TEST_BYPASS_ON_STAGING: process.env.INTERNAL_TEST_BYPASS_ON_STAGING || 'false',
+
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
   DEFAULT_PLANNER_MODEL: process.env.DEFAULT_PLANNER_MODEL || 'claude',

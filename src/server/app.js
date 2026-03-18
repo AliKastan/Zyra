@@ -13,8 +13,9 @@ const fixRoutes      = require('../routes/fixRoutes');
 const billingRoutes  = require('../routes/billingRoutes');
 const debugRoutes    = require('../routes/debugRoutes');
 const selfHealRoutes = require('../routes/selfHealRoutes');
-const backendRoutes  = require('../routes/backendRoutes');
-const envRoutes      = require('../routes/envRoutes');
+const backendRoutes   = require('../routes/backendRoutes');
+const envRoutes       = require('../routes/envRoutes');
+const internalRoutes  = require('../routes/internalRoutes');
 const { serveEnvScript } = require('../controllers/envController');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { stripeWebhook } = require('../controllers/billingController');
@@ -128,6 +129,11 @@ app.get('/debug-report', requireGate, (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/debug-report.html'));
 });
 
+// Internal test access debug page — gate + auth required, content restricted to testers
+app.get('/admin/test-access', requireGate, (_req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../frontend/internal-access.html'));
+});
+
 // ── Static assets (CSS, JS, images) — index:false prevents serving index.html ─
 // Registered AFTER page routes so it only handles actual asset files.
 app.use(express.static(path.resolve(__dirname, '../../frontend'), { index: false }));
@@ -151,7 +157,10 @@ app.use('/api/billing',   requireAuth, billingRoutes);
 app.use('/api/debug',     requireAuth, debugRoutes);
 app.use('/api/self-heal', requireAuth, selfHealRoutes);
 // No requireAuth — called directly from generated apps running in iframes/user browsers
-app.use('/api/backend',  backendRoutes);
+app.use('/api/backend',   backendRoutes);
+
+// Internal testing — auth required, public users get a safe 200 with granted:false
+app.use('/api/internal',  requireAuth, internalRoutes);
 
 // Env vars API — auth-protected
 app.use('/api/projects', requireAuth, envRoutes);

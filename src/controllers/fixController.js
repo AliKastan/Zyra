@@ -99,7 +99,7 @@ async function handleFixGame(req, res) {
   if (!/^[a-z0-9-]+$/.test(slug)) {
     return res.status(400).json({ error: 'Invalid project slug' });
   }
-  if (!['fast', 'balanced', 'quality'].includes(mode)) {
+  if (!['2d', '3d', 'balanced', 'quality'].includes(mode)) {
     return res.status(400).json({ error: 'Invalid mode' });
   }
 
