@@ -49,6 +49,7 @@ setInterval(() => {
  * Attaches req.billingUsage and req.userPlan for downstream use.
  */
 async function enforceQuota(req, res, next) {
+  if (process.env.BILLING_BYPASS === "true") return next();
   if (!isBillingConfigured()) return next();
 
   const userId = req.user?.id;
