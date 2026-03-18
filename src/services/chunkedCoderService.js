@@ -19,6 +19,7 @@ const { callClaude, HAIKU_MODEL, SONNET_MODEL } = require('../providers/anthropi
 const { slugify } = require('../utils/slugify');
 const { withTimeout } = require('../utils/withTimeout');
 const { buildGenreRuleBlock } = require('../generators/genreRules');
+const promptBuilder = require('../generators/promptBuilder');
 const logger = require('../utils/logger');
 
 // ── Per-file output token budgets ─────────────────────────────────────────────
@@ -27,6 +28,7 @@ const CHUNK_TOKENS = {
   fast:     4_000,
   balanced: 7_000,
   quality:  9_000,
+  '3d':     4_000, // 3D games are 3-file max with simple shapes — Haiku handles this fine
 };
 
 // Timeout per file (generous but much shorter than the 10-min coder timeout)
@@ -168,9 +170,15 @@ function buildChunkPrompt(targetPath, plan, userPrompt, previousFiles, mode) {
   const genreRules = (plan.genre && targetPath.toLowerCase().includes('game.js'))
     ? '\n\n' + buildGenreRuleBlock(plan.genre)
     : '';
+  // 3D mode: use the dedicated 3D system prompt instead of the standard chunk base
+  const is3d = mode === '3d';
+  const coderSystem3d = promptBuilder.CODER_SYSTEM?.['3d'];
+  const systemBase = (is3d && coderSystem3d)
+    ? coderSystem3d + `\n\nFILE TO GENERATE: Only generate ${targetPath}. Output: ---FILE: ${targetPath}--- [full content] ---END FILE---`
+    : CHUNK_SYSTEM_BASE + fileRules + genreRules;
 
   return {
-    system: CHUNK_SYSTEM_BASE + fileRules + genreRules,
+    system: systemBase,
     user: `Game request: "${userPrompt}"
 Game plan: ${planContext}${prevBlock}
 
@@ -216,7 +224,7 @@ function makeStub(filePath, plan) {
  * @returns {Promise<{path: string, content: string}|null>} null only on critical failure
  */
 async function generateOneFile(targetPath, plan, userPrompt, previousFiles, mode, costTracker) {
-  const claudeModel = mode === 'fast' ? HAIKU_MODEL : SONNET_MODEL;
+  const claudeModel = (mode === 'fast' || mode === '3d') ? HAIKU_MODEL : SONNET_MODEL;
   const maxTokens   = CHUNK_TOKENS[mode] || 7_000;
 
   const { system, user } = buildChunkPrompt(targetPath, plan, userPrompt, previousFiles, mode);

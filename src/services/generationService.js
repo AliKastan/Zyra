@@ -238,10 +238,20 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
           await log(`Scope reduced (${complexityRisk.risk} risk) — stripped: ${[...complexityRisk.impossible, ...complexityRisk.highRisk].join(', ') || 'n/a'}`);
         }
 
-        const plannerOpts = complexityRisk.scopeNote ? { scopeNote: complexityRisk.scopeNote } : {};
+        // 3D mode: treat as simple/fast for planning (always uses inline plan, 3 files max)
+        const plannerMode = mode === '3d' ? 'fast' : mode;
+        const plannerOpts = {
+          ...(complexityRisk.scopeNote ? { scopeNote: complexityRisk.scopeNote } : {}),
+          ...(mode === '3d' ? { scopeNote: '3D canvas-perspective game — 3 files max: index.html, css/style.css, js/game.js' } : {}),
+        };
         const planT0 = Date.now();
-        plan   = await runPlanner(userPrompt, mode, complexity, plannerOpts);
+        plan   = await runPlanner(userPrompt, plannerMode, complexity, plannerOpts);
         const planMs = Date.now() - planT0;
+
+        // 3D mode: cap files to exactly 3 — index.html, css/style.css, js/game.js
+        if (mode === '3d' && Array.isArray(plan.files)) {
+          plan.files = ['index.html', 'css/style.css', 'js/game.js'];
+        }
 
         logger.info(`[job:${jobId}] planner: source=${plan._source} files=${plan.files?.length} ms=${planMs}`);
         if (plan._source === 'inline')   await log(`Using quick plan — ${plan.files?.length} files (${planMs}ms)`);

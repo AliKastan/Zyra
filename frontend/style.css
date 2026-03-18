@@ -1074,47 +1074,34 @@ html, body {
 
 .mode-bar label:hover { color: rgba(255,255,255,0.9); }
 
-.mode-bar input[type="radio"]:checked + label { color: #fff; }
+.mode-bar input[type="radio"]:checked + label { color: #0d0d0d; font-weight: 600; }
 
 .glass-glider {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: calc(100% / 3);
+  width: calc(100% / 2);
   border-radius: 1rem;
   z-index: 1;
   pointer-events: none;
   transition:
-    transform 0.5s cubic-bezier(0.37, 1.95, 0.66, 0.56),
-    background 0.4s ease-in-out,
-    box-shadow 0.4s ease-in-out;
+    transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s ease-in-out;
+  background: #ffffff;
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.18),
+    0 1px 3px rgba(0,0,0,0.12),
+    0 0 0 1px rgba(255,255,255,0.9) inset;
 }
 
-/* Fast = Gold/Yellow — translateX(0%) */
-#mode-fast:checked ~ .glass-glider {
+/* 2D Game — translateX(0%) */
+#mode-2d:checked ~ .glass-glider {
   transform: translateX(0%);
-  background: linear-gradient(135deg, rgba(255,215,0,0.33), #ffcc00);
-  box-shadow:
-    0 0 18px rgba(255,215,0,0.5),
-    0 0 10px rgba(255,235,150,0.4) inset;
 }
 
-/* Standard = Silver — translateX(100%) */
-#mode-standard:checked ~ .glass-glider {
+/* 3D Game — translateX(100%) */
+#mode-3d:checked ~ .glass-glider {
   transform: translateX(100%);
-  background: linear-gradient(135deg, rgba(192,192,192,0.33), #e0e0e0);
-  box-shadow:
-    0 0 18px rgba(192,192,192,0.5),
-    0 0 10px rgba(255,255,255,0.4) inset;
-}
-
-/* Quality = Platinum/Blue — translateX(200%) */
-#mode-quality:checked ~ .glass-glider {
-  transform: translateX(200%);
-  background: linear-gradient(135deg, rgba(208,231,255,0.33), #a0d8ff);
-  box-shadow:
-    0 0 18px rgba(160,216,255,0.5),
-    0 0 10px rgba(200,240,255,0.4) inset;
 }
 
 /* Input box */
