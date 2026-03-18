@@ -34,7 +34,7 @@ async function checkCredits(userId, plan, estimatedCost = 0) {
     if (usage.creditsRemaining <= 0) {
       return {
         allowed: false,
-        reason:  'Monthly credits exhausted. Upgrade your plan or wait until the next billing period.',
+        reason:  'Generation limit reached. Upgrade your plan or wait for the next billing period.',
         warning: 'critical',
         ...usage,
       };

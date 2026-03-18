@@ -17,19 +17,14 @@ const SKIPPED_RESULT = (reason) => ({
 
 /**
  * Runs the review stage.
- * In fast mode, review is skipped entirely to save time and tokens.
+ * Only runs in quality mode for complex projects — always non-fatal.
  * @param {string} projectName
  * @param {Array<{path, content}>} files
- * @param {string} mode - 'fast' | 'balanced' | 'quality'
+ * @param {string} mode - 'balanced' | 'quality'
  * @returns {Promise<object>} review result (never throws)
  */
 async function runReviewer(projectName, files, mode = 'balanced') {
-  if (mode === 'fast') {
-    logger.info('reviewerService: skipped (fast mode)');
-    return SKIPPED_RESULT('fast mode');
-  }
-
-  const maxTokens = limits.MODE_TOKENS[mode]?.reviewer || 2000;
+  const maxTokens = limits.MODE_TOKENS[mode]?.reviewer ?? limits.MODE_TOKENS['balanced']?.reviewer ?? 2000;
   const modelName = env.DEFAULT_REVIEW_MODEL;
   const { system, user } = buildReviewerPrompt(projectName, files);
 

@@ -3,7 +3,7 @@ const { classifyComplexity } = require('../utils/complexity');
 const limits = require('../config/limits');
 const logger = require('../utils/logger');
 
-const VALID_MODES = ['fast', 'balanced', 'quality'];
+const VALID_MODES = ['2d', '3d', 'balanced', 'quality'];
 
 /**
  * POST /api/generate

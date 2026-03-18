@@ -213,7 +213,7 @@ function generateTitle(msgs) {
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let currentMode              = 'balanced';
+let currentMode              = '2d';
 let currentJobId             = null;
 let pollInterval             = null;
 let activeMessageId          = null;   // ID of the currently-generating assistant message
@@ -685,11 +685,32 @@ async function startGeneration(prompt, isPrefill = false) {
         return;
       }
     }
+    // Provider unavailable or credits exhausted — non-blocking: load dev fallback instead
+    if (err.code === 'CREDITS_EXHAUSTED' || err.httpStatus === 402) {
+      stopGenerationTimer();
+      setGenerating(false);
+      updateMessage(asstMsgId, { status: 'failed', error: "We couldn't finish this build right now. Your workspace is still available." });
+      showToast("Generation couldn't complete. Preview fallback loaded so you can keep testing.", 'warning');
+      _loadDevFallback(currentMode);
+      activeMessageId = null;
+      return;
+    }
+
     stopGenerationTimer();
     setGenerating(false);
     updateMessage(asstMsgId, { status: 'failed', error: err.message });
     setPreviewState('error', 'Generation failed', err.message);
     activeMessageId = null;
+  }
+}
+
+// Loads the dev fallback game template into the preview iframe.
+// Called when real generation fails — keeps the preview panel usable for testing.
+function _loadDevFallback(mode) {
+  const fallbackMode = (mode === '3d') ? '3d' : '2d';
+  if (previewIframe) {
+    previewIframe.src = `/api/preview/dev-fallback/${fallbackMode}`;
+    setPreviewState('frame');
   }
 }
 
@@ -860,9 +881,17 @@ async function pollJob(jobId) {
       } else {
         const errMsg = job.error || 'An unexpected error occurred.';
         updateMessage(msgId, { status: job.status, error: errMsg });
+        const isCancelled = job.status === 'cancelled';
         const isExpired = errMsg.toLowerCase().includes('not found') || errMsg.toLowerCase().includes('expired');
-        const errorTitle = job.status === 'cancelled' ? 'Cancelled' : job.isEdit ? 'Edit failed' : 'Generation failed';
-        setPreviewState('error', errorTitle, errMsg, { showRegenerate: isExpired });
+        const errorTitle = isCancelled ? 'Cancelled' : job.isEdit ? 'Edit failed' : 'Generation failed';
+
+        if (!isCancelled && !job.isEdit) {
+          // Non-cancelled generation failure: show toast + fallback preview so the workspace stays usable
+          showToast("Generation couldn't complete. Preview fallback loaded so you can keep testing.", 'warning');
+          _loadDevFallback(currentMode);
+        } else {
+          setPreviewState('error', errorTitle, errMsg, { showRegenerate: isExpired });
+        }
       }
     }
   } catch (err) {
@@ -1123,7 +1152,7 @@ function getErrorHint(errorMsg) {
   if (msg.includes('api key') || msg.includes('unauthorized') || msg.includes('authentication'))
     return 'Check that your API key is configured correctly in your environment.';
   if (msg.includes('timed out') || msg.includes('timeout') || msg.includes('took too long'))
-    return 'Try Fast mode for a quicker result, or simplify your prompt.';
+    return 'Simplify your prompt and try again — shorter prompts generate faster.';
   if (msg.includes('parse') || msg.includes('format') || msg.includes('unexpected'))
     return 'The AI returned an unexpected format. This usually resolves on retry.';
   if (msg.includes('too long') || msg.includes('words') || msg.includes('chars'))
@@ -1132,7 +1161,7 @@ function getErrorHint(errorMsg) {
     return 'The server may have restarted. Your generation did not complete — try again.';
   if (msg.includes('disk') || msg.includes('write') || msg.includes('space'))
     return 'A server storage issue occurred. Contact support if this persists.';
-  return 'This is usually temporary. Try again or switch to Fast mode.';
+  return 'This is usually temporary. You can try again.';
 }
 
 function handleMsgAction(btn) {
@@ -1338,7 +1367,7 @@ async function triggerPreviewFailureDebug(slug, errorMsg) {
         consoleErrors:  [{ message: String(errorMsg).slice(0, 300), level: 'error', source: 'preview' }],
         previewState:   'error',
         trigger:        'preview_fail',
-        mode:           'fast',
+        mode:           'balanced',
       }),
     });
 
@@ -2070,7 +2099,7 @@ async function triggerRuntimeAutoFix(errors) {
         consoleErrors: errorList.slice(0, 10),
         previewState:  'runtime_error',
         trigger:       'runtime',
-        mode:          'fast',
+        mode:          'balanced',
       }),
     });
 

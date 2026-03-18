@@ -10,6 +10,7 @@ const { runPlanner } = require('./plannerService');
 const { runCoder, injectViewportNormalize, injectRuntimeErrorCatcher } = require('./coderService');
 const { runAdvancedPipeline, shouldUseAdvancedPipeline } = require('../generation/orchestrator');
 const { generateFallback } = require('../generators/fallbackGenerator');
+const { getFallbackFiles } = require('../generators/devFallback');
 const { runReviewer } = require('./reviewerService');
 const { generateProject } = require('../generators/projectGenerator');
 const { createCostTracker } = require('../utils/costTracker');
@@ -130,6 +131,8 @@ async function startGeneration(userPrompt, mode = 'balanced', options = {}) {
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 
 async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, startedAt, userId, sessionId) {
+  // Normalize UI modes to internal pipeline modes
+  if (mode === '2d') mode = 'balanced';
   const pipelineStart = startedAt ? new Date(startedAt).getTime() : Date.now();
   const deadline      = pipelineStart + limits.MAX_JOB_DURATION_MS;
   const cost          = createCostTracker();
@@ -229,8 +232,8 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
         await log(note);
 
       } else {
-        // ── Legacy pipeline (fast mode or simple prompts) ────────────────────────
-        const willSkip = complexity.level === 'simple' || mode === 'fast';
+        // ── Legacy pipeline (simple prompts or 3D) ──────────────────────────────
+        const willSkip = complexity.level === 'simple';
         await log(willSkip ? 'Quick planning...' : 'Planning app structure...');
 
         // Log scope reduction if the complexity limiter flagged issues
@@ -387,9 +390,9 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
     const skipReview = mode !== 'quality' || codeOutput._template || codeOutput._fallback ||
                        codeOutput._advanced || complexity.level === 'simple';
     if (skipReview) {
-      const reason = mode === 'fast' ? 'fast mode' : codeOutput._template ? 'template' :
+      const reason = codeOutput._template ? 'template' :
                      codeOutput._fallback ? 'fallback' : codeOutput._advanced ? 'advanced pipeline' :
-                     mode === 'balanced' ? 'balanced mode' : 'simple request';
+                     mode === 'balanced' ? 'standard mode' : 'simple request';
       await log(`Skipping review (${reason})`);
       review = { passed: null, skipped: true, summary: `Skipped — ${reason}` };
     } else {
@@ -486,7 +489,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
 
 function categoriseError(err, type) {
   if (type === 'cancelled')                             return 'Generation cancelled by user';
-  if (type === 'timed_out')                            return 'Generation timed out — try a simpler prompt or fast mode';
+  if (type === 'timed_out')                            return 'Generation timed out — try simplifying your prompt';
   if (err.errorType === 'timeout_error')               return 'Code generation timed out — model took too long';
   if (err.errorType === 'api_error')                   return 'AI provider error — check your API key and try again';
   if (err.errorType === 'parse_error')                 return 'Code generation produced an unexpected format (retries exhausted)';
