@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Zyra — AI SaaS Builder</title>
+  <title>Zyra — AI Mobile Game Generator</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=5" />
   <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg?v=5" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -85,13 +85,13 @@
           <div class="welcome-mark">
             <img src="logo-symbol.svg" height="52" alt="Zyra" style="display:block;" />
           </div>
-          <p class="welcome-title">Describe the product you want to build.</p>
-          <p class="welcome-sub">Zyra generates production-capable SaaS MVPs — with auth, dashboard, billing, and deploy-ready code.</p>
+          <p class="welcome-title">Describe the game you want to build.</p>
+          <p class="welcome-sub">Zyra generates playable mobile game prototypes — touch-friendly, designed for phones, ready to play instantly.</p>
           <div class="welcome-chips">
-            <span class="example-chip" data-prompt="Build a SaaS for barbershop bookings — customers book slots, barbers manage availability, admin sees all bookings">Barbershop booking SaaS</span>
-            <span class="example-chip" data-prompt="Build an AI writing assistant SaaS — users sign up, get credits, generate marketing copy, upgrade to Pro for more credits">AI writing SaaS</span>
-            <span class="example-chip" data-prompt="Build a CRM SaaS for real estate agents — track clients, manage property pipeline, schedule follow-ups, team dashboard">Real estate CRM</span>
-            <span class="example-chip" data-prompt="Build a subscription-based client portal for fitness coaches — clients view workout plans, coaches manage programs, billing via Stripe">Fitness coach portal</span>
+            <span class="example-chip" data-prompt="Make a hypercasual runner game where the player dodges traffic on a mobile highway — swipe left and right to switch lanes, increasing speed over time">Endless runner</span>
+            <span class="example-chip" data-prompt="Build a mobile survival game where junk and rocks fall from the sky — the player moves left and right to survive as long as possible, score by time survived">Falling junk survival</span>
+            <span class="example-chip" data-prompt="Make a tapping tycoon idle game about running a coffee cart — tap to earn coins, buy upgrades to earn faster, idle income while away">Coffee cart tycoon</span>
+            <span class="example-chip" data-prompt="Create a mobile puzzle game where colored blocks fall and the player matches 3 of the same color to clear them — touch to move and drop">Color match puzzle</span>
           </div>
         </div>
       </div>
@@ -105,7 +105,7 @@
             </svg>
           </div>
           <p class="sidebar-auth-heading">Sign in to build</p>
-          <p class="sidebar-auth-sub">Create a free account or sign in to start building apps with Zyra.</p>
+          <p class="sidebar-auth-sub">Create a free account or sign in to start building mobile games with Zyra.</p>
           <a class="sidebar-auth-btn-primary" href="/login?mode=signup">Get started free</a>
           <a class="sidebar-auth-btn-secondary" href="/login">Sign in</a>
         </div>
@@ -115,11 +115,11 @@
       <div class="sidebar-input hidden" id="sidebar-input">
         <div class="mode-bar" id="mode-bar">
           <input type="radio" name="generation-mode" id="mode-fast" data-mode="fast" />
-          <label for="mode-fast" title="Quick prototype — 3-8 files, no backend">Fast</label>
+          <label for="mode-fast" title="Quick playable prototype — 3-5 files, core mechanic only">Fast</label>
           <input type="radio" name="generation-mode" id="mode-standard" data-mode="balanced" checked />
-          <label for="mode-standard" title="Full SaaS MVP — auth, dashboard, billing, 20+ files">Standard</label>
+          <label for="mode-standard" title="Full mobile game — all screens, touch controls, scoring, polish">Standard</label>
           <input type="radio" name="generation-mode" id="mode-quality" data-mode="quality" />
-          <label for="mode-quality" title="Production-grade SaaS — 30-60 files, PWA, advanced DB">Quality</label>
+          <label for="mode-quality" title="Complete game project — progression, juice effects, audio hooks, full polish">Quality</label>
           <div class="glass-glider"></div>
         </div>
 
@@ -137,7 +137,7 @@
             id="prompt-input"
             rows="3"
             maxlength="3000"
-            placeholder="Describe the SaaS product you want to build. E.g. 'Build a booking SaaS for barbers with auth, dashboard, and Stripe billing'"
+            placeholder="Describe the mobile game you want to build. E.g. 'Make a hypercasual runner game where the player dodges traffic by swiping left and right'"
           ></textarea>
           <div class="input-meta-row">
             <div class="input-right-meta">
@@ -177,13 +177,13 @@
             Keys
           </button>
           <div class="device-btns" id="device-btns">
-            <button class="device-btn device-btn--active" data-device="desktop" title="Desktop" type="button">
+            <button class="device-btn" data-device="desktop" title="Desktop" type="button">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             </button>
             <button class="device-btn" data-device="tablet" title="Tablet" type="button">
               <svg width="13" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="18.5" r="0.7" fill="currentColor"/></svg>
             </button>
-            <button class="device-btn" data-device="mobile" title="Mobile" type="button">
+            <button class="device-btn device-btn--active" data-device="mobile" title="Mobile" type="button">
               <svg width="11" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="18.5" r="0.7" fill="currentColor"/><line x1="9" y1="6" x2="15" y2="6"/></svg>
             </button>
           </div>
@@ -247,7 +247,7 @@
             </svg>
           </div>
           <h3 class="empty-title">Preview will appear here</h3>
-          <p class="empty-sub">Describe an app in the chat to generate it</p>
+          <p class="empty-sub">Describe a mobile game in the chat to generate it</p>
         </div>
 
         <div class="preview-state hidden" id="state-loading">
@@ -272,7 +272,7 @@
         </div>
 
         <div class="preview-state hidden" id="state-frame">
-          <div class="device-wrapper" id="device-wrapper" data-device="desktop">
+          <div class="device-wrapper" id="device-wrapper" data-device="mobile">
             <div class="browser-chrome" id="browser-chrome">
               <div class="browser-dots">
                 <span class="bdot bdot-r"></span>
@@ -431,12 +431,12 @@
 </div>
 
 <!-- ── Debug Modal ────────────────────────────────────────────────────────── -->
-<div class="debug-overlay hidden" id="debug-overlay" role="dialog" aria-modal="true" aria-label="Fix My App">
+<div class="debug-overlay hidden" id="debug-overlay" role="dialog" aria-modal="true" aria-label="Fix My Game">
   <div class="debug-modal">
     <div class="debug-modal-header">
       <div class="debug-modal-title">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-        Fix My App
+        Fix My Game
       </div>
       <button class="debug-modal-close" id="debug-modal-close" type="button" aria-label="Close">&times;</button>
     </div>

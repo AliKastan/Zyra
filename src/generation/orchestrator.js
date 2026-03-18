@@ -62,9 +62,10 @@ const logger                = require('../utils/logger');
  * @returns {boolean}
  */
 function shouldUseAdvancedPipeline(mode, complexity) {
-  if (mode === 'fast')               return false; // user explicitly chose speed
-  if (complexity.level === 'simple') return false; // templates handle simple prompts well
-  return true; // all medium/complex prompts in balanced/quality mode
+  // Disabled: Zyra is now a mobile game generator.
+  // The advanced pipeline is SaaS-oriented and would produce incorrect output for games.
+  // All generation goes through the game-optimized plannerService + coderService pipeline.
+  return false;
 }
 
 /**

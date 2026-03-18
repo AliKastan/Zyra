@@ -2,7 +2,6 @@ const { callClaude, HAIKU_MODEL } = require('../providers/anthropicProvider');
 const { callOpenAI } = require('../providers/openaiProvider');
 const { buildPlannerPrompt } = require('../generators/promptBuilder');
 const { getInlinePlan, getFallbackPlan } = require('../generators/inlinePlanner');
-const { parseSaasIntent } = require('../utils/saasIntentParser');
 const { safeJsonParse } = require('../utils/safeJsonParse');
 const { withTimeout } = require('../utils/withTimeout');
 const { elapsedMs } = require('../utils/generationTimer');
@@ -23,9 +22,9 @@ function getPlannerTimeout(complexityLevel, mode) {
  * Resolves the max file count based on complexity and mode.
  */
 function getMaxFiles(complexityLevel, mode) {
-  if (complexityLevel === 'simple') return limits.SIMPLE_MAX_FILES;
-  if (complexityLevel === 'medium') return limits.MEDIUM_MAX_FILES;
-  return limits.MODE_MAX_FILES[mode] || 20;
+  if (complexityLevel === 'simple') return limits.SIMPLE_MAX_FILES || 6;
+  if (complexityLevel === 'medium') return limits.MEDIUM_MAX_FILES || 12;
+  return limits.MODE_MAX_FILES[mode] || 12;
 }
 
 /**
@@ -42,12 +41,12 @@ function validatePlan(data) {
  * Calls the planner API with an aggressive timeout.
  * Returns null on timeout or failure (caller should use fallback).
  */
-async function callPlannerAPI(userPrompt, mode, timeoutMs, saasIntent) {
-  const { system, user } = buildPlannerPrompt(userPrompt, mode, saasIntent);
+async function callPlannerAPI(userPrompt, mode, timeoutMs) {
+  const { system, user } = buildPlannerPrompt(userPrompt, mode);
   const modelName = env.DEFAULT_PLANNER_MODEL;
   const maxTokens = limits.MODE_TOKENS[mode]?.planner || 600;
 
-  // Planner outputs small structured JSON — Haiku is fast and cheap enough
+  // Planner outputs small structured JSON — Haiku is fast and cheap
   const call = modelName === 'openai'
     ? callOpenAI(system, user, { maxTokens })
     : callClaude(system, user, { maxTokens, model: HAIKU_MODEL });
@@ -73,9 +72,9 @@ async function callPlannerAPI(userPrompt, mode, timeoutMs, saasIntent) {
  * Main planner entry point.
  *
  * Routing logic (in order):
- *   1. SIMPLE complexity → inline plan (0ms, no API call)
- *   2. MEDIUM/COMPLEX    → API call with aggressive timeout
- *   3. Timeout / failure → fallback plan (instant)
+ *   1. SIMPLE complexity OR fast mode → inline plan (0ms, no API call)
+ *   2. MEDIUM/COMPLEX                 → API call with aggressive timeout
+ *   3. Timeout / failure              → fallback plan (instant)
  *
  * @param {string} userPrompt
  * @param {string} mode       - 'fast' | 'balanced' | 'quality'
@@ -83,33 +82,24 @@ async function callPlannerAPI(userPrompt, mode, timeoutMs, saasIntent) {
  * @returns {Promise<object>} plan with _source: 'inline' | 'api' | 'fallback'
  */
 async function runPlanner(userPrompt, mode = 'balanced', complexity = {}) {
-  const level   = complexity.level   || 'medium';
-  const appType = complexity.appType || 'generic';
-  const t0      = Date.now();
+  const level    = complexity.level    || 'medium';
+  const gameType = complexity.appType  || 'generic-game';
+  const t0       = Date.now();
 
-  // Parse SaaS intent once — thread through to API planner and fallback
-  const saasIntent = parseSaasIntent(userPrompt);
-  if (saasIntent.isSaaS) {
-    logger.info(`plannerService: SaaS detected — category="${saasIntent.category}" modules=[${saasIntent.requiredModules.join(',')}]`);
+  // ── Tier 1: Inline plan for simple requests / fast mode ───────────────────
+  if (level === 'simple' || mode === 'fast') {
+    const plan = getInlinePlan(gameType, userPrompt);
+    logger.success(`plannerService: inline plan — gameType="${gameType}" [${Date.now() - t0}ms]`);
+    return plan;
   }
 
-  // ── Tier 1: Inline plan for simple requests ────────────────────────────────
-  // SaaS types skip inline plan even when simple — they need API planning
-  const isSaasType = saasIntent.isSaaS || complexity.appType?.endsWith('-saas') || complexity.appType === 'project-management' || complexity.appType === 'marketplace' || complexity.appType === 'collaboration-saas';
-  if ((level === 'simple' || mode === 'fast') && !isSaasType) {
-    const plan = getInlinePlan(appType, userPrompt);
-    logger.success(`plannerService: inline plan — appType="${appType}" [${Date.now() - t0}ms]`);
-    return { ...plan, _saasIntent: saasIntent };
-  }
-
-  // ── Tier 2: API planner for medium/complex and all SaaS requests ───────────
+  // ── Tier 2: API planner for medium/complex games ──────────────────────────
   const timeoutMs = getPlannerTimeout(level, mode);
   logger.info(`plannerService: API call — level="${level}" mode="${mode}" timeout=${timeoutMs}ms`);
 
-  const plan = await callPlannerAPI(userPrompt, mode, timeoutMs, saasIntent);
+  const plan = await callPlannerAPI(userPrompt, mode, timeoutMs);
 
   if (plan) {
-    // Enforce file count limit
     const maxFiles = getMaxFiles(level, mode);
     if (plan.files.length > maxFiles) {
       logger.warn(`plannerService: trimming files ${plan.files.length} → ${maxFiles}`);
@@ -117,14 +107,14 @@ async function runPlanner(userPrompt, mode = 'balanced', complexity = {}) {
     }
     const duration = Date.now() - t0;
     logger.success(`plannerService: API plan — ${plan.files.length} files [${duration}ms]`);
-    return { ...plan, _source: 'api', _saasIntent: saasIntent };
+    return { ...plan, _source: 'api' };
   }
 
-  // ── Tier 3: Fallback plan ──────────────────────────────────────────────────
-  logger.warn(`plannerService: using fallback plan for appType="${appType}"`);
-  const fallback = getFallbackPlan(userPrompt, appType);
+  // ── Tier 3: Fallback plan ─────────────────────────────────────────────────
+  logger.warn(`plannerService: using fallback plan for gameType="${gameType}"`);
+  const fallback = getFallbackPlan(userPrompt, gameType);
   logger.success(`plannerService: fallback plan — ${fallback.files.length} files [${Date.now() - t0}ms]`);
-  return { ...fallback, _saasIntent: saasIntent };
+  return fallback;
 }
 
 module.exports = { runPlanner };

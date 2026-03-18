@@ -2,7 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const { slugify } = require('../utils/slugify');
 const { now } = require('../utils/timestamps');
 const { formatElapsed } = require('../utils/generationTimer');
-const { classifyComplexity } = require('../utils/complexity');
+const { classifyComplexity, isNonGameRequest } = require('../utils/complexity');
 const { withTimeout } = require('../utils/withTimeout');
 const { assertProviderAvailable } = require('./orchestrator');
 const { runPlanner } = require('./plannerService');
@@ -94,6 +94,16 @@ async function startGeneration(userPrompt, mode = 'balanced', options = {}) {
     throw err;
   }
 
+  // Redirect non-game requests — Zyra is specialized for mobile games
+  if (isNonGameRequest(userPrompt)) {
+    const err = new Error(
+      'Zyra is specialized for mobile game generation. It looks like you might be describing a website, SaaS, or app instead of a game. ' +
+      'Try rephrasing your idea as a mobile game — for example: "Make a mobile game where the player dodges falling objects."'
+    );
+    err.code = 'NOT_A_GAME';
+    throw err;
+  }
+
   const jobId = uuidv4();
   const startedAt  = now();
   const complexity = classifyComplexity(userPrompt);
@@ -101,14 +111,7 @@ async function startGeneration(userPrompt, mode = 'balanced', options = {}) {
   await createJob(jobId, { prompt: userPrompt, mode, complexity, status: 'queued', startedAt });
   _addActive(jobId, userId);
 
-  // Eager SaaS intent parse for logging (plannerService will re-parse with full context)
-  let saasHint = '';
-  try {
-    const { parseSaasIntent } = require('../utils/saasIntentParser');
-    const intent = parseSaasIntent(userPrompt);
-    if (intent.isSaaS) saasHint = ` saasCategory="${intent.category}"`;
-  } catch (_) {}
-  logger.info(`generationService: job ${jobId} — mode="${mode}" complexity="${complexity.level}" appType="${complexity.appType}"${saasHint}`);
+  logger.info(`generationService: job ${jobId} — mode="${mode}" complexity="${complexity.level}" gameType="${complexity.appType}"`);
 
   runPipeline(jobId, userPrompt, mode, complexity, startedAt, userId, sessionId)
     .catch((err) => logger.error(`generationService: unhandled error for job ${jobId}`, { error: err.message }))

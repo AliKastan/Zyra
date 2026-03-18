@@ -226,7 +226,7 @@ let generationStartMs   = null;   // Date.now() when generation started
 let currentSlug         = null;
 let currentPreviewUrl   = null;
 let previewPollInterval = null;
-let currentDevice       = 'desktop';
+let currentDevice       = 'mobile';
 let currentTab          = 'preview';
 let currentScope        = 'auto'; // 'auto' | 'ui' | 'logic' | 'component' | 'page'
 
@@ -344,21 +344,20 @@ function classifyLocally(prompt) {
   const text  = prompt.toLowerCase().trim();
   const chars = prompt.length;
   const words = text.split(/\s+/).length;
+  // Signals that make a game harder/more complex to generate
   const complex = [
-    'full-stack','fullstack','auth','authentication','login','register','database','db','sql',
-    'postgres','mongodb','prisma','payment','stripe','billing','subscription','saas','crm','erp',
-    'admin panel','role','permissions','multi-user','user management','real-time','websocket',
-    'notifications','email','oauth','jwt','session','backend api','rest api','graphql','microservice',
-    'booking','reservation','appointment','scheduling','kanban','project management','workflow',
-    'marketplace','e-commerce','ecommerce','inventory','analytics','reporting','dashboard app',
-    'platform','portal','management system','team','workspace','organization','b2b','lms',
-    'learning platform','course','fitness','gym','health','hr platform','employee','invoice',
-    'accounting','ai tool','ai saas','ai wrapper','gpt','openai','llm',
+    'multiplayer','multi-player','online multiplayer','mmo','mmorpg','pvp','co-op',
+    'matchmaking','lobby','server','backend','real-time multiplayer','cloud save',
+    'open world','sandbox','gta','procedurally generated','rpg','100 players',
+    '3d game','3d engine','unity','unreal','godot','physics engine',
+    'authentication','user accounts','login system','supabase','database','sql','payments',
+    'ai enemies','pathfinding','navmesh','procedural generation',
   ];
+  // Signals that indicate a simpler, faster game
   const simple = [
-    'landing page','landing','portfolio','personal site','resume site',
-    'calculator','counter','timer','stopwatch','simple form','contact form','quiz','survey',
-    'simple','basic','minimal','static site','single page','one page','static','brochure','homepage',
+    'tap','clicker','idle','hypercasual','hyper casual','simple','basic','minimal','casual',
+    'one-tap','one tap','reaction','reflex','avoid obstacles','dodge','collect coins',
+    'score as high','survive as long','endless tap',
   ];
   let score = 0;
   if (chars > 300)  score += 1;
