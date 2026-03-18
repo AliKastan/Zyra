@@ -6,6 +6,7 @@ const {
   buildAutoFixPrompt,
   buildGameFixPrompt,
 } = require('../generators/promptBuilder');
+const { runChunkedCoder } = require('./chunkedCoderService');
 const { validateGeneratedCode, applyQuickFixes, validateGamePlayability } = require('../utils/codeValidator');
 const {
   buildContentExtractionPrompt,
@@ -220,6 +221,9 @@ async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTr
  * @param {Function} [onProgress] - ({ filesComplete, currentFile, filesTotal }) => void
  */
 async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity, onProgress, options = {}) {
+  const { log, ...coderOptions } = options;
+  options = coderOptions;
+
   const appType = complexity?.appType || plan?._appType || 'generic';
   const level   = complexity?.level || 'simple';
 
@@ -243,7 +247,18 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
 
   // Full generation: AI handles Supabase directly via config/supabase.js pattern.
   // ZyraApp SDK injection is not used for full-generation output.
-  let result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, onProgress, options);
+  //
+  // Routing:
+  //   fast     → runFullCoder   (Haiku, streaming, ~30-60s, single call)
+  //   balanced → runChunkedCoder (Sonnet, non-streaming per file, robust against connection drops)
+  //   quality  → runChunkedCoder (Sonnet, non-streaming per file, larger per-file budget)
+  let result;
+  if (mode !== 'fast') {
+    logger.info(`coderService: routing mode="${mode}" to chunked coder`);
+    result = await runChunkedCoder(userPrompt, plan, mode, costTracker, onProgress, log || null, options);
+  } else {
+    result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, onProgress, options);
+  }
 
   // ── Post-generation quality pipeline ─────────────────────────────────────
   // Always runs except for fallback/template output (those are pre-validated).

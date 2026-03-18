@@ -273,7 +273,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
             cost,
             complexity,
             onProgress,
-            complexityRisk.scopeNote ? { scopeNote: complexityRisk.scopeNote } : {},
+            { ...(complexityRisk.scopeNote ? { scopeNote: complexityRisk.scopeNote } : {}), log },
           );
         } finally {
           stopHeartbeat();
