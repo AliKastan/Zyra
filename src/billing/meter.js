@@ -25,6 +25,7 @@ const logger = require('../utils/logger');
  * @returns {{ allowed: boolean, reason: string|null, warning: 'soft'|'critical'|null, ...usage }}
  */
 async function checkCredits(userId, plan, estimatedCost = 0) {
+  if (process.env.BILLING_BYPASS === "true") return { allowed: true, reason: null, warning: null };
   if (!isBillingConfigured()) return { allowed: true, reason: null, warning: null };
 
   try {
@@ -91,6 +92,7 @@ async function checkCredits(userId, plan, estimatedCost = 0) {
  * @returns {{ creditsCharged, creditsRemaining, duplicate }}
  */
 async function chargeUsage(userId, requestId, usageData) {
+  if (process.env.BILLING_BYPASS === "true") return { creditsCharged: 0, creditsRemaining: null, duplicate: false };
   if (!isBillingConfigured()) return { creditsCharged: 0, creditsRemaining: null, duplicate: false };
 
   const { eventType, model, inputTokens = 0, outputTokens = 0, toolCalls = 0, metadata = {} } = usageData;
