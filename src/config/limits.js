@@ -47,11 +47,20 @@ module.exports = {
   REPAIR_TIMEOUT_MS:    parseInt(process.env.REPAIR_TIMEOUT_MS    || '180000', 10),
   REPAIR_MAX_TOKENS:    parseInt(process.env.REPAIR_MAX_TOKENS    || '12000',  10),
 
-  // ── Auto-fix (post-generation self-healing) ──────────────────────────────────
+  // ── Auto-fix (syntax self-healing) ───────────────────────────────────────────
   AUTOFIX_TIMEOUT_MS:  parseInt(process.env.AUTOFIX_TIMEOUT_MS  || '60000', 10),
-  // Max AI fix rounds after the free quick-fix pass (each round = 1 extra API call)
-  // Default 0 = regex-only quickfix, no extra API calls. Set to 1 to re-enable.
-  AUTOFIX_MAX_ROUNDS:  parseInt(process.env.AUTOFIX_MAX_ROUNDS  || '0',     10),
+  // Max AI syntax-fix rounds after the quick-fix pass (each = 1 extra API call)
+  AUTOFIX_MAX_ROUNDS:  parseInt(process.env.AUTOFIX_MAX_ROUNDS  || '1',     10),
+
+  // ── Game-fix (playability repair) ────────────────────────────────────────────
+  GAME_FIX_TIMEOUT_MS: parseInt(process.env.GAME_FIX_TIMEOUT_MS || '120000', 10), // 2 min
+  GAME_FIX_MAX_ROUNDS: parseInt(process.env.GAME_FIX_MAX_ROUNDS || '1',      10),
+  // Output token budgets for game-fix call per mode
+  GAME_FIX_TOKENS: {
+    fast:     parseInt(process.env.GAME_FIX_TOKENS_FAST     || '8000',  10),
+    balanced: parseInt(process.env.GAME_FIX_TOKENS_BALANCED || '12000', 10),
+    quality:  parseInt(process.env.GAME_FIX_TOKENS_QUALITY  || '16000', 10),
+  },
 
   // ── Retry config ─────────────────────────────────────────────────────────────
   CODER_MAX_RETRIES: parseInt(process.env.CODER_MAX_RETRIES || '2', 10),

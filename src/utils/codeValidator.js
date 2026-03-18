@@ -240,4 +240,124 @@ function applyQuickFixes(files, errors) {
   return anyChanged ? result : files;
 }
 
-module.exports = { validateGeneratedCode, applyQuickFixes };
+// ── Game playability validation ────────────────────────────────────────────────
+
+/**
+ * Extracts all JavaScript source from a file set (inline <script> blocks + .js files).
+ */
+function extractAllJs(files) {
+  const parts = [];
+  for (const f of files) {
+    const content = f.content || '';
+    if (f.path.endsWith('.js')) {
+      parts.push(content);
+    } else if (f.path.endsWith('.html')) {
+      const re = /<script(?:\s[^>]*)?\s*>([\s\S]*?)<\/script>/gi;
+      let m;
+      while ((m = re.exec(content)) !== null) {
+        if (m[1]?.trim()) parts.push(m[1]);
+      }
+    }
+  }
+  return parts.join('\n');
+}
+
+/**
+ * Validates that a generated game is actually playable.
+ * Checks for the five most common critical failure modes.
+ *
+ * @param {Array<{path: string, content: string}>} files
+ * @returns {{ critical: Array<{type: string, message: string}>, warnings: Array<{type: string, message: string}> }}
+ */
+function validateGamePlayability(files) {
+  const critical = [];
+  const warnings = [];
+
+  const allJs   = extractAllJs(files);
+  const allHtml = (files.filter(f => f.path.endsWith('.html')).map(f => f.content || '').join('\n'));
+
+  if (!allJs.trim()) {
+    critical.push({ type: 'no_js', message: 'No JavaScript found — game cannot run' });
+    return { critical, warnings };
+  }
+
+  // 1. Game loop — requestAnimationFrame is mandatory
+  if (!/requestAnimationFrame/i.test(allJs)) {
+    critical.push({
+      type: 'no_game_loop',
+      message: 'No requestAnimationFrame found — add a rAF game loop: function gameLoop(ts){...} requestAnimationFrame(gameLoop)',
+    });
+  }
+
+  // 2. Touch / pointer controls
+  if (!/pointerdown|touchstart/i.test(allJs)) {
+    critical.push({
+      type: 'no_touch_controls',
+      message: 'No pointerdown/touchstart event — add: canvas.addEventListener("pointerdown", e => { handleTap(e); })',
+    });
+  }
+
+  // 3. Canvas rendering context
+  if (!/getContext/i.test(allJs)) {
+    critical.push({
+      type: 'no_canvas_context',
+      message: 'No getContext() call found — add: const ctx = canvas.getContext("2d")',
+    });
+  }
+
+  // 4. Canvas element in HTML
+  if (allHtml && !/<canvas/i.test(allHtml)) {
+    critical.push({
+      type: 'no_canvas_element',
+      message: 'No <canvas> element in HTML — add: <canvas id="game-canvas"></canvas>',
+    });
+  }
+
+  // 5. Empty stub functions (3+ empty bodies = incomplete game)
+  const emptyFuncMatches = allJs.match(/function\s+\w+\s*\([^)]*\)\s*\{\s*\}/g) || [];
+  if (emptyFuncMatches.length >= 3) {
+    critical.push({
+      type: 'stub_functions',
+      message: `${emptyFuncMatches.length} empty stub functions — implement core game logic (update, draw, collision, etc.)`,
+    });
+  }
+
+  // 6. TODO comments signal unimplemented features
+  const todoCount = (allJs.match(/\/\/\s*TODO/gi) || []).length;
+  if (todoCount > 0) {
+    critical.push({
+      type: 'todo_comments',
+      message: `${todoCount} TODO comment(s) — replace all TODO stubs with real implementations`,
+    });
+  }
+
+  // 7. alert() / confirm() — disruptive on mobile, block touch events
+  if (/\balert\s*\(|\bconfirm\s*\(/i.test(allJs)) {
+    critical.push({
+      type: 'disruptive_dialog',
+      message: 'alert() or confirm() found — these block touch input on mobile; replace with canvas-drawn overlays',
+    });
+  }
+
+  // 8. Score variable exists but never drawn — invisible progress
+  const hasScore = /\bscore\b/i.test(allJs);
+  const drawsScore = /fillText.*score|score.*fillText|innerHTML.*score|score.*innerHTML/i.test(allJs);
+  if (hasScore && !drawsScore) {
+    warnings.push({ type: 'score_not_displayed', message: 'score variable exists but never drawn to canvas or HUD — add a fillText(score, ...) call' });
+  }
+
+  // Warnings (possible issues, not guaranteed broken)
+  if (!/gameState|game_state/i.test(allJs)) {
+    warnings.push({ type: 'no_state_machine', message: 'No gameState variable — add: let gameState = "menu"; // menu|playing|paused|gameover' });
+  }
+  if (!/restart|resetGame|initGame|startGame/i.test(allJs)) {
+    warnings.push({ type: 'no_restart', message: 'No restart/reset function — player may be stuck after game over' });
+  }
+  if (!/localStorage/i.test(allJs)) {
+    warnings.push({ type: 'no_persistence', message: 'No localStorage usage — best score will not persist between sessions' });
+  }
+
+  return { critical, warnings };
+}
+
+module.exports = { validateGeneratedCode, applyQuickFixes, validateGamePlayability };

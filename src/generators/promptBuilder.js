@@ -10,6 +10,8 @@
  * Edit, auto-fix, reviewer, and other prompts still use JSON where appropriate.
  */
 
+const { buildGenreRuleBlock } = require('./genreRules');
+
 // ── Planner ───────────────────────────────────────────────────────────────────
 
 const PLANNER_SYSTEM = `Mobile game designer. Output raw JSON only — no prose, no markdown.
@@ -385,8 +387,10 @@ Check: canvas fills viewport, touch controls exist, game loop present, game over
  * @param {string} userPrompt
  * @param {string} [mode]
  * @param {object} [gameIntent] - optional pre-parsed game intent
+ * @param {object} [options]
+ * @param {string} [options.scopeNote] - complexity reduction note from complexityLimiter
  */
-function buildPlannerPrompt(userPrompt, mode, gameIntent) {
+function buildPlannerPrompt(userPrompt, mode, gameIntent, options = {}) {
   let contextNote = '';
   if (gameIntent?.genre) {
     const parts = [
@@ -396,9 +400,10 @@ function buildPlannerPrompt(userPrompt, mode, gameIntent) {
     ].filter(Boolean);
     if (parts.length) contextNote = `\nContext: ${parts.join(' | ')}`;
   }
+  const scopeBlock = options.scopeNote ? `\n${options.scopeNote}` : '';
   return {
     system: PLANNER_SYSTEM,
-    user:   `Request: "${userPrompt}"${contextNote}`,
+    user:   `Request: "${userPrompt}"${contextNote}${scopeBlock}`,
   };
 }
 
@@ -407,8 +412,10 @@ function buildPlannerPrompt(userPrompt, mode, gameIntent) {
  * @param {object} plan
  * @param {string} [mode]
  * @param {object} [gameIntent] - optional pre-parsed game intent
+ * @param {object} [options]
+ * @param {string} [options.scopeNote] - complexity reduction note to inject
  */
-function buildCoderPrompt(userPrompt, plan, mode = 'balanced', gameIntent = null) {
+function buildCoderPrompt(userPrompt, plan, mode = 'balanced', gameIntent = null, options = {}) {
   const system = CODER_SYSTEM[mode] || CODER_SYSTEM.balanced;
 
   const planFields = {
@@ -428,13 +435,20 @@ function buildCoderPrompt(userPrompt, plan, mode = 'balanced', gameIntent = null
   Object.keys(planFields).forEach(k => planFields[k] === undefined && delete planFields[k]);
   const planStr = JSON.stringify(planFields);
 
+  // Inject genre-specific rules when available
+  const genre = plan.genre || plan.category || gameIntent?.genre;
+  const genreBlock = genre ? buildGenreRuleBlock(genre) : '';
+
+  // Inject scope reduction note if complexity limiter flagged issues
+  const scopeBlock = options.scopeNote ? `\n${options.scopeNote}\n` : '';
+
   return {
     system,
     user: `Request: "${userPrompt}"
-
+${scopeBlock}
 Game Plan:
 ${planStr}
-
+${genreBlock ? `\n${genreBlock}\n` : ''}
 Generate ALL files now using the ---FILE: path--- / ---END FILE--- format.
 Every file must be COMPLETE and WORKING — no placeholders, no TODOs, no stub functions.
 The game must be playable immediately when opened in a browser on a phone.
@@ -622,6 +636,86 @@ Output ONLY the changed files using the ---FILE--- format. Start with the first 
   };
 }
 
+// ── Game-fix prompt ───────────────────────────────────────────────────────────
+
+const GAME_FIX_RULES = `
+MANDATORY PATTERNS (add whichever are missing):
+GAME LOOP:
+  let lastTime=0;
+  function gameLoop(ts){const dt=Math.min((ts-lastTime)/1000,0.05);lastTime=ts;if(gameState==='playing'){update(dt);draw();}requestAnimationFrame(gameLoop);}
+  requestAnimationFrame(gameLoop);
+TOUCH CONTROLS:
+  canvas.addEventListener('pointerdown',e=>{const r=canvas.getBoundingClientRect();handleTap(e.clientX-r.left,e.clientY-r.top);});
+CANVAS SETUP:
+  const canvas=document.getElementById('game-canvas'); if(!canvas)return;
+  const ctx=canvas.getContext('2d'); if(!ctx)return;
+  function resizeCanvas(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+  window.addEventListener('resize',resizeCanvas); resizeCanvas();
+GAME STATE: let gameState='menu'; // 'menu'|'playing'|'gameover'
+RESTART: function restartGame(){score=0;player.x=canvas.width/2;enemies=[];gameState='playing';}
+HTML CANVAS: <canvas id="game-canvas" style="display:block;width:100%;height:100%;"></canvas>`;
+
+/**
+ * Builds a targeted prompt to fix critical game playability issues.
+ * Outputs files using ---FILE: path--- delimiters (not JSON) for reliability with large game files.
+ *
+ * @param {string} userPrompt
+ * @param {Array<{path: string, content: string}>} files
+ * @param {Array<{type: string, message: string}>} issues - critical issues from validateGamePlayability
+ */
+function buildGameFixPrompt(userPrompt, files, issues) {
+  const issueList = issues.map(i => `- [${i.type}] ${i.message}`).join('\n');
+
+  // Prioritize game logic files
+  const priority = ['js/game.js', 'game.js', 'index.html', 'js/input.js', 'js/ui.js', 'css/style.css'];
+  const sorted = [...files].sort((a, b) => {
+    const ai = priority.findIndex(p => a.path.endsWith(p));
+    const bi = priority.findIndex(p => b.path.endsWith(p));
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return 0;
+  });
+
+  // Cap total file content to ~18000 chars to fit in token budget
+  const MAX_TOTAL = 18000;
+  let usedChars = 0;
+  const included = [];
+  for (const f of sorted) {
+    if (usedChars >= MAX_TOTAL) break;
+    const cap = Math.min(f.content.length, MAX_TOTAL - usedChars);
+    included.push({
+      path: f.path,
+      content: cap < f.content.length ? f.content.slice(0, cap) + '\n// ...truncated' : f.content,
+    });
+    usedChars += cap;
+  }
+
+  const filesBlock = included.map(f => `---FILE: ${f.path}---\n${f.content}\n---END FILE---`).join('\n\n');
+  const allPaths   = files.map(f => f.path).join(', ');
+
+  const system = `Mobile game fixer. Fix the critical issues listed. Output ALL game files using this exact format:
+---FILE: path/to/file---
+[complete corrected content]
+---END FILE---
+Output every file (fixed and unchanged). Start immediately with the first ---FILE--- block. No text before it.
+${GAME_FIX_RULES}
+${CORRECTNESS_RULES}`;
+
+  const user = `Game: "${userPrompt}"
+All files: ${allPaths}
+
+CRITICAL ISSUES TO FIX:
+${issueList}
+
+CURRENT CODE:
+${filesBlock}
+
+Fix every listed issue. The result must be a fully playable mobile game with working touch controls and a real game loop. Output complete corrected versions of ALL files.`;
+
+  return { system, user };
+}
+
 // ── Auto-fix prompt ───────────────────────────────────────────────────────────
 
 /**
@@ -666,4 +760,5 @@ module.exports = {
   buildReviewerPrompt,
   buildEditCoderPrompt,
   buildAutoFixPrompt,
+  buildGameFixPrompt,
 };

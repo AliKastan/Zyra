@@ -4,8 +4,9 @@ const {
   buildCoderPrompt,
   buildCoderRetryPrompt,
   buildAutoFixPrompt,
+  buildGameFixPrompt,
 } = require('../generators/promptBuilder');
-const { validateGeneratedCode, applyQuickFixes } = require('../utils/codeValidator');
+const { validateGeneratedCode, applyQuickFixes, validateGamePlayability } = require('../utils/codeValidator');
 const {
   buildContentExtractionPrompt,
   detectStyleTag,
@@ -120,7 +121,7 @@ function makeStreamProgressTracker(plan, onProgress) {
  * @param {Function} [onProgress] - callback({ filesComplete, currentFile, filesTotal })
  * @returns {Promise<{projectName, files, _fallback?}>}
  */
-async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTracker, onProgress) {
+async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTracker, onProgress, options = {}) {
   const modelName   = env.DEFAULT_CODER_MODEL;
   // Model tiering:
   //   fast     → Haiku  (ultra-cheap, simple 2-6 file apps)
@@ -143,7 +144,7 @@ async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTr
     }
 
     const { system, user } = attempt === 0
-      ? buildCoderPrompt(userPrompt, plan, mode)
+      ? buildCoderPrompt(userPrompt, plan, mode, null, options)
       : buildCoderRetryPrompt(userPrompt, plan, mode, attempt);
 
     // Reduce output budget on retries (simpler output expected)
@@ -218,7 +219,7 @@ async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTr
  * @param {object}  [complexity]  - from classifyComplexity
  * @param {Function} [onProgress] - ({ filesComplete, currentFile, filesTotal }) => void
  */
-async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity, onProgress) {
+async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity, onProgress, options = {}) {
   const appType = complexity?.appType || plan?._appType || 'generic';
   const level   = complexity?.level || 'simple';
 
@@ -242,55 +243,81 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
 
   // Full generation: AI handles Supabase directly via config/supabase.js pattern.
   // ZyraApp SDK injection is not used for full-generation output.
-  let result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, onProgress);
+  let result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, onProgress, options);
 
-  // ── Post-generation code validation + multi-round auto-fix ────────────────
-  // Skip for fallback/template output (already known-good).
-  // Skip for fast mode — saves an extra API call; fast mode trades perfection for speed.
-  if (!result._fallback && !result._template && mode !== 'fast') {
-    const MAX_AI_FIX_ROUNDS = limits.AUTOFIX_MAX_ROUNDS || 2;
-    let files     = result.files;
-    let autoFixed = false;
+  // ── Post-generation quality pipeline ─────────────────────────────────────
+  // Always runs except for fallback/template output (those are pre-validated).
+  // Pipeline: syntax fix → game playability fix → fallback escape hatch
+  if (!result._fallback && !result._template) {
+    let files    = result.files;
+    let anyFixed = false;
 
-    // Round 0: quick fixes — const→let via regex (no API call, instant)
-    const initialErrors = validateGeneratedCode(files);
-    if (initialErrors.length > 0) {
-      logger.info(`coderService: validation found ${initialErrors.length} issue(s)`);
-      initialErrors.forEach((e) => logger.debug(`  [${e.type}] ${e.file}: ${e.message}`));
+    // ── Step A: Syntax validation + quick fix (all modes) ──────────────────
+    const syntaxErrors = validateGeneratedCode(files);
+    if (syntaxErrors.length > 0) {
+      logger.info(`coderService: ${syntaxErrors.length} syntax issue(s) found`);
+      syntaxErrors.forEach((e) => logger.debug(`  [${e.type}] ${e.file}: ${e.message}`));
 
-      const quickFixed = applyQuickFixes(files, initialErrors);
+      const quickFixed = applyQuickFixes(files, syntaxErrors);
       if (quickFixed !== files) {
-        files     = quickFixed;
-        autoFixed = true;
+        files    = quickFixed;
+        anyFixed = true;
         logger.info('coderService: quick-fix applied (const→let)');
       }
 
-      // Rounds 1…MAX_AI_FIX_ROUNDS: AI-powered fix for remaining issues
-      for (let round = 0; round < MAX_AI_FIX_ROUNDS; round++) {
-        const errors = validateGeneratedCode(files);
-        if (errors.length === 0) break; // clean
-
-        logger.info(`coderService: AI auto-fix round ${round + 1}/${MAX_AI_FIX_ROUNDS} — ${errors.length} issue(s)`);
-        errors.forEach((e) => logger.debug(`  [${e.type}] ${e.file}: ${e.message}`));
-
-        if (round === 0 && typeof onRetry === 'function') onRetry('autofix', 'Polishing code...');
-
-        try {
-          const fixed = await runAutoFix(userPrompt, files, errors, mode, costTracker);
-          if (fixed) {
-            files     = fixed;
-            autoFixed = true;
-          } else {
-            break; // AI returned nothing useful
+      // AI syntax-fix rounds — balanced/quality only (fast trades speed for perfection)
+      if (mode !== 'fast') {
+        const MAX_SYNTAX_ROUNDS = limits.AUTOFIX_MAX_ROUNDS || 1;
+        for (let round = 0; round < MAX_SYNTAX_ROUNDS; round++) {
+          const remaining = validateGeneratedCode(files);
+          if (remaining.length === 0) break;
+          logger.info(`coderService: AI syntax-fix round ${round + 1}/${MAX_SYNTAX_ROUNDS} — ${remaining.length} issue(s)`);
+          if (round === 0 && typeof onRetry === 'function') onRetry('autofix', 'Polishing code...');
+          try {
+            const fixed = await runAutoFix(userPrompt, files, remaining, mode, costTracker);
+            if (fixed) { files = fixed; anyFixed = true; }
+            else break;
+          } catch (e) {
+            logger.warn(`coderService: syntax-fix round ${round + 1} failed: ${e.message}`);
+            break;
           }
-        } catch (fixErr) {
-          logger.warn(`coderService: auto-fix round ${round + 1} failed (non-fatal): ${fixErr.message}`);
-          break;
         }
       }
     }
 
-    if (autoFixed) result = { ...result, files, _autoFixed: true };
+    // ── Step B: Game playability validation + fix (all modes) ──────────────
+    const gameIssues = validateGamePlayability(files);
+    if (gameIssues.critical.length > 0) {
+      logger.info(`coderService: ${gameIssues.critical.length} critical game issue(s)`);
+      gameIssues.critical.forEach((i) => logger.debug(`  [${i.type}] ${i.message}`));
+
+      if (typeof onRetry === 'function') onRetry('gamefix', 'Fixing game logic...');
+
+      const MAX_GAME_ROUNDS = limits.GAME_FIX_MAX_ROUNDS || 1;
+      for (let round = 0; round < MAX_GAME_ROUNDS; round++) {
+        const issues = validateGamePlayability(files).critical;
+        if (issues.length === 0) break;
+        logger.info(`coderService: game-fix round ${round + 1}/${MAX_GAME_ROUNDS} — ${issues.length} issue(s)`);
+        try {
+          const fixed = await runGameFix(userPrompt, files, issues, mode, costTracker);
+          if (fixed) { files = fixed; anyFixed = true; }
+          else break;
+        } catch (e) {
+          logger.warn(`coderService: game-fix round ${round + 1} failed: ${e.message}`);
+          break;
+        }
+      }
+
+      // Final check — if critical issues remain, use the stable fallback game
+      const finalCheck = validateGamePlayability(files);
+      if (finalCheck.critical.length > 0) {
+        logger.warn(`coderService: ${finalCheck.critical.length} critical issue(s) remain after fix — using fallback`);
+        finalCheck.critical.forEach((i) => logger.debug(`  [${i.type}] ${i.message}`));
+        return generateFallback(userPrompt, plan);
+      }
+    }
+
+    if (anyFixed) result = { ...result, files, _autoFixed: true };
   }
 
   return result;
@@ -340,6 +367,46 @@ async function runAutoFix(userPrompt, files, errors, mode, costTracker) {
   return files.map((f) =>
     fixedMap.has(f.path) ? { ...f, content: fixedMap.get(f.path) } : f,
   );
+}
+
+// ── Game-fix ───────────────────────────────────────────────────────────────────
+
+/**
+ * Sends game files + critical playability issues to the AI for targeted fixing.
+ * Uses file-delimiter output format (---FILE: path---) rather than JSON so large
+ * game files are handled reliably.
+ * Returns fixed files array or null if the attempt failed.
+ */
+async function runGameFix(userPrompt, files, issues, mode, costTracker) {
+  const modelName   = env.DEFAULT_CODER_MODEL;
+  // fast → Haiku (cheap, smaller budget); balanced/quality → Sonnet (better reasoning)
+  const claudeModel = mode === 'fast' ? HAIKU_MODEL : SONNET_MODEL;
+  const maxTokens   = (limits.GAME_FIX_TOKENS || {})[mode] || 8000;
+
+  const { system, user } = buildGameFixPrompt(userPrompt, files, issues);
+
+  let raw;
+  try {
+    const call = modelName === 'openai'
+      ? callOpenAI(system, user, { maxTokens })
+      : callClaude(system, user, { maxTokens, model: claudeModel });
+    raw = await withTimeout(call, limits.GAME_FIX_TIMEOUT_MS || 120_000, 'GameFix');
+  } catch (err) {
+    throw new Error(`Game-fix model call failed: ${err.message}`);
+  }
+
+  if (costTracker) costTracker.record('coder-gamefix', system, user, raw);
+
+  // Parse file-delimiter format
+  const { success, files: fixedFiles, error } = parseFileDelimited(raw);
+  if (!success || !fixedFiles || fixedFiles.length === 0) {
+    logger.warn(`coderService: game-fix parse failed: ${error}`);
+    return null;
+  }
+
+  // Merge: prefer fixed version, keep originals for files not returned
+  const fixedMap = new Map(fixedFiles.map((f) => [f.path, f.content]));
+  return files.map((f) => fixedMap.has(f.path) ? { ...f, content: fixedMap.get(f.path) } : f);
 }
 
 // ── Viewport normalize injection ──────────────────────────────────────────────

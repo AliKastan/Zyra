@@ -194,41 +194,30 @@
             <button id="open-tab-btn" class="icon-btn" title="Open in new tab" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </button>
-            <button id="deploy-btn" class="deploy-btn hidden" title="Deploy to Vercel" type="button">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-              Deploy
+            <button id="fix-my-app-btn" class="fix-game-btn hidden" title="Fix My Game" type="button">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+              Fix
+            </button>
+            <button id="download-btn" class="download-btn hidden" title="Download project ZIP" type="button">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Deploy Status Panel — slides in below the topbar when a deploy is active -->
-      <div class="deploy-panel hidden" id="deploy-panel" role="status" aria-live="polite">
-
-        <!-- Deploying state -->
-        <div class="deploy-state deploy-state--deploying hidden" id="deploy-state-deploying">
-          <div class="deploy-spinner"></div>
-          <span id="deploy-progress-msg" class="deploy-msg">Deploying to Vercel...</span>
-        </div>
-
-        <!-- Success state -->
-        <div class="deploy-state deploy-state--success hidden" id="deploy-state-success">
-          <svg class="deploy-icon deploy-icon--success" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          <span class="deploy-msg">Live at</span>
-          <a id="deploy-live-url" class="deploy-url" href="#" target="_blank" rel="noopener noreferrer">—</a>
-          <button id="deploy-copy-btn" class="deploy-copy-btn" title="Copy URL" type="button">
+      <!-- Run Instructions Panel — slides in below the topbar when shown -->
+      <div class="handoff-panel hidden" id="handoff-panel" role="status" aria-live="polite">
+        <div class="handoff-inner">
+          <span class="handoff-label">Run locally:</span>
+          <code class="handoff-cmd" id="handoff-cmd">cd &lt;project&gt; &amp;&amp; open index.html</code>
+          <button id="handoff-copy-btn" class="handoff-copy-btn" title="Copy command" type="button">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </button>
-          <button id="deploy-again-btn" class="deploy-action-link" type="button">Redeploy</button>
+          <button id="handoff-close-btn" class="handoff-close-btn" title="Dismiss" type="button">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
-
-        <!-- Error state -->
-        <div class="deploy-state deploy-state--error hidden" id="deploy-state-error">
-          <svg class="deploy-icon deploy-icon--error" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span id="deploy-error-msg" class="deploy-msg deploy-msg--error">Deployment failed.</span>
-          <button id="deploy-retry-btn" class="deploy-action-link" type="button">Retry</button>
-        </div>
-
       </div>
 
       <!-- Preview Content -->

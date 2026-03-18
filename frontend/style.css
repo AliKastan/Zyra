@@ -1369,8 +1369,37 @@ textarea::placeholder { color: var(--text-muted); }
 .keys-btn.has-vars:hover { background: rgba(86,107,72,.12); }
 .keys-btn svg { flex-shrink: 0; }
 
-/* ── Deploy button ─────────────────────────────────────────────────────────── */
-.deploy-btn {
+/* ── Fix My Game button ────────────────────────────────────────────────────── */
+.fix-game-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 12px;
+  background: rgba(108,99,255,0.12);
+  color: rgba(180,170,255,0.9);
+  border: 1px solid rgba(108,99,255,0.25);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: border-color var(--ease), color var(--ease), background var(--ease), transform var(--ease);
+  outline: none;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.fix-game-btn:hover:not(:disabled) {
+  background: rgba(108,99,255,0.22);
+  border-color: rgba(108,99,255,0.5);
+  color: rgba(210,205,255,1);
+  transform: translateY(-1px);
+}
+.fix-game-btn:active { transform: translateY(0); }
+
+/* ── Download button ───────────────────────────────────────────────────────── */
+.download-btn {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -1390,59 +1419,52 @@ textarea::placeholder { color: var(--text-muted); }
   flex-shrink: 0;
   white-space: nowrap;
 }
-.deploy-btn:hover:not(:disabled) {
+.download-btn:hover:not(:disabled) {
   background: rgba(255,255,255,0.10);
   border-color: rgba(255,255,255,0.25);
   color: rgba(255,255,255,0.92);
   transform: translateY(-1px);
   box-shadow: 0 4px 14px rgba(0,0,0,0.4), var(--glow-subtle);
 }
-.deploy-btn:active { transform: translateY(0); }
-.deploy-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.download-btn:active { transform: translateY(0); }
+.download-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-/* ── Deploy status panel ───────────────────────────────────────────────────── */
-.deploy-panel {
-  display: flex;
-  align-items: center;
-  min-height: 38px;
-  padding: 0 1rem;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+/* ── Handoff / run-instructions panel ─────────────────────────────────────── */
+.handoff-panel {
   flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
   animation: deployPanelIn 0.2s ease both;
 }
-
-.deploy-state { display: flex; align-items: center; gap: 8px; width: 100%; }
-
-.deploy-spinner {
-  width: 12px; height: 12px;
-  border: 1.75px solid var(--surface3);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+.handoff-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 1rem;
+  overflow: hidden;
+}
+.handoff-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
   flex-shrink: 0;
 }
-
-.deploy-msg { font-size: 0.79rem; color: var(--text-dim); flex-shrink: 0; }
-.deploy-msg--error { color: var(--danger); }
-
-.deploy-icon { flex-shrink: 0; }
-.deploy-icon--success { color: var(--success); }
-.deploy-icon--error   { color: var(--danger); }
-
-.deploy-url {
+.handoff-cmd {
   font-family: var(--mono);
-  font-size: 0.73rem;
-  color: var(--accent);
-  text-decoration: none;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 360px;
+  max-width: 420px;
+  user-select: all;
 }
-.deploy-url:hover { text-decoration: underline; }
-
-.deploy-copy-btn {
+.handoff-copy-btn,
+.handoff-close-btn {
   width: 24px; height: 24px;
   display: flex; align-items: center; justify-content: center;
   background: transparent;
@@ -1454,23 +1476,9 @@ textarea::placeholder { color: var(--text-muted); }
   outline: none;
   flex-shrink: 0;
 }
-.deploy-copy-btn:hover { color: var(--text); border-color: var(--border-mid); background: var(--surface2); }
-
-.deploy-action-link {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-family: var(--font);
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  padding: 0;
-  margin-left: auto;
-  outline: none;
-  transition: color var(--ease);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.deploy-action-link:hover { color: var(--accent); }
+.handoff-copy-btn:hover,
+.handoff-close-btn:hover { color: var(--text); border-color: var(--border-mid); background: var(--surface2); }
+.handoff-close-btn { margin-left: auto; }
 
 /* ── Preview content area ──────────────────────────────────────────────────── */
 .preview-content-area {

@@ -3,6 +3,7 @@ const { slugify } = require('../utils/slugify');
 const { now } = require('../utils/timestamps');
 const { formatElapsed } = require('../utils/generationTimer');
 const { classifyComplexity, isNonGameRequest } = require('../utils/complexity');
+const { assessComplexity } = require('../generators/complexityLimiter');
 const { withTimeout } = require('../utils/withTimeout');
 const { assertProviderAvailable } = require('./orchestrator');
 const { runPlanner } = require('./plannerService');
@@ -108,12 +109,18 @@ async function startGeneration(userPrompt, mode = 'balanced', options = {}) {
   const startedAt  = now();
   const complexity = classifyComplexity(userPrompt);
 
-  await createJob(jobId, { prompt: userPrompt, mode, complexity, status: 'queued', startedAt });
+  // Assess scope risk — strips impossible features, simplifies over-engineered prompts
+  const complexityRisk = assessComplexity(userPrompt);
+  if (complexityRisk.risk !== 'safe') {
+    logger.info(`generationService: job ${jobId} — complexity risk="${complexityRisk.risk}" impossible=[${complexityRisk.impossible.join(',')}] highRisk=[${complexityRisk.highRisk.join(',')}]`);
+  }
+
+  await createJob(jobId, { prompt: userPrompt, mode, complexity, complexityRisk: { risk: complexityRisk.risk, impossible: complexityRisk.impossible, highRisk: complexityRisk.highRisk }, status: 'queued', startedAt });
   _addActive(jobId, userId);
 
   logger.info(`generationService: job ${jobId} — mode="${mode}" complexity="${complexity.level}" gameType="${complexity.appType}"`);
 
-  runPipeline(jobId, userPrompt, mode, complexity, startedAt, userId, sessionId)
+  runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, startedAt, userId, sessionId)
     .catch((err) => logger.error(`generationService: unhandled error for job ${jobId}`, { error: err.message }))
     .finally(() => _removeActive(jobId, userId));
 
@@ -122,7 +129,7 @@ async function startGeneration(userPrompt, mode = 'balanced', options = {}) {
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 
-async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userId, sessionId) {
+async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, startedAt, userId, sessionId) {
   const pipelineStart = startedAt ? new Date(startedAt).getTime() : Date.now();
   const deadline      = pipelineStart + limits.MAX_JOB_DURATION_MS;
   const cost          = createCostTracker();
@@ -226,8 +233,14 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
         const willSkip = complexity.level === 'simple' || mode === 'fast';
         await log(willSkip ? 'Quick planning...' : 'Planning app structure...');
 
+        // Log scope reduction if the complexity limiter flagged issues
+        if (complexityRisk.risk !== 'safe') {
+          await log(`Scope reduced (${complexityRisk.risk} risk) — stripped: ${[...complexityRisk.impossible, ...complexityRisk.highRisk].join(', ') || 'n/a'}`);
+        }
+
+        const plannerOpts = complexityRisk.scopeNote ? { scopeNote: complexityRisk.scopeNote } : {};
         const planT0 = Date.now();
-        plan   = await runPlanner(userPrompt, mode, complexity);
+        plan   = await runPlanner(userPrompt, mode, complexity, plannerOpts);
         const planMs = Date.now() - planT0;
 
         logger.info(`[job:${jobId}] planner: source=${plan._source} files=${plan.files?.length} ms=${planMs}`);
@@ -260,6 +273,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, startedAt, userI
             cost,
             complexity,
             onProgress,
+            complexityRisk.scopeNote ? { scopeNote: complexityRisk.scopeNote } : {},
           );
         } finally {
           stopHeartbeat();

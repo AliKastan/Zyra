@@ -41,8 +41,8 @@ function validatePlan(data) {
  * Calls the planner API with an aggressive timeout.
  * Returns null on timeout or failure (caller should use fallback).
  */
-async function callPlannerAPI(userPrompt, mode, timeoutMs) {
-  const { system, user } = buildPlannerPrompt(userPrompt, mode);
+async function callPlannerAPI(userPrompt, mode, timeoutMs, options = {}) {
+  const { system, user } = buildPlannerPrompt(userPrompt, mode, null, options);
   const modelName = env.DEFAULT_PLANNER_MODEL;
   const maxTokens = limits.MODE_TOKENS[mode]?.planner || 600;
 
@@ -81,7 +81,7 @@ async function callPlannerAPI(userPrompt, mode, timeoutMs) {
  * @param {object} complexity - from classifyComplexity()
  * @returns {Promise<object>} plan with _source: 'inline' | 'api' | 'fallback'
  */
-async function runPlanner(userPrompt, mode = 'balanced', complexity = {}) {
+async function runPlanner(userPrompt, mode = 'balanced', complexity = {}, options = {}) {
   const level    = complexity.level    || 'medium';
   const gameType = complexity.appType  || 'generic-game';
   const t0       = Date.now();
@@ -97,7 +97,7 @@ async function runPlanner(userPrompt, mode = 'balanced', complexity = {}) {
   const timeoutMs = getPlannerTimeout(level, mode);
   logger.info(`plannerService: API call — level="${level}" mode="${mode}" timeout=${timeoutMs}ms`);
 
-  const plan = await callPlannerAPI(userPrompt, mode, timeoutMs);
+  const plan = await callPlannerAPI(userPrompt, mode, timeoutMs, options);
 
   if (plan) {
     const maxFiles = getMaxFiles(level, mode);
