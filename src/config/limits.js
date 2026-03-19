@@ -75,12 +75,12 @@ module.exports = {
   // ── Token budgets per mode ───────────────────────────────────────────────────
   // Template-hybrid uses CONTENT_EXTRACTION_TOKENS (~400) instead of these.
   //
-  // Fast (Haiku):     2-6 files,  6K output  — ultra-cheap (~$0.025/gen)
-  // Balanced (Sonnet): 8-14 files, 14K output  — real SaaS quality (~$0.215/gen, 55% off old)
-  // Quality (Sonnet):  15-22 files, 28K output — production-grade (~$0.42/gen)
+  // Fast (Haiku):     2-6 files,  6K output  — ultra-cheap (~$0.005/gen)
+  // Balanced (Haiku): 8-14 files, 4.5K/file  — ~$0.020/gen (was $0.215 with Sonnet, ~90% savings)
+  // Quality (Sonnet): 15-22 files, 28K output — production-grade (~$0.42/gen)
   MODE_TOKENS: {
     fast:     { planner: 200,  coder: 6000,  reviewer: 0    },
-    balanced: { planner: 400,  coder: 14000, reviewer: 0    },
+    balanced: { planner: 400,  coder: 10000, reviewer: 0    },
     quality:  { planner: 600,  coder: 28000, reviewer: 1500 },
   },
 

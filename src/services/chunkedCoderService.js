@@ -26,7 +26,7 @@ const logger = require('../utils/logger');
 // Small enough to complete in ~30-90s. game.js gets the most (it's the largest file).
 const CHUNK_TOKENS = {
   fast:     4_000,
-  balanced: 7_000,
+  balanced: 4_500, // Haiku handles 4500 tokens cleanly — was 7000 with Sonnet
   quality:  9_000,
   '3d':     4_000, // 3D games are 3-file max with simple shapes — Haiku handles this fine
 };
@@ -131,8 +131,8 @@ function getFileRules(filePath, plan) {
 function buildPreviousContext(previousFiles) {
   if (!previousFiles.length) return '';
 
-  const MAX_TOTAL = 5_000;
-  const MAX_PER_FILE = 2_000;
+  const MAX_TOTAL = 2_000;
+  const MAX_PER_FILE = 1_000;
   let total = 0;
   const lines = ['\n\nPREVIOUSLY GENERATED FILES (reference for DOM IDs, function names, imports):'];
 
@@ -224,7 +224,8 @@ function makeStub(filePath, plan) {
  * @returns {Promise<{path: string, content: string}|null>} null only on critical failure
  */
 async function generateOneFile(targetPath, plan, userPrompt, previousFiles, mode, costTracker) {
-  const claudeModel = (mode === 'fast' || mode === '3d') ? HAIKU_MODEL : SONNET_MODEL;
+  // quality → Sonnet for best output; everything else (fast, balanced, 3d) → Haiku for cost
+  const claudeModel = (mode === 'quality') ? SONNET_MODEL : HAIKU_MODEL;
   const maxTokens   = CHUNK_TOKENS[mode] || 7_000;
 
   const { system, user } = buildChunkPrompt(targetPath, plan, userPrompt, previousFiles, mode);

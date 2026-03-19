@@ -14,6 +14,7 @@ const { getFallbackFiles } = require('../generators/devFallback');
 const { runReviewer } = require('./reviewerService');
 const { generateProject } = require('../generators/projectGenerator');
 const { createCostTracker } = require('../utils/costTracker');
+const { getCached, setCached, cacheStats } = require('../utils/generationCache');
 const {
   createJob, updateJob, appendJobLog,
   setJobStage, completeJobStage,
@@ -187,10 +188,26 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
     let codeOutput;
     let plan;
 
+    // ── Cache lookup ──────────────────────────────────────────────────────────
+    // Skip all API calls when an identical prompt+mode was recently generated.
+    // Quality mode is excluded — users expect fresh output at higher cost tier.
+    if (mode !== 'quality') {
+      const cached = getCached(userPrompt, mode);
+      if (cached) {
+        logger.info(`[job:${jobId}] cache HIT (hits=${cached.hits}) — skipping API calls`);
+        await log(`Cache hit — reusing previous generation (${cached.result.files.length} files)`);
+        codeOutput = { ...cached.result, _cached: true };
+        await completeJobStage(jobId, 'planning').catch(() => {});
+        await setJobStage(jobId, 'coding').catch(() => {});
+        await completeJobStage(jobId, 'coding').catch(() => {});
+      }
+    }
+
     // Inner try/catch: any pipeline error (API down, parse failure, timeout, etc.)
     // falls back to the template generator so the job ALWAYS completes with output.
     // Cancellation and deadline errors are re-thrown — user explicitly stopped it.
-    try {
+    // Skipped entirely on cache hit (codeOutput already set above).
+    if (!codeOutput) try {
       assertProviderAvailable('plan');
       assertProviderAvailable('code');
 
@@ -308,7 +325,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
       await completeJobStage(jobId, 'planning').catch(() => {});
       await setJobStage(jobId, 'coding').catch(() => {});
       await completeJobStage(jobId, 'coding').catch(() => {});
-    }
+    } // end if (!codeOutput) pipeline block
 
     // Final safety net: if codeOutput is still empty for any reason, use fallback
     if (!codeOutput || !Array.isArray(codeOutput.files) || codeOutput.files.length === 0) {
@@ -317,12 +334,23 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
       codeOutput = generateFallback(userPrompt, null);
     }
 
+    // Store successful real generations in cache (skip templates, fallbacks, cached hits)
+    if (codeOutput && !codeOutput._template && !codeOutput._fallback && !codeOutput._cached && mode !== 'quality') {
+      try {
+        setCached(userPrompt, mode, { files: codeOutput.files, projectName: codeOutput.projectName, _source: mode });
+        const stats = cacheStats();
+        logger.debug(`[job:${jobId}] cached generation (cache size: ${stats.active} active)`);
+      } catch (_) {}
+    }
+
     if (!codeOutput._advanced) {
-      const genNote = codeOutput._template
-        ? `Built from template — ${codeOutput.files.length} files`
-        : codeOutput._fallback
-          ? `Used fallback template — ${codeOutput.files.length} files`
-          : `Generation complete — ${codeOutput.files.length} files`;
+      const genNote = codeOutput._cached
+        ? `Reused cached generation — ${codeOutput.files.length} files`
+        : codeOutput._template
+          ? `Built from template — ${codeOutput.files.length} files`
+          : codeOutput._fallback
+            ? `Used fallback template — ${codeOutput.files.length} files`
+            : `Generation complete — ${codeOutput.files.length} files`;
       await log(genNote);
     }
 
