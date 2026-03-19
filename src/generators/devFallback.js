@@ -326,19 +326,19 @@ function drawCube(cx, cy, cz, size, hue, lit) {
   ctx.beginPath();
   ctx.moveTo(...corners[4]); ctx.lineTo(...corners[5]);
   ctx.lineTo(...corners[6]); ctx.lineTo(...corners[7]); ctx.closePath();
-  ctx.fillStyle = `hsl(${hue},${sat},${lit ? 65 : 48}%)`;
+  ctx.fillStyle = 'hsl(' + hue + ',' + sat + ',' + (lit ? 65 : 48) + '%)';
   ctx.fill();
   // Left face
   ctx.beginPath();
   ctx.moveTo(...corners[0]); ctx.lineTo(...corners[4]);
   ctx.lineTo(...corners[7]); ctx.lineTo(...corners[3]); ctx.closePath();
-  ctx.fillStyle = `hsl(${hue},${sat},${lit ? 50 : 36}%)`;
+  ctx.fillStyle = 'hsl(' + hue + ',' + sat + ',' + (lit ? 50 : 36) + '%)';
   ctx.fill();
   // Right face
   ctx.beginPath();
   ctx.moveTo(...corners[1]); ctx.lineTo(...corners[5]);
   ctx.lineTo(...corners[6]); ctx.lineTo(...corners[2]); ctx.closePath();
-  ctx.fillStyle = `hsl(${hue},${sat},${lit ? 42 : 28}%)`;
+  ctx.fillStyle = 'hsl(' + hue + ',' + sat + ',' + (lit ? 42 : 28) + '%)';
   ctx.fill();
 }
 
@@ -347,9 +347,9 @@ function drawOrb(cx, cy, cz, r, hue, t) {
   const sx = W/2 + p.sx, sy = H/2 + p.sy;
   const pulse = 0.85 + Math.sin(t * 4) * 0.15;
   const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * pulse * 22);
-  grad.addColorStop(0,   `hsl(${hue},100%,90%)`);
-  grad.addColorStop(0.4, `hsl(${hue},90%,65%)`);
-  grad.addColorStop(1,   `hsla(${hue},80%,50%,0)`);
+  grad.addColorStop(0,   'hsl(' + hue + ',100%,90%)');
+  grad.addColorStop(0.4, 'hsl(' + hue + ',90%,65%)');
+  grad.addColorStop(1,   'hsla(' + hue + ',80%,50%,0)');
   ctx.beginPath();
   ctx.arc(sx, sy, r * pulse * 22, 0, Math.PI * 2);
   ctx.fillStyle = grad;
