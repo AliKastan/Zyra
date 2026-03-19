@@ -33,7 +33,19 @@ async function getJob(jobId) {
   await ensureJobsDir();
   const filePath = path.join(JOBS_DIR, `${jobId}.json`);
   if (!(await fse.pathExists(filePath))) return null;
-  return fse.readJson(filePath);
+  try {
+    return await fse.readJson(filePath);
+  } catch (parseErr) {
+    // File may be mid-write from a concurrent updateJob/appendJobLog call.
+    // Wait briefly and retry once — enough time for the other write to finish.
+    await new Promise(r => setTimeout(r, 120));
+    try {
+      return await fse.readJson(filePath);
+    } catch (_) {
+      logger.warn(`jobStore: could not parse job file for ${jobId} after retry — treating as not found`);
+      return null;
+    }
+  }
 }
 
 /**

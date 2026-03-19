@@ -299,7 +299,7 @@ async function runChunkedCoder(userPrompt, plan, mode, costTracker, onProgress, 
     const targetPath = orderedFiles[i];
 
     // Signal start of this file to the progress system
-    if (onProgress) onProgress({ filesComplete: i, currentFile: targetPath, filesTotal: totalFiles });
+    if (onProgress) await onProgress({ filesComplete: i, currentFile: targetPath, filesTotal: totalFiles });
     if (log) await log(`Generating ${targetPath} (${i + 1}/${totalFiles})...`);
 
     const file = await generateOneFile(targetPath, plan, userPrompt, generated, mode, costTracker);
@@ -318,7 +318,7 @@ async function runChunkedCoder(userPrompt, plan, mode, costTracker, onProgress, 
     }
 
     // Signal completion of this file
-    if (onProgress) onProgress({ filesComplete: i + 1, currentFile: null, filesTotal: totalFiles });
+    if (onProgress) await onProgress({ filesComplete: i + 1, currentFile: null, filesTotal: totalFiles });
   }
 
   if (failCount > 0 && log) {
