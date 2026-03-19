@@ -59,14 +59,24 @@ setInterval(() => {
 /**
  * Checks that the user has credits remaining before allowing a generation/edit.
  * Attaches req.billingUsage and req.userPlan for downstream use.
+ *
+ * Billing is OPT-IN: only enforced when ENFORCE_BILLING=true is explicitly set.
+ * This means billing is OFF by default (safe for private beta / development).
+ * Set ENFORCE_BILLING=true in production when real payment flows are live.
  */
 async function enforceQuota(req, res, next) {
-  // ── Private-beta bypass ───────────────────────────────────────────────────
-  // When enabled, Zyra's own credit/subscription gate is fully disabled.
-  // The access-code gate and auth remain in force — this only removes the
-  // internal paywall. To re-enable: remove env var or set to false.
+  // ── Billing is opt-in ────────────────────────────────────────────────────
+  // Billing enforcement requires an explicit ENFORCE_BILLING=true flag.
+  // Without it, ALL authenticated users generate freely — no credit checks.
+  // This is the correct default for private beta and development.
+  if (process.env.ENFORCE_BILLING !== 'true') {
+    req.userPlan = 'beta';
+    return next();
+  }
+
+  // ── Legacy bypass flags (still respected when ENFORCE_BILLING=true) ──────
   if (process.env.DISABLE_APP_BILLING_FOR_PRIVATE_BETA === 'true') {
-    logger.info(`[quota] Private-beta mode: billing gate skipped for ${req.user?.email || req.user?.id}`);
+    logger.info(`[quota] Private-beta flag: billing gate skipped for ${req.user?.email || req.user?.id}`);
     req.userPlan = 'beta';
     return next();
   }
