@@ -29,11 +29,21 @@ function getSupabaseAdmin() {
 }
 
 /**
- * Returns true if the Supabase admin client can be initialised.
+ * Returns true only when the full billing stack is configured:
+ * Supabase (credit tracking) + Stripe (payment processing).
+ *
+ * Without Stripe there is no way to add credits or upgrade plans, so
+ * enforcing limits would permanently block all users. In that case we
+ * treat billing as unconfigured and fail open.
+ *
  * Use this as a guard before calling getSupabaseAdmin() in optional paths.
  */
 function isBillingConfigured() {
-  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return !!(
+    process.env.SUPABASE_URL &&
+    process.env.SUPABASE_SERVICE_ROLE_KEY &&
+    process.env.STRIPE_SECRET_KEY
+  );
 }
 
 module.exports = { getSupabaseAdmin, isBillingConfigured };
