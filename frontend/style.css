@@ -1278,7 +1278,7 @@ textarea::placeholder { color: var(--text-muted); }
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: clip; /* clip instead of hidden so absolute children (toolbar) can overflow */
   background: var(--bg);
   position: relative;
   min-width: 0;
@@ -1454,135 +1454,240 @@ textarea::placeholder { color: var(--text-muted); }
 .download-btn:active { transform: translateY(0); }
 .download-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-/* ── Edit Mode button ──────────────────────────────────────────────────────── */
+/* ── Edit Mode toggle button ─────────────────────────────────────────────────── */
 .edit-mode-btn { color: var(--text-muted); }
 .edit-mode-btn--active {
   color: #FBBF24 !important;
-  border-color: rgba(251,191,36,0.3) !important;
-  background: rgba(251,191,36,0.08) !important;
+  border-color: rgba(251,191,36,0.28) !important;
+  background: rgba(251,191,36,0.09) !important;
 }
-.edit-mode-btn--active:hover {
-  background: rgba(251,191,36,0.14) !important;
+.edit-mode-btn--active:hover { background: rgba(251,191,36,0.15) !important; }
+
+/* ── Edit overlay — transparent div that sits over the iframe ───────────────── */
+.edit-overlay {
+  position: absolute;
+  pointer-events: none; /* passthrough when edit mode off */
+  z-index: 800;
+  cursor: default;
+  display: none;
+  user-select: none;
+}
+.edit-overlay--active {
+  pointer-events: all;
+  cursor: crosshair;
 }
 
-/* ── Visual Inspector Panel ─────────────────────────────────────────────────── */
-.visual-inspector {
+/* ── Hover + Selection boxes (created by JS, live inside .preview-main) ─────── */
+.ed-hover-box {
+  border: 1.5px dashed rgba(99, 179, 237, 0.65);
+  border-radius: 2px;
+  z-index: 801;
+  transition: left 0.06s ease, top 0.06s ease, width 0.06s ease, height 0.06s ease;
+  background: rgba(99, 179, 237, 0.05);
+}
+.ed-select-box {
+  border: 2px solid rgba(246, 173, 85, 0.9);
+  border-radius: 2px;
+  z-index: 802;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(246,173,85,0.3);
+  background: rgba(246, 173, 85, 0.04);
+}
+/* Corner handles drawn with pseudo-elements */
+.ed-select-box::before,
+.ed-select-box::after {
+  content: '';
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 230px;
-  background: rgba(24,24,26,0.97);
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4);
-  z-index: 9999;
-  overflow: hidden;
-  font-size: 0.78rem;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  width: 7px; height: 7px;
+  border: 2px solid rgba(246,173,85,0.95);
+  border-radius: 1px;
+  background: #1a1a1a;
 }
-.vi-header {
-  display: flex;
+.ed-select-box::before { top: -4px; left: -4px; }
+.ed-select-box::after  { bottom: -4px; right: -4px; }
+
+/* ── Floating Edit Toolbar ───────────────────────────────────────────────────── */
+.edit-toolbar {
+  position: absolute;
+  z-index: 9000;
+  display: none; /* shown via JS */
+  flex-direction: row;
   align-items: center;
-  gap: 6px;
-  padding: 8px 10px 7px;
-  border-bottom: 1px solid rgba(255,255,255,0.07);
-}
-.vi-title {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,0.5);
-  flex-shrink: 0;
-}
-.vi-path {
-  flex: 1;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  background: rgba(20, 20, 22, 0.97);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  font-size: 0.77rem;
+  font-family: var(--font);
+  color: var(--text);
+  overflow: visible;
+  animation: etb-appear 0.12s ease;
+  pointer-events: all; /* always clickable */
   white-space: nowrap;
 }
-.vi-close {
-  width: 20px; height: 20px;
-  display: flex; align-items: center; justify-content: center;
-  background: none; border: none; cursor: pointer;
-  color: var(--text-muted); border-radius: 4px;
-  flex-shrink: 0;
-  transition: color var(--ease), background var(--ease);
+@keyframes etb-appear {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
-.vi-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
-
-.vi-empty {
-  padding: 14px 12px;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  line-height: 1.5;
-  text-align: center;
-}
-.vi-body { padding: 6px 0 8px; }
-.vi-section {
-  padding: 4px 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-.vi-section:last-child { border-bottom: none; }
-.vi-row {
+.etb-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 0;
+  gap: 2px;
+  padding: 5px 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  max-width: min(calc(100vw - 24px), 780px);
 }
-.vi-label {
-  width: 68px;
-  flex-shrink: 0;
-  color: var(--text-muted);
-  font-size: 0.72rem;
+.etb-row::-webkit-scrollbar { display: none; }
+
+/* Text input */
+.etb-field--text { display: flex; }
+.etb-text-input {
+  width: 110px !important;
+  border-radius: 6px !important;
+  font-size: 0.75rem !important;
 }
-.vi-input {
-  flex: 1;
+
+/* Shared input style */
+.etb-input {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 0.76rem;
+  padding: 4px 6px;
+  outline: none;
+  font-family: var(--font);
+  transition: border-color 0.12s, background 0.12s;
   min-width: 0;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
+}
+.etb-input:focus { border-color: rgba(255,255,255,0.28); background: rgba(255,255,255,0.09); }
+.etb-input:disabled { opacity: 0.28; cursor: not-allowed; }
+
+/* Number field */
+.etb-num-field {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.etb-num {
+  width: 46px;
+  padding: 4px 4px 4px 6px;
+  text-align: right;
+  -moz-appearance: textfield;
+}
+.etb-num::-webkit-outer-spin-button,
+.etb-num::-webkit-inner-spin-button { -webkit-appearance: none; }
+.etb-num-sm { width: 38px; }
+.etb-unit {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+  font-weight: 500;
+  padding: 0 2px;
+}
+
+/* Select */
+.etb-select {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
   border-radius: 5px;
   color: var(--text);
-  font-size: 0.75rem;
-  padding: 3px 6px;
+  font-size: 0.74rem;
+  padding: 4px 4px;
   outline: none;
-  font-family: var(--font);
-  transition: border-color var(--ease), background var(--ease);
-}
-.vi-input:focus { border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.07); }
-.vi-input:disabled { opacity: 0.3; cursor: not-allowed; }
-.vi-input.vi-short { width: 72px; flex: none; }
-.vi-select {
-  flex: 1;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 5px;
-  color: var(--text);
-  font-size: 0.75rem;
-  padding: 3px 4px;
-  outline: none;
-  font-family: var(--font);
-  transition: border-color var(--ease);
-}
-.vi-select:focus { border-color: rgba(255,255,255,0.22); }
-.vi-color-wrap {
-  width: 22px; height: 22px;
-  flex-shrink: 0;
-  border-radius: 4px;
-  overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.12);
   cursor: pointer;
+  font-family: var(--font);
+  max-width: 88px;
+  transition: border-color 0.12s;
 }
-.vi-color {
-  width: 36px; height: 36px;
-  border: none; padding: 0;
-  cursor: pointer; background: none;
-  margin: -7px 0 0 -7px;
+.etb-select:focus { border-color: rgba(255,255,255,0.28); }
+
+/* Toggle button (Bold/Italic) */
+.etb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 5px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  outline: none;
 }
-.vi-color-text { flex: 1; }
+.etb-btn:hover { background: rgba(255,255,255,0.09); color: var(--text); }
+.etb-toggle-btn--on {
+  background: rgba(246,173,85,0.15) !important;
+  border-color: rgba(246,173,85,0.4) !important;
+  color: #FBBF24 !important;
+}
+
+/* Close button */
+.etb-close-btn {
+  width: 24px; height: 24px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+.etb-close-btn:hover { background: rgba(248,113,113,0.12); color: var(--danger); border-color: transparent; }
+
+/* Separator */
+.etb-sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(255,255,255,0.08);
+  flex-shrink: 0;
+  margin: 0 3px;
+}
+
+/* Color chip */
+.etb-color-chip {
+  position: relative;
+  width: 28px; height: 28px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.12);
+  overflow: hidden;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.04);
+  transition: border-color 0.1s;
+}
+.etb-color-chip:hover { border-color: rgba(255,255,255,0.25); }
+.etb-color-label {
+  position: absolute;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.85);
+  z-index: 1;
+  pointer-events: none;
+  line-height: 1;
+}
+.etb-color-swatch {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+}
+.etb-color-pick {
+  position: absolute;
+  inset: 0;
+  width: 200%;
+  height: 200%;
+  top: -50%; left: -50%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
 
 /* ── Handoff / run-instructions panel ─────────────────────────────────────── */
 .handoff-panel {

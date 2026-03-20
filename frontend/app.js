@@ -128,10 +128,14 @@ function switchToConversation(convId) {
   currentPreviewUrl = conv.previewUrl  || null;
   // Reset edit mode when switching conversations
   _editModeActive = false;
-  _editSelectedPath = null;
+  _edNodeId = null;
   if (editModeBtn) editModeBtn.classList.toggle('hidden', !currentSlug);
   if (editModeBtn) editModeBtn.classList.remove('edit-mode-btn--active');
-  if (viInspector) viInspector.classList.add('hidden');
+  if (editOverlay) editOverlay.classList.remove('edit-overlay--active');
+  if (editOverlay) editOverlay.style.display = 'none';
+  if (editToolbar) editToolbar.style.display = 'none';
+  _edHideBox(_edHoverBox);
+  _edHideBox(_edSelectBox);
   // Show/hide scope bar based on whether this conversation has a project
   if (scopeBar) scopeBar.classList.toggle('hidden', !currentSlug);
   // Reset scope to auto when switching conversations
@@ -251,10 +255,13 @@ let currentTab          = 'preview';
 let currentScope        = 'auto'; // 'auto' | 'ui' | 'logic' | 'component' | 'page'
 
 // Visual edit
-let _editModeActive     = false;
-let _editSelectedPath   = null;  // CSS path of selected element
-let _visualOverrides    = {};    // { [slug]: { [cssPath]: { prop: val } } }
-let _viSaveTimer        = null;
+let _editModeActive  = false;
+let _edNodeId        = null;   // currently selected data-zyra-id
+let _edHoverBox      = null;   // DOM element: hover indicator
+let _edSelectBox     = null;   // DOM element: selection box
+let _edHandles       = [];     // resize handle DOM elements
+let _visualOverrides = {};     // { [slug]: { [nodeId]: { styles:{}, text:'' } } }
+let _viSaveTimer     = null;
 
 // ── Generation timer helpers ──────────────────────────────────────────────────
 function formatElapsedMs(ms) {
@@ -328,21 +335,9 @@ const codeText     = $('code-text');
 const codeFileName = $('code-file-name');
 
 // Visual edit
-const editModeBtn    = $('edit-mode-btn');
-const viInspector    = $('visual-inspector');
-const viPath         = $('vi-path');
-const viEmpty        = $('vi-empty');
-const viBody         = $('vi-body');
-const viClose        = $('vi-close');
-const viTextInput    = $('vi-text');
-const viColor        = $('vi-color');
-const viColorText    = $('vi-color-text');
-const viBg           = $('vi-bg');
-const viBgText       = $('vi-bg-text');
-const viFontSize     = $('vi-font-size');
-const viFontWeight   = $('vi-font-weight');
-const viRadius       = $('vi-radius');
-const viOpacity      = $('vi-opacity');
+const editModeBtn = $('edit-mode-btn');
+const editOverlay = $('edit-overlay');
+const editToolbar = $('edit-toolbar');
 
 // ── Logo → Projects navigation ────────────────────────────────────────────────
 // Intercepts the logo link click so we can guard against in-progress generation.
@@ -1505,8 +1500,10 @@ function activatePreview(preview) {
   browserUrlDisplay.textContent = fullUrl.replace(/^https?:\/\//, '');
   previewUrlText.textContent = fullUrl.replace(/^https?:\/\//, '');
 
-  // Show edit mode button now that we have a live preview
+  // Show edit mode button and reposition overlay for new iframe position
   if (editModeBtn) editModeBtn.classList.remove('hidden');
+  // Delay slightly to let iframe layout settle before reading getBoundingClientRect
+  setTimeout(() => { if (_editModeActive) _edRepositionOverlay(); }, 200);
 
   // Fade iframe in on load
   previewIframe.style.opacity = '0';
@@ -1609,45 +1606,200 @@ $('device-btns').addEventListener('click', (e) => {
   deviceWrapper.dataset.device = currentDevice;
 });
 
-// ── Visual Edit Mode ──────────────────────────────────────────────────────────
+// ── Visual Edit Mode — Figma-like direct element editor ──────────────────────
 
-function _cssColorToHex(color) {
-  // Converts "rgb(r, g, b)" or "rgba(r,g,b,a)" to "#rrggbb" for <input type=color>
-  if (!color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)') return '#000000';
-  if (color.startsWith('#')) return color.slice(0, 7);
-  const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+// ── Coordinate helpers ────────────────────────────────────────────────────────
+
+function _edIframeScale() {
+  if (!previewIframe) return { sx: 1, sy: 1 };
+  const r = previewIframe.getBoundingClientRect();
+  const sx = previewIframe.offsetWidth  > 0 ? r.width  / previewIframe.offsetWidth  : 1;
+  const sy = previewIframe.offsetHeight > 0 ? r.height / previewIframe.offsetHeight : 1;
+  return { sx, sy };
+}
+
+// Convert iframe-viewport rect → preview-main-relative rect
+function _edIframeRectToMain(elRect) {
+  const iframeRect = previewIframe.getBoundingClientRect();
+  const pmRect     = document.querySelector('.preview-main').getBoundingClientRect();
+  const { sx, sy } = _edIframeScale();
+  return {
+    left:   iframeRect.left - pmRect.left + elRect.left   * sx,
+    top:    iframeRect.top  - pmRect.top  + elRect.top    * sy,
+    width:  elRect.width  * sx,
+    height: elRect.height * sy,
+  };
+}
+
+// ── Overlay repositioning ─────────────────────────────────────────────────────
+
+function _edRepositionOverlay() {
+  if (!editOverlay || !previewIframe) return;
+  const iframeRect = previewIframe.getBoundingClientRect();
+  const pmRect     = document.querySelector('.preview-main').getBoundingClientRect();
+  editOverlay.style.left   = (iframeRect.left - pmRect.left) + 'px';
+  editOverlay.style.top    = (iframeRect.top  - pmRect.top)  + 'px';
+  editOverlay.style.width  = iframeRect.width  + 'px';
+  editOverlay.style.height = iframeRect.height + 'px';
+}
+
+// ── Box helpers ───────────────────────────────────────────────────────────────
+
+function _edMakeBox(id, cls) {
+  const box = document.createElement('div');
+  box.id = id;
+  box.className = cls;
+  box.style.cssText = 'display:none;position:absolute;pointer-events:none;box-sizing:border-box;';
+  document.querySelector('.preview-main').appendChild(box);
+  return box;
+}
+
+function _edHideBox(box) { if (box) box.style.display = 'none'; }
+
+function _edPositionBox(box, mainRect) {
+  if (!box) return;
+  box.style.display = 'block';
+  box.style.left    = mainRect.left   + 'px';
+  box.style.top     = mainRect.top    + 'px';
+  box.style.width   = mainRect.width  + 'px';
+  box.style.height  = mainRect.height + 'px';
+}
+
+function _edGetHoverBox() {
+  if (!_edHoverBox) _edHoverBox = _edMakeBox('_ed-hover', 'ed-hover-box');
+  return _edHoverBox;
+}
+function _edGetSelectBox() {
+  if (!_edSelectBox) _edSelectBox = _edMakeBox('_ed-select', 'ed-select-box');
+  return _edSelectBox;
+}
+
+// ── Toolbar positioning ───────────────────────────────────────────────────────
+
+function _edPositionToolbar(mainRect) {
+  if (!editToolbar) return;
+  const pm    = document.querySelector('.preview-main');
+  const pmW   = pm ? pm.offsetWidth  : 600;
+  const pmH   = pm ? pm.offsetHeight : 600;
+  const tbH   = editToolbar.offsetHeight || 44;
+  const tbW   = editToolbar.scrollWidth  || 560;
+
+  let top  = mainRect.top - tbH - 10;
+  let left = mainRect.left;
+
+  if (top < 8) top = mainRect.top + mainRect.height + 10;
+  top  = Math.max(8, Math.min(top,  pmH - tbH - 8));
+  left = Math.max(8, Math.min(left, pmW - tbW - 8));
+
+  editToolbar.style.left = left + 'px';
+  editToolbar.style.top  = top  + 'px';
+  editToolbar.style.display = 'flex';
+}
+
+// ── Color helper ──────────────────────────────────────────────────────────────
+
+function _edRgbToHex(css) {
+  if (!css || css === 'transparent' || css === 'rgba(0, 0, 0, 0)') return '#000000';
+  if (/^#/.test(css)) return css.slice(0, 7);
+  const m = css.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
   if (!m) return '#000000';
-  return '#' + [m[1], m[2], m[3]].map(n => parseInt(n).toString(16).padStart(2, '0')).join('');
+  return '#' + [m[1], m[2], m[3]].map(n => (+n).toString(16).padStart(2, '0')).join('');
 }
 
-function _sendToIframe(msg) {
-  try {
-    if (previewIframe && previewIframe.contentWindow) {
-      previewIframe.contentWindow.postMessage(msg, '*');
-    }
-  } catch (_) {}
-}
+function _edParsePx(v) { return v ? Math.round(parseFloat(v)) || '' : ''; }
 
-function _setEditMode(active) {
-  _editModeActive = active;
-  if (editModeBtn) editModeBtn.classList.toggle('edit-mode-btn--active', active);
-  _sendToIframe({ type: 'ZYRA_EDIT_MODE', enabled: active });
-  if (!active) {
-    _editSelectedPath = null;
-    if (viInspector) viInspector.classList.add('hidden');
-  } else {
-    if (viInspector) viInspector.classList.remove('hidden');
-    if (viEmpty)  viEmpty.classList.remove('hidden');
-    if (viBody)   viBody.classList.add('hidden');
+// ── Toolbar population ────────────────────────────────────────────────────────
+
+function _edPopulateToolbar(info) {
+  if (!editToolbar || !info) return;
+  const s  = info.styles || {};
+  const tf = $('etb-text-field');
+
+  // Text
+  const etText = $('etb-text');
+  if (etText) {
+    etText.disabled    = !info.isTextNode;
+    etText.value       = info.isTextNode ? (info.text || '') : '';
+    etText.placeholder = info.isTextNode ? 'text content' : '(has child elements)';
+    if (tf) tf.style.opacity = info.isTextNode ? '1' : '0.35';
   }
+
+  // Font
+  const etFF = $('etb-font-family');
+  if (etFF) etFF.value = s.fontFamily || '';
+  const etFS = $('etb-font-size');
+  if (etFS) etFS.value = _edParsePx(s.fontSize);
+
+  // Bold / Italic
+  const etBold   = $('etb-bold');
+  const etItalic = $('etb-italic');
+  if (etBold)   etBold.classList.toggle('etb-toggle-btn--on',   parseInt(s.fontWeight) >= 600);
+  if (etItalic) etItalic.classList.toggle('etb-toggle-btn--on', s.fontStyle === 'italic');
+
+  // Colors
+  const etColor = $('etb-text-color');
+  if (etColor)  etColor.value = _edRgbToHex(s.color);
+  const etBg    = $('etb-bg-color');
+  const bgHex   = _edRgbToHex(s.backgroundColor);
+  if (etBg)     etBg.value = bgHex;
+  const bgSw    = $('etb-bg-swatch');
+  if (bgSw)     bgSw.style.background = bgHex;
+
+  // Box
+  const etW = $('etb-width');
+  if (etW)  etW.value  = _edParsePx(s.width);
+  const etH = $('etb-height');
+  if (etH)  etH.value  = _edParsePx(s.height);
+
+  // Radius + opacity
+  const etR = $('etb-radius');
+  if (etR)  etR.value  = _edParsePx(s.borderRadius);
+  const etO = $('etb-opacity');
+  if (etO)  etO.value  = Math.round(parseFloat(s.opacity || 1) * 100);
 }
 
-function _getOverridesForSlug() {
-  if (!currentSlug) return {};
-  return _visualOverrides[currentSlug] || {};
+// ── Override application ──────────────────────────────────────────────────────
+
+function _edApplyStyle(prop, value) {
+  if (!_edNodeId || !currentSlug) return;
+  const doc = previewIframe && previewIframe.contentDocument;
+  if (!doc) return;
+  const el = doc.querySelector(`[data-zyra-id="${_edNodeId}"]`);
+  if (!el) return;
+
+  // Apply directly — real DOM, instant visual feedback
+  try { el.style[prop] = value; } catch (_) {}
+
+  // Reposition selection box (size may have changed)
+  const elRect = el.getBoundingClientRect();
+  _edPositionBox(_edGetSelectBox(), _edIframeRectToMain(elRect));
+
+  // Store in override map
+  if (!_visualOverrides[currentSlug])           _visualOverrides[currentSlug] = {};
+  if (!_visualOverrides[currentSlug][_edNodeId]) _visualOverrides[currentSlug][_edNodeId] = {};
+  const entry = _visualOverrides[currentSlug][_edNodeId];
+  if (!entry.styles) entry.styles = {};
+  entry.styles[prop] = value;
+
+  _edSaveDebounced();
 }
 
-function _saveOverridesDebounced() {
+function _edApplyText(text) {
+  if (!_edNodeId || !currentSlug) return;
+  const doc = previewIframe && previewIframe.contentDocument;
+  if (!doc) return;
+  const el = doc.querySelector(`[data-zyra-id="${_edNodeId}"]`);
+  if (!el) return;
+  if (el.childNodes.length <= 1) el.textContent = text;
+
+  if (!_visualOverrides[currentSlug])           _visualOverrides[currentSlug] = {};
+  if (!_visualOverrides[currentSlug][_edNodeId]) _visualOverrides[currentSlug][_edNodeId] = {};
+  _visualOverrides[currentSlug][_edNodeId].text = text;
+
+  _edSaveDebounced();
+}
+
+function _edSaveDebounced() {
   if (_viSaveTimer) clearTimeout(_viSaveTimer);
   _viSaveTimer = setTimeout(() => {
     if (!currentSlug) return;
@@ -1655,110 +1807,212 @@ function _saveOverridesDebounced() {
       method: 'PATCH',
       body: JSON.stringify({ visualOverrides: _visualOverrides[currentSlug] || {} }),
     }).catch(() => {});
-  }, 600);
+  }, 800);
 }
 
-function _applyVisualProp(prop, value) {
-  if (!_editSelectedPath || !currentSlug) return;
-  if (!_visualOverrides[currentSlug]) _visualOverrides[currentSlug] = {};
-  if (!_visualOverrides[currentSlug][_editSelectedPath]) _visualOverrides[currentSlug][_editSelectedPath] = {};
-  _visualOverrides[currentSlug][_editSelectedPath][prop] = value;
+// ── Node selection ────────────────────────────────────────────────────────────
 
-  _sendToIframe({ type: 'ZYRA_APPLY_STYLES', cssPath: _editSelectedPath, styles: { [prop]: value } });
-  _saveOverridesDebounced();
+function _edSelectById(nodeId) {
+  const doc = previewIframe && previewIframe.contentDocument;
+  if (!doc) return;
+  const el = doc.querySelector(`[data-zyra-id="${nodeId}"]`);
+  if (!el) return;
+  _edNodeId = nodeId;
+
+  // Draw selection box
+  const elRect   = el.getBoundingClientRect();
+  const mainRect = _edIframeRectToMain(elRect);
+  _edPositionBox(_edGetSelectBox(), mainRect);
+  _edHideBox(_edGetHoverBox());
+
+  // Populate toolbar with info from iframe
+  previewIframe.contentWindow.postMessage({ type: 'ZYRA_GET_NODE_INFO', nodeId }, '*');
+  // Toolbar will appear after ZYRA_NODE_INFO arrives; show loading state now
+  editToolbar.style.display = 'flex';
+  _edPositionToolbar(mainRect);
 }
 
-function _loadOverridesIntoIframe(slug) {
-  const overrides = _visualOverrides[slug];
-  if (overrides && Object.keys(overrides).length > 0) {
-    _sendToIframe({ type: 'ZYRA_LOAD_OVERRIDES', overrides });
+function _edDeselect() {
+  _edNodeId = null;
+  _edHideBox(_edGetSelectBox());
+  _edHideBox(_edGetHoverBox());
+  if (editToolbar) editToolbar.style.display = 'none';
+}
+
+// ── Edit mode toggle ──────────────────────────────────────────────────────────
+
+function _setEditMode(active) {
+  _editModeActive = active;
+  if (editModeBtn) editModeBtn.classList.toggle('edit-mode-btn--active', active);
+
+  if (editOverlay) {
+    editOverlay.classList.toggle('edit-overlay--active', active);
+    if (active) {
+      editOverlay.style.display = 'block';
+      _edRepositionOverlay();
+    } else {
+      editOverlay.style.display = 'none';
+    }
+  }
+
+  if (!active) {
+    _edDeselect();
+    _edHideBox(_edGetHoverBox());
   }
 }
 
-function _populateInspector(data) {
-  _editSelectedPath = data.cssPath;
-  if (viPath) viPath.textContent = data.tagName + (data.cssPath.length > 30 ? '' : '');
-  if (viEmpty) viEmpty.classList.add('hidden');
-  if (viBody)  viBody.classList.remove('hidden');
+// ── Overlay pointer events ────────────────────────────────────────────────────
 
-  const s = data.styles || {};
-  if (viTextInput) {
-    viTextInput.value = data.textContent != null ? data.textContent : '';
-    viTextInput.disabled = data.textContent == null;
-    viTextInput.placeholder = data.textContent == null ? '(complex element)' : '';
+function _edFindNode(clientX, clientY) {
+  const doc = previewIframe && previewIframe.contentDocument;
+  if (!doc) return null;
+  const iframeRect = previewIframe.getBoundingClientRect();
+  if (clientX < iframeRect.left || clientX > iframeRect.right) return null;
+  if (clientY < iframeRect.top  || clientY > iframeRect.bottom) return null;
+
+  const { sx, sy } = _edIframeScale();
+  const ix = (clientX - iframeRect.left) / sx;
+  const iy = (clientY - iframeRect.top)  / sy;
+
+  let el;
+  try { el = doc.elementFromPoint(ix, iy); } catch (_) { return null; }
+  if (!el || el === doc.documentElement || el === doc.body) return null;
+
+  // Walk up to find the closest ancestor with a zyra-id
+  let node = el;
+  while (node && node !== doc.body) {
+    if (node.hasAttribute && node.hasAttribute('data-zyra-id')) return node;
+    node = node.parentElement;
   }
-  if (viColor)     viColor.value     = _cssColorToHex(s.color);
-  if (viColorText) viColorText.value = s.color || '';
-  if (viBg)        viBg.value        = _cssColorToHex(s.background);
-  if (viBgText)    viBgText.value    = s.background || '';
-  if (viFontSize)  viFontSize.value  = s.fontSize  || '';
-  if (viFontWeight) {
-    const w = parseInt(s.fontWeight) || 400;
-    const opt = viFontWeight.querySelector(`option[value="${w}"]`);
-    if (opt) viFontWeight.value = String(w);
-  }
-  if (viRadius)  viRadius.value  = s.borderRadius || '';
-  if (viOpacity) viOpacity.value = parseFloat(s.opacity) || 1;
+  return null;
 }
 
-// Wire inspector inputs
-if (viTextInput) viTextInput.addEventListener('input', () => {
-  if (!_editSelectedPath) return;
-  _sendToIframe({ type: 'ZYRA_APPLY_TEXT', cssPath: _editSelectedPath, text: viTextInput.value });
-});
-if (viColor) viColor.addEventListener('input', () => {
-  if (viColorText) viColorText.value = viColor.value;
-  _applyVisualProp('color', viColor.value);
-});
-if (viColorText) viColorText.addEventListener('change', () => {
-  _applyVisualProp('color', viColorText.value);
-});
-if (viBg) viBg.addEventListener('input', () => {
-  if (viBgText) viBgText.value = viBg.value;
-  _applyVisualProp('background', viBg.value);
-});
-if (viBgText) viBgText.addEventListener('change', () => {
-  _applyVisualProp('background', viBgText.value);
-});
-if (viFontSize) viFontSize.addEventListener('change', () => {
-  _applyVisualProp('font-size', viFontSize.value);
-});
-if (viFontWeight) viFontWeight.addEventListener('change', () => {
-  _applyVisualProp('font-weight', viFontWeight.value);
-});
-if (viRadius) viRadius.addEventListener('change', () => {
-  _applyVisualProp('border-radius', viRadius.value);
-});
-if (viOpacity) viOpacity.addEventListener('input', () => {
-  _applyVisualProp('opacity', viOpacity.value);
-});
-if (viClose) viClose.addEventListener('click', () => _setEditMode(false));
+if (editOverlay) {
+  editOverlay.addEventListener('mousemove', (e) => {
+    if (!_editModeActive) return;
+    const el = _edFindNode(e.clientX, e.clientY);
+    if (!el) { _edHideBox(_edGetHoverBox()); return; }
+    const nodeId = el.getAttribute('data-zyra-id');
+    if (nodeId === _edNodeId) { _edHideBox(_edGetHoverBox()); return; }
+    _edPositionBox(_edGetHoverBox(), _edIframeRectToMain(el.getBoundingClientRect()));
+  });
 
-if (editModeBtn) editModeBtn.addEventListener('click', () => {
-  _setEditMode(!_editModeActive);
+  editOverlay.addEventListener('mouseleave', () => {
+    _edHideBox(_edGetHoverBox());
+  });
+
+  editOverlay.addEventListener('click', (e) => {
+    if (!_editModeActive) return;
+    e.preventDefault();
+    const el = _edFindNode(e.clientX, e.clientY);
+    if (!el) { _edDeselect(); return; }
+    const nodeId = el.getAttribute('data-zyra-id');
+    if (nodeId) _edSelectById(nodeId);
+    else _edDeselect();
+  });
+}
+
+// ── Toolbar controls ──────────────────────────────────────────────────────────
+
+function _etbOn(id, event, fn) {
+  const el = $(id);
+  if (el) el.addEventListener(event, fn);
+}
+
+_etbOn('etb-text',       'input',  () => _edApplyText($('etb-text').value));
+_etbOn('etb-font-family','change', () => _edApplyStyle('fontFamily',       $('etb-font-family').value));
+_etbOn('etb-font-size',  'change', () => { const v = $('etb-font-size').value; if (v) _edApplyStyle('fontSize', v + 'px'); });
+_etbOn('etb-bold',       'click',  () => {
+  const btn = $('etb-bold');
+  btn.classList.toggle('etb-toggle-btn--on');
+  _edApplyStyle('fontWeight', btn.classList.contains('etb-toggle-btn--on') ? '700' : '400');
+});
+_etbOn('etb-italic',     'click',  () => {
+  const btn = $('etb-italic');
+  btn.classList.toggle('etb-toggle-btn--on');
+  _edApplyStyle('fontStyle', btn.classList.contains('etb-toggle-btn--on') ? 'italic' : 'normal');
+});
+_etbOn('etb-text-color', 'input',  () => _edApplyStyle('color',           $('etb-text-color').value));
+_etbOn('etb-bg-color',   'input',  () => {
+  const v = $('etb-bg-color').value;
+  const sw = $('etb-bg-swatch');
+  if (sw) sw.style.background = v;
+  _edApplyStyle('backgroundColor', v);
+});
+_etbOn('etb-width',      'change', () => { const v = $('etb-width').value;   if (v) _edApplyStyle('width',        v + 'px'); });
+_etbOn('etb-height',     'change', () => { const v = $('etb-height').value;  if (v) _edApplyStyle('height',       v + 'px'); });
+_etbOn('etb-radius',     'change', () => { const v = $('etb-radius').value;  if (v !== '') _edApplyStyle('borderRadius', v + 'px'); });
+_etbOn('etb-opacity',    'input',  () => {
+  const v = $('etb-opacity').value;
+  if (v !== '') _edApplyStyle('opacity', (parseFloat(v) / 100).toFixed(2));
+});
+_etbOn('etb-close',      'click',  () => _edDeselect());
+
+if (editModeBtn) editModeBtn.addEventListener('click', () => _setEditMode(!_editModeActive));
+
+// Esc: deselect → exit edit mode
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (_edNodeId) _edDeselect();
+  else if (_editModeActive) _setEditMode(false);
 });
 
-// postMessage listener for iframe bridge messages
+// Reposition on resize
+window.addEventListener('resize', () => {
+  if (_editModeActive) _edRepositionOverlay();
+  if (_edNodeId) {
+    const doc = previewIframe && previewIframe.contentDocument;
+    if (!doc) return;
+    const el = doc.querySelector(`[data-zyra-id="${_edNodeId}"]`);
+    if (el) {
+      const mainRect = _edIframeRectToMain(el.getBoundingClientRect());
+      _edPositionBox(_edGetSelectBox(), mainRect);
+      _edPositionToolbar(mainRect);
+    }
+  }
+});
+
+// ── postMessage: iframe bridge events ─────────────────────────────────────────
+
 window.addEventListener('message', (e) => {
   const msg = e.data;
   if (!msg || !msg.type) return;
 
+  // Bridge loaded — apply saved overrides + reposition overlay
   if (msg.type === 'ZYRA_EDIT_READY') {
-    // Bridge loaded — push existing overrides
-    if (currentSlug) _loadOverridesIntoIframe(currentSlug);
-    // Also re-enable edit mode if it was active before the iframe reloaded
-    if (_editModeActive) _sendToIframe({ type: 'ZYRA_EDIT_MODE', enabled: true });
+    _edRepositionOverlay();
+    if (currentSlug && _visualOverrides[currentSlug]) {
+      try {
+        previewIframe.contentWindow.postMessage({
+          type:      'ZYRA_LOAD_OVERRIDES',
+          overrides: _visualOverrides[currentSlug],
+        }, '*');
+      } catch (_) {}
+    }
+    // Listen to iframe scroll to reposition selection box
+    try {
+      previewIframe.contentWindow.addEventListener('scroll', () => {
+        if (!_edNodeId) return;
+        const doc = previewIframe.contentDocument;
+        const el  = doc && doc.querySelector(`[data-zyra-id="${_edNodeId}"]`);
+        if (!el) return;
+        const mainRect = _edIframeRectToMain(el.getBoundingClientRect());
+        _edPositionBox(_edGetSelectBox(), mainRect);
+        _edPositionToolbar(mainRect);
+      }, { passive: true });
+    } catch (_) {}
   }
 
-  if (msg.type === 'ZYRA_ELEMENT_SELECTED' && msg.data) {
-    _populateInspector(msg.data);
+  // Node info response — populate toolbar after selection
+  if (msg.type === 'ZYRA_NODE_INFO' && msg.info) {
+    _edPopulateToolbar(msg.info);
+    if (msg.info.rect) {
+      const mainRect = _edIframeRectToMain(msg.info.rect);
+      _edPositionToolbar(mainRect);
+    }
   }
 
-  if (msg.type === 'ZYRA_ELEMENT_DESELECTED') {
-    _editSelectedPath = null;
-    if (viEmpty) viEmpty.classList.remove('hidden');
-    if (viBody)  viBody.classList.add('hidden');
-  }
+  // ZYRA_RUNTIME_ERROR is handled elsewhere
 });
 
 // ── Preview controls ──────────────────────────────────────────────────────────
