@@ -1355,22 +1355,6 @@ textarea::placeholder {
 }
 
 .preview-controls { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; margin-left: auto; }
-.device-btns { display: flex; gap: 2px; }
-
-.device-btn {
-  width: 30px; height: 28px;
-  display: flex; align-items: center; justify-content: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  color: rgba(255,255,255,0.28);
-  transition: var(--ease);
-  outline: none;
-}
-.device-btn:hover { color: rgba(255,255,255,0.65); border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); }
-.device-btn--active { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.18); color: rgba(255,255,255,0.9); }
-
 .preview-action-btns { display: flex; gap: 2px; }
 .icon-btn {
   width: 30px; height: 28px;
@@ -1999,163 +1983,33 @@ textarea::placeholder {
 .zyra-toast--success { background: #2e7d4f; }
 .zyra-toast--warning { background: #8A2E1A; }
 
-/* ── Device wrapper & frames ───────────────────────────────────────────────── */
+/* ── Preview canvas — frameless clean artboard ─────────────────────────────── */
 
-/*
- * CRITICAL: #state-frame MUST stay position:absolute so that inset:0
- * (inherited from .preview-state) fills the entire .preview-content-area.
- * Any position:relative override will collapse it to content size.
- */
+/* #state-frame: centers the canvas on a dark background.
+ * Must stay position:absolute (from .preview-state) to fill .preview-content-area. */
 #state-frame {
-  padding: 0;
-  /* Override .preview-state flex centering — content fills, not centers */
-  align-items: stretch;
-  justify-content: flex-start;
-  background: transparent;
-  /* Ensure absolute positioning is NOT overridden anywhere */
+  align-items: center;
+  justify-content: center;
+  background: #0f0f1a;
   position: absolute;
 }
 
-.device-wrapper {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-width: 0;
-  min-height: 0;
-}
-
-/* ── Desktop: fills the entire preview canvas ── */
-.device-wrapper[data-device="desktop"] {
-  /* Stretch to fill #state-frame completely */
-  flex: 1 1 auto;
-  width: 100%;
-  border-radius: 0;
-  border: none;
-  box-shadow: none;
-  overflow: hidden;
-  background: #fff;
-}
-.device-wrapper[data-device="desktop"] .browser-chrome   { display: flex; }
-.device-wrapper[data-device="desktop"] .phone-notch-bar  { display: none; }
-.device-wrapper[data-device="desktop"] .phone-home-bar   { display: none; }
-/* frame-inner takes all remaining height after the 40px browser chrome */
-.device-wrapper[data-device="desktop"] .frame-inner {
-  flex: 1 1 auto;
-  min-height: 0;
-  position: relative;
-}
-
-/* ── Tablet: centered device frame with padding ── */
-.device-wrapper[data-device="tablet"] {
-  width: 768px;
-  max-width: calc(100% - 2.5rem);
-  height: calc(100% - 2.5rem);
-  border-radius: 12px;
-  border: 1px solid var(--border-mid);
-  box-shadow: var(--shadow-xl);
-  overflow: hidden;
-  background: #fff;
-  margin: 1.25rem auto;
-  flex-shrink: 0;
-}
-.device-wrapper[data-device="tablet"] .browser-chrome   { display: flex; }
-.device-wrapper[data-device="tablet"] .phone-notch-bar  { display: none; }
-.device-wrapper[data-device="tablet"] .phone-home-bar   { display: none; }
-.device-wrapper[data-device="tablet"] .frame-inner {
-  flex: 1 1 auto;
-  min-height: 0;
-  position: relative;
-}
-
-/* ── Mobile: phone frame ── */
-.device-wrapper[data-device="mobile"] {
+/* The game canvas: a clean 9:16 rectangle, no phone chrome */
+.preview-canvas {
   width: 390px;
-  max-width: calc(100% - 2.5rem);
-  height: calc(100% - 2.5rem);
-  max-height: 800px;
-  border-radius: 46px;
-  border: 10px solid #0A0A0F;
-  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.08), inset 0 0 0 1px rgba(255,255,255,0.04), 0 32px 80px rgba(0,0,0,0.7), 0 0 40px rgba(255,255,255,0.05);
-  overflow: hidden;
-  background: #0A0A0F;
+  max-width: calc(100% - 3rem);
+  aspect-ratio: 9 / 16;
+  max-height: calc(100% - 3rem);
   margin: auto;
-  flex-shrink: 0;
-}
-.device-wrapper[data-device="mobile"] .browser-chrome   { display: none; }
-.device-wrapper[data-device="mobile"] .phone-notch-bar  { display: flex; }
-.device-wrapper[data-device="mobile"] .phone-home-bar   { display: flex; }
-.device-wrapper[data-device="mobile"] .frame-inner {
-  flex: 1 1 auto;
-  min-height: 0;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 20px 50px rgba(0,0,0,0.55);
+  overflow: hidden;
   background: #fff;
   position: relative;
-}
-
-/* Browser chrome bar */
-.browser-chrome {
-  display: none;
-  align-items: center;
-  gap: 10px;
-  height: 40px;
-  padding: 0 14px;
-  background: #1A1B23;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
   flex-shrink: 0;
 }
-.browser-dots { display: flex; gap: 6px; flex-shrink: 0; }
-.bdot { width: 12px; height: 12px; border-radius: 50%; }
-.bdot-r { background: #FF5F57; }
-.bdot-y { background: #FFBD2E; }
-.bdot-g { background: #28C840; }
-.browser-url-display {
-  flex: 1;
-  text-align: center;
-  font-size: 0.69rem;
-  color: var(--text-muted);
-  font-family: var(--mono);
-  background: rgba(255,255,255,0.05);
-  padding: 0.22rem 0.75rem;
-  border-radius: 5px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  max-width: 320px;
-  margin: 0 auto;
-}
 
-/* Phone chrome */
-.phone-notch-bar {
-  display: none;
-  justify-content: center;
-  align-items: flex-end;
-  height: 28px;
-  background: #0A0A0F;
-  flex-shrink: 0;
-}
-.phone-notch {
-  width: 96px; height: 19px;
-  background: #0A0A0F;
-  border-radius: 0 0 14px 14px;
-  border: 1.5px solid rgba(255,255,255,0.06);
-  border-top: none;
-}
-.phone-home-bar {
-  display: none;
-  justify-content: center;
-  align-items: center;
-  height: 20px;
-  background: #0A0A0F;
-  flex-shrink: 0;
-}
-.home-indicator { width: 90px; height: 4px; background: rgba(255,255,255,0.22); border-radius: 2px; }
-
-/* iframe host + iframe — absolute fill for guaranteed full coverage */
-.frame-inner {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-  position: relative;
-}
 #preview-iframe {
   position: absolute;
   inset: 0;
@@ -3459,8 +3313,6 @@ textarea::placeholder {
   background: rgba(255,255,255,0.06);
 }
 
-/* #state-frame must remain position:absolute (from .preview-state) to fill the canvas.
-   Any overlay children should be position:absolute within .device-wrapper instead. */
 
 /* Toggle button active state */
 .vpad-toggle-btn.vpad-on {
@@ -3520,9 +3372,6 @@ textarea::placeholder {
   /* Mobile tab switching — preview active (preview visible, sidebar hidden) */
   .studio-body.mobile-preview .sidebar      { opacity: 0; transform: translateX(-4px); pointer-events: none; }
   .studio-body.mobile-preview .preview-main { opacity: 1; transform: translateX(0); pointer-events: auto; }
-
-  /* Hide device-btns on mobile — preview is always "mobile" effectively */
-  .device-btns { display: none; }
 
   /* Hide deploy button on mobile — too complex */
   .deploy-btn { display: none !important; }

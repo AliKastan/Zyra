@@ -1506,7 +1506,7 @@ function activatePreview(preview) {
   setPreviewState('loading', 'Loading preview...', '');
   if (currentTab !== 'preview') switchTab('preview');
   previewUrlBar.style.display = '';
-  browserUrlDisplay.textContent = fullUrl.replace(/^https?:\/\//, '');
+  if (browserUrlDisplay) browserUrlDisplay.textContent = fullUrl.replace(/^https?:\/\//, '');
   previewUrlText.textContent = fullUrl.replace(/^https?:\/\//, '');
 
   // Show edit mode button and reset to Play state (new preview = fresh play mode)
@@ -1825,15 +1825,6 @@ function switchTab(tab) {
   $('tab-code').classList.toggle('tab-btn--active', tab === 'code');
 }
 
-// ── Device switching ──────────────────────────────────────────────────────────
-$('device-btns').addEventListener('click', (e) => {
-  const btn = e.target.closest('.device-btn');
-  if (!btn) return;
-  currentDevice = btn.dataset.device;
-  document.querySelectorAll('.device-btn').forEach((b) => b.classList.remove('device-btn--active'));
-  btn.classList.add('device-btn--active');
-  deviceWrapper.dataset.device = currentDevice;
-});
 
 // ── Visual Edit Mode ──────────────────────────────────────────────────────────
 //

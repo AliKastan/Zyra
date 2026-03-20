@@ -171,17 +171,6 @@
           <button id="vpad-toggle-btn" class="icon-btn vpad-toggle-btn hidden" title="Virtual gamepad" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="10" r="1.5" fill="currentColor"/><circle cx="12" cy="14" r="1.5" fill="currentColor"/><circle cx="16" cy="12" r="1.5" fill="currentColor"/></svg>
           </button>
-          <div class="device-btns" id="device-btns">
-            <button class="device-btn" data-device="desktop" title="Desktop" type="button">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-            </button>
-            <button class="device-btn" data-device="tablet" title="Tablet" type="button">
-              <svg width="13" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="18.5" r="0.7" fill="currentColor"/></svg>
-            </button>
-            <button class="device-btn device-btn--active" data-device="mobile" title="Mobile" type="button">
-              <svg width="11" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="18.5" r="0.7" fill="currentColor"/><line x1="9" y1="6" x2="15" y2="6"/></svg>
-            </button>
-          </div>
           <div class="preview-action-btns">
             <button id="edit-mode-btn" class="edit-mode-toggle hidden" title="Toggle visual edit mode (E)" type="button">
               <span class="edit-mode-btn-icon" id="edit-mode-icon">
@@ -348,25 +337,8 @@
             <button id="zyra-edit-banner-close" class="zyra-edit-banner-close" type="button" title="Dismiss">&#x2715;</button>
           </div>
 
-          <div class="device-wrapper" id="device-wrapper" data-device="mobile">
-            <div class="browser-chrome" id="browser-chrome">
-              <div class="browser-dots">
-                <span class="bdot bdot-r"></span>
-                <span class="bdot bdot-y"></span>
-                <span class="bdot bdot-g"></span>
-              </div>
-              <div class="browser-url-display" id="browser-url-display">localhost:3001</div>
-              <div style="width:58px;"></div>
-            </div>
-            <div class="phone-notch-bar" id="phone-notch-bar">
-              <div class="phone-notch"></div>
-            </div>
-            <div class="frame-inner">
-              <iframe id="preview-iframe" title="App preview"></iframe>
-            </div>
-            <div class="phone-home-bar" id="phone-home-bar">
-              <div class="home-indicator"></div>
-            </div>
+          <div class="preview-canvas" id="device-wrapper">
+            <iframe id="preview-iframe" title="Game preview"></iframe>
           </div>
 
             <!-- Virtual gamepad — for testing keyboard-controlled apps on touch devices -->
