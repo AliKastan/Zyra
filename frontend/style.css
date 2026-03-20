@@ -1163,14 +1163,19 @@ textarea {
   color: var(--text);
   font-family: var(--font);
   font-size: 0.875rem;
-  padding: 0.65rem 0.85rem 0.4rem;
+  padding: 1rem 1.1rem 0.5rem;
   resize: none;
-  line-height: 1.6;
-  min-height: 110px;
-  max-height: 220px;
+  line-height: 1.65;
+  min-height: 160px;
+  max-height: 320px;
   overflow-y: auto;
+  letter-spacing: 0.005em;
 }
-textarea::placeholder { color: var(--text-muted); }
+textarea::placeholder {
+  color: var(--text-muted);
+  line-height: 1.7;
+  white-space: pre-line; /* allows \n in placeholder */
+}
 
 .input-meta-row {
   display: flex;
@@ -1463,47 +1468,12 @@ textarea::placeholder { color: var(--text-muted); }
 }
 .edit-mode-btn--active:hover { background: rgba(251,191,36,0.15) !important; }
 
-/* ── Edit overlay — transparent div that sits over the iframe ───────────────── */
-.edit-overlay {
-  position: absolute;
-  pointer-events: none; /* passthrough when edit mode off */
-  z-index: 800;
-  cursor: default;
-  display: none;
-  user-select: none;
+/* ── Edit mode active: amber outline on iframe (visual indicator only) ────────── */
+/* All selection boxes and hover highlights are drawn INSIDE the iframe by zyra-edit.js */
+#preview-iframe.preview-edit-active {
+  outline: 2px solid rgba(246, 173, 85, 0.45);
+  outline-offset: -2px;
 }
-.edit-overlay--active {
-  pointer-events: all;
-  cursor: crosshair;
-}
-
-/* ── Hover + Selection boxes (created by JS, live inside .preview-main) ─────── */
-.ed-hover-box {
-  border: 1.5px dashed rgba(99, 179, 237, 0.65);
-  border-radius: 2px;
-  z-index: 801;
-  transition: left 0.06s ease, top 0.06s ease, width 0.06s ease, height 0.06s ease;
-  background: rgba(99, 179, 237, 0.05);
-}
-.ed-select-box {
-  border: 2px solid rgba(246, 173, 85, 0.9);
-  border-radius: 2px;
-  z-index: 802;
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(246,173,85,0.3);
-  background: rgba(246, 173, 85, 0.04);
-}
-/* Corner handles drawn with pseudo-elements */
-.ed-select-box::before,
-.ed-select-box::after {
-  content: '';
-  position: absolute;
-  width: 7px; height: 7px;
-  border: 2px solid rgba(246,173,85,0.95);
-  border-radius: 1px;
-  background: #1a1a1a;
-}
-.ed-select-box::before { top: -4px; left: -4px; }
-.ed-select-box::after  { bottom: -4px; right: -4px; }
 
 /* ── Floating Edit Toolbar ───────────────────────────────────────────────────── */
 .edit-toolbar {

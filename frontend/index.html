@@ -134,9 +134,9 @@
         <div class="input-box">
           <textarea
             id="prompt-input"
-            rows="5"
+            rows="7"
             maxlength="3000"
-            placeholder="Describe the mobile game you want to build. E.g. 'Make a hypercasual runner game where the player dodges traffic by swiping left and right'"
+            placeholder="Describe the mobile game you want to build…&#10;&#10;e.g. 'A hypercasual runner where the player dodges traffic by swiping left and right, with neon city visuals and combo scoring'"
           ></textarea>
           <div class="input-meta-row">
             <div class="input-right-meta">
@@ -217,12 +217,6 @@
           </button>
         </div>
       </div>
-
-      <!-- Edit Overlay — transparent div covering the iframe in edit mode.
-           Captures pointer events so we can find + select iframe elements.
-           Hover/select boxes and the toolbar are siblings (not children) because
-           they need to escape the iframe's clipping boundary. -->
-      <div id="edit-overlay" class="edit-overlay"></div>
 
       <!-- Floating Edit Toolbar — appears near selected element, Figma-style -->
       <div id="edit-toolbar" class="edit-toolbar" aria-label="Element editor" style="display:none;">

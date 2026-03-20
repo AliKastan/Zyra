@@ -131,11 +131,8 @@ function switchToConversation(convId) {
   _edNodeId = null;
   if (editModeBtn) editModeBtn.classList.toggle('hidden', !currentSlug);
   if (editModeBtn) editModeBtn.classList.remove('edit-mode-btn--active');
-  if (editOverlay) editOverlay.classList.remove('edit-overlay--active');
-  if (editOverlay) editOverlay.style.display = 'none';
   if (editToolbar) editToolbar.style.display = 'none';
-  _edHideBox(_edHoverBox);
-  _edHideBox(_edSelectBox);
+  if (previewIframe) previewIframe.classList.remove('preview-edit-active');
   // Show/hide scope bar based on whether this conversation has a project
   if (scopeBar) scopeBar.classList.toggle('hidden', !currentSlug);
   // Reset scope to auto when switching conversations
@@ -256,10 +253,7 @@ let currentScope        = 'auto'; // 'auto' | 'ui' | 'logic' | 'component' | 'pa
 
 // Visual edit
 let _editModeActive  = false;
-let _edNodeId        = null;   // currently selected data-zyra-id
-let _edHoverBox      = null;   // DOM element: hover indicator
-let _edSelectBox     = null;   // DOM element: selection box
-let _edHandles       = [];     // resize handle DOM elements
+let _edNodeId        = null;   // data-zyra-id of currently selected element (set by ZYRA_ELEMENT_SELECTED)
 let _visualOverrides = {};     // { [slug]: { [nodeId]: { styles:{}, text:'' } } }
 let _viSaveTimer     = null;
 
@@ -336,7 +330,6 @@ const codeFileName = $('code-file-name');
 
 // Visual edit
 const editModeBtn = $('edit-mode-btn');
-const editOverlay = $('edit-overlay');
 const editToolbar = $('edit-toolbar');
 
 // ── Logo → Projects navigation ────────────────────────────────────────────────
@@ -1500,10 +1493,8 @@ function activatePreview(preview) {
   browserUrlDisplay.textContent = fullUrl.replace(/^https?:\/\//, '');
   previewUrlText.textContent = fullUrl.replace(/^https?:\/\//, '');
 
-  // Show edit mode button and reposition overlay for new iframe position
+  // Show edit mode button
   if (editModeBtn) editModeBtn.classList.remove('hidden');
-  // Delay slightly to let iframe layout settle before reading getBoundingClientRect
-  setTimeout(() => { if (_editModeActive) _edRepositionOverlay(); }, 200);
 
   // Fade iframe in on load
   previewIframe.style.opacity = '0';
@@ -1606,98 +1597,61 @@ $('device-btns').addEventListener('click', (e) => {
   deviceWrapper.dataset.device = currentDevice;
 });
 
-// ── Visual Edit Mode — Figma-like direct element editor ──────────────────────
+// ── Visual Edit Mode ──────────────────────────────────────────────────────────
+//
+// Architecture: zyra-edit.js (running inside the iframe) handles ALL selection,
+// hover highlighting, inline text editing, and the in-iframe selection bounding
+// box. This parent-side code only:
+//   1. Toggles edit mode via postMessage to the iframe
+//   2. Receives ZYRA_ELEMENT_SELECTED and shows/positions the floating toolbar
+//   3. Applies style changes directly to the iframe DOM (same-origin)
+//   4. Persists overrides per project
+//
+// NO parent-side overlay intercepts pointer events.
 
-// ── Coordinate helpers ────────────────────────────────────────────────────────
-
+// ── Iframe scale (accounts for CSS transform on device-wrapper) ───────────────
 function _edIframeScale() {
   if (!previewIframe) return { sx: 1, sy: 1 };
-  const r = previewIframe.getBoundingClientRect();
+  const r  = previewIframe.getBoundingClientRect();
   const sx = previewIframe.offsetWidth  > 0 ? r.width  / previewIframe.offsetWidth  : 1;
   const sy = previewIframe.offsetHeight > 0 ? r.height / previewIframe.offsetHeight : 1;
   return { sx, sy };
 }
 
-// Convert iframe-viewport rect → preview-main-relative rect
-function _edIframeRectToMain(elRect) {
-  const iframeRect = previewIframe.getBoundingClientRect();
-  const pmRect     = document.querySelector('.preview-main').getBoundingClientRect();
+// Convert an iframe-viewport rect to .preview-main-relative coordinates
+function _edIframeRectToMain(rect) {
+  const ir  = previewIframe.getBoundingClientRect();
+  const pmr = document.querySelector('.preview-main').getBoundingClientRect();
   const { sx, sy } = _edIframeScale();
   return {
-    left:   iframeRect.left - pmRect.left + elRect.left   * sx,
-    top:    iframeRect.top  - pmRect.top  + elRect.top    * sy,
-    width:  elRect.width  * sx,
-    height: elRect.height * sy,
+    left:   ir.left - pmr.left + rect.left   * sx,
+    top:    ir.top  - pmr.top  + rect.top    * sy,
+    width:  rect.width  * sx,
+    height: rect.height * sy,
   };
 }
 
-// ── Overlay repositioning ─────────────────────────────────────────────────────
-
-function _edRepositionOverlay() {
-  if (!editOverlay || !previewIframe) return;
-  const iframeRect = previewIframe.getBoundingClientRect();
-  const pmRect     = document.querySelector('.preview-main').getBoundingClientRect();
-  editOverlay.style.left   = (iframeRect.left - pmRect.left) + 'px';
-  editOverlay.style.top    = (iframeRect.top  - pmRect.top)  + 'px';
-  editOverlay.style.width  = iframeRect.width  + 'px';
-  editOverlay.style.height = iframeRect.height + 'px';
-}
-
-// ── Box helpers ───────────────────────────────────────────────────────────────
-
-function _edMakeBox(id, cls) {
-  const box = document.createElement('div');
-  box.id = id;
-  box.className = cls;
-  box.style.cssText = 'display:none;position:absolute;pointer-events:none;box-sizing:border-box;';
-  document.querySelector('.preview-main').appendChild(box);
-  return box;
-}
-
-function _edHideBox(box) { if (box) box.style.display = 'none'; }
-
-function _edPositionBox(box, mainRect) {
-  if (!box) return;
-  box.style.display = 'block';
-  box.style.left    = mainRect.left   + 'px';
-  box.style.top     = mainRect.top    + 'px';
-  box.style.width   = mainRect.width  + 'px';
-  box.style.height  = mainRect.height + 'px';
-}
-
-function _edGetHoverBox() {
-  if (!_edHoverBox) _edHoverBox = _edMakeBox('_ed-hover', 'ed-hover-box');
-  return _edHoverBox;
-}
-function _edGetSelectBox() {
-  if (!_edSelectBox) _edSelectBox = _edMakeBox('_ed-select', 'ed-select-box');
-  return _edSelectBox;
-}
-
-// ── Toolbar positioning ───────────────────────────────────────────────────────
-
+// ── Floating toolbar positioning ──────────────────────────────────────────────
 function _edPositionToolbar(mainRect) {
   if (!editToolbar) return;
-  const pm    = document.querySelector('.preview-main');
-  const pmW   = pm ? pm.offsetWidth  : 600;
-  const pmH   = pm ? pm.offsetHeight : 600;
-  const tbH   = editToolbar.offsetHeight || 44;
-  const tbW   = editToolbar.scrollWidth  || 560;
+  const pm  = document.querySelector('.preview-main');
+  const pmW = pm ? pm.offsetWidth  : 600;
+  const pmH = pm ? pm.offsetHeight : 600;
+  const tbH = editToolbar.offsetHeight || 44;
+  const tbW = editToolbar.scrollWidth  || 560;
 
   let top  = mainRect.top - tbH - 10;
   let left = mainRect.left;
-
   if (top < 8) top = mainRect.top + mainRect.height + 10;
   top  = Math.max(8, Math.min(top,  pmH - tbH - 8));
   left = Math.max(8, Math.min(left, pmW - tbW - 8));
 
-  editToolbar.style.left = left + 'px';
-  editToolbar.style.top  = top  + 'px';
+  editToolbar.style.left    = left + 'px';
+  editToolbar.style.top     = top  + 'px';
   editToolbar.style.display = 'flex';
 }
 
-// ── Color helper ──────────────────────────────────────────────────────────────
-
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function _edRgbToHex(css) {
   if (!css || css === 'transparent' || css === 'rgba(0, 0, 0, 0)') return '#000000';
   if (/^#/.test(css)) return css.slice(0, 7);
@@ -1705,61 +1659,44 @@ function _edRgbToHex(css) {
   if (!m) return '#000000';
   return '#' + [m[1], m[2], m[3]].map(n => (+n).toString(16).padStart(2, '0')).join('');
 }
-
 function _edParsePx(v) { return v ? Math.round(parseFloat(v)) || '' : ''; }
 
-// ── Toolbar population ────────────────────────────────────────────────────────
-
+// ── Populate toolbar from node info ──────────────────────────────────────────
 function _edPopulateToolbar(info) {
   if (!editToolbar || !info) return;
   const s  = info.styles || {};
   const tf = $('etb-text-field');
 
-  // Text
   const etText = $('etb-text');
   if (etText) {
-    etText.disabled    = !info.isTextNode;
-    etText.value       = info.isTextNode ? (info.text || '') : '';
-    etText.placeholder = info.isTextNode ? 'text content' : '(has child elements)';
-    if (tf) tf.style.opacity = info.isTextNode ? '1' : '0.35';
+    const editable      = !!info.isTextNode;
+    etText.disabled     = !editable;
+    etText.value        = editable ? (info.textContent || '') : '';
+    etText.placeholder  = editable ? 'text content' : '(has child elements)';
+    if (tf) tf.style.opacity = editable ? '1' : '0.35';
   }
 
-  // Font
-  const etFF = $('etb-font-family');
-  if (etFF) etFF.value = s.fontFamily || '';
-  const etFS = $('etb-font-size');
-  if (etFS) etFS.value = _edParsePx(s.fontSize);
+  const etFF = $('etb-font-family'); if (etFF) etFF.value = s.fontFamily || '';
+  const etFS = $('etb-font-size');   if (etFS) etFS.value = _edParsePx(s.fontSize);
 
-  // Bold / Italic
   const etBold   = $('etb-bold');
   const etItalic = $('etb-italic');
   if (etBold)   etBold.classList.toggle('etb-toggle-btn--on',   parseInt(s.fontWeight) >= 600);
   if (etItalic) etItalic.classList.toggle('etb-toggle-btn--on', s.fontStyle === 'italic');
 
-  // Colors
-  const etColor = $('etb-text-color');
-  if (etColor)  etColor.value = _edRgbToHex(s.color);
+  const etColor = $('etb-text-color'); if (etColor) etColor.value = _edRgbToHex(s.color);
   const etBg    = $('etb-bg-color');
   const bgHex   = _edRgbToHex(s.backgroundColor);
-  if (etBg)     etBg.value = bgHex;
-  const bgSw    = $('etb-bg-swatch');
-  if (bgSw)     bgSw.style.background = bgHex;
+  if (etBg) etBg.value = bgHex;
+  const bgSw = $('etb-bg-swatch'); if (bgSw) bgSw.style.background = bgHex;
 
-  // Box
-  const etW = $('etb-width');
-  if (etW)  etW.value  = _edParsePx(s.width);
-  const etH = $('etb-height');
-  if (etH)  etH.value  = _edParsePx(s.height);
-
-  // Radius + opacity
-  const etR = $('etb-radius');
-  if (etR)  etR.value  = _edParsePx(s.borderRadius);
-  const etO = $('etb-opacity');
-  if (etO)  etO.value  = Math.round(parseFloat(s.opacity || 1) * 100);
+  const etW = $('etb-width');   if (etW) etW.value = _edParsePx(s.width);
+  const etH = $('etb-height');  if (etH) etH.value = _edParsePx(s.height);
+  const etR = $('etb-radius');  if (etR) etR.value = _edParsePx(s.borderRadius);
+  const etO = $('etb-opacity'); if (etO) etO.value = Math.round(parseFloat(s.opacity || 1) * 100);
 }
 
-// ── Override application ──────────────────────────────────────────────────────
-
+// ── Apply a style override — direct DOM + store ───────────────────────────────
 function _edApplyStyle(prop, value) {
   if (!_edNodeId || !currentSlug) return;
   const doc = previewIframe && previewIframe.contentDocument;
@@ -1767,35 +1704,32 @@ function _edApplyStyle(prop, value) {
   const el = doc.querySelector(`[data-zyra-id="${_edNodeId}"]`);
   if (!el) return;
 
-  // Apply directly — real DOM, instant visual feedback
+  // Direct DOM — instant visual feedback, no postMessage round-trip needed
   try { el.style[prop] = value; } catch (_) {}
 
-  // Reposition selection box (size may have changed)
-  const elRect = el.getBoundingClientRect();
-  _edPositionBox(_edGetSelectBox(), _edIframeRectToMain(elRect));
+  // Tell zyra-edit.js to refresh its in-iframe selection box (size may change)
+  try { previewIframe.contentWindow.__zyraEdit.repositionSel(); } catch (_) {}
 
-  // Store in override map
-  if (!_visualOverrides[currentSlug])           _visualOverrides[currentSlug] = {};
-  if (!_visualOverrides[currentSlug][_edNodeId]) _visualOverrides[currentSlug][_edNodeId] = {};
-  const entry = _visualOverrides[currentSlug][_edNodeId];
-  if (!entry.styles) entry.styles = {};
-  entry.styles[prop] = value;
-
+  // Persist
+  if (!_visualOverrides[currentSlug]) _visualOverrides[currentSlug] = {};
+  const slug = _visualOverrides[currentSlug];
+  if (!slug[_edNodeId]) slug[_edNodeId] = {};
+  if (!slug[_edNodeId].styles) slug[_edNodeId].styles = {};
+  slug[_edNodeId].styles[prop] = value;
   _edSaveDebounced();
 }
 
+// Apply a text change from the toolbar text input
 function _edApplyText(text) {
   if (!_edNodeId || !currentSlug) return;
   const doc = previewIframe && previewIframe.contentDocument;
   if (!doc) return;
   const el = doc.querySelector(`[data-zyra-id="${_edNodeId}"]`);
-  if (!el) return;
-  if (el.childNodes.length <= 1) el.textContent = text;
+  if (el && el.childNodes.length <= 1) el.textContent = text;
 
-  if (!_visualOverrides[currentSlug])           _visualOverrides[currentSlug] = {};
+  if (!_visualOverrides[currentSlug]) _visualOverrides[currentSlug] = {};
   if (!_visualOverrides[currentSlug][_edNodeId]) _visualOverrides[currentSlug][_edNodeId] = {};
   _visualOverrides[currentSlug][_edNodeId].text = text;
-
   _edSaveDebounced();
 }
 
@@ -1810,177 +1744,78 @@ function _edSaveDebounced() {
   }, 800);
 }
 
-// ── Node selection ────────────────────────────────────────────────────────────
-
-function _edSelectById(nodeId) {
-  const doc = previewIframe && previewIframe.contentDocument;
-  if (!doc) return;
-  const el = doc.querySelector(`[data-zyra-id="${nodeId}"]`);
-  if (!el) return;
-  _edNodeId = nodeId;
-
-  // Draw selection box
-  const elRect   = el.getBoundingClientRect();
-  const mainRect = _edIframeRectToMain(elRect);
-  _edPositionBox(_edGetSelectBox(), mainRect);
-  _edHideBox(_edGetHoverBox());
-
-  // Populate toolbar with info from iframe
-  previewIframe.contentWindow.postMessage({ type: 'ZYRA_GET_NODE_INFO', nodeId }, '*');
-  // Toolbar will appear after ZYRA_NODE_INFO arrives; show loading state now
-  editToolbar.style.display = 'flex';
-  _edPositionToolbar(mainRect);
-}
-
-function _edDeselect() {
-  _edNodeId = null;
-  _edHideBox(_edGetSelectBox());
-  _edHideBox(_edGetHoverBox());
-  if (editToolbar) editToolbar.style.display = 'none';
-}
-
 // ── Edit mode toggle ──────────────────────────────────────────────────────────
-
 function _setEditMode(active) {
   _editModeActive = active;
   if (editModeBtn) editModeBtn.classList.toggle('edit-mode-btn--active', active);
 
-  if (editOverlay) {
-    editOverlay.classList.toggle('edit-overlay--active', active);
-    if (active) {
-      editOverlay.style.display = 'block';
-      _edRepositionOverlay();
-    } else {
-      editOverlay.style.display = 'none';
+  // Visual indicator: amber outline on iframe when edit mode is on
+  if (previewIframe) previewIframe.classList.toggle('preview-edit-active', active);
+
+  // Tell iframe to activate/deactivate its own event interceptors
+  try {
+    if (previewIframe && previewIframe.contentWindow) {
+      previewIframe.contentWindow.postMessage({ type: 'ZYRA_EDIT_MODE', enabled: active }, '*');
     }
-  }
+  } catch (_) {}
 
   if (!active) {
-    _edDeselect();
-    _edHideBox(_edGetHoverBox());
+    _edNodeId = null;
+    if (editToolbar) editToolbar.style.display = 'none';
   }
 }
 
-// ── Overlay pointer events ────────────────────────────────────────────────────
+// ── Toolbar control wiring ────────────────────────────────────────────────────
+function _etbOn(id, ev, fn) { const el = $(id); if (el) el.addEventListener(ev, fn); }
 
-function _edFindNode(clientX, clientY) {
-  const doc = previewIframe && previewIframe.contentDocument;
-  if (!doc) return null;
-  const iframeRect = previewIframe.getBoundingClientRect();
-  if (clientX < iframeRect.left || clientX > iframeRect.right) return null;
-  if (clientY < iframeRect.top  || clientY > iframeRect.bottom) return null;
-
-  const { sx, sy } = _edIframeScale();
-  const ix = (clientX - iframeRect.left) / sx;
-  const iy = (clientY - iframeRect.top)  / sy;
-
-  let el;
-  try { el = doc.elementFromPoint(ix, iy); } catch (_) { return null; }
-  if (!el || el === doc.documentElement || el === doc.body) return null;
-
-  // Walk up to find the closest ancestor with a zyra-id
-  let node = el;
-  while (node && node !== doc.body) {
-    if (node.hasAttribute && node.hasAttribute('data-zyra-id')) return node;
-    node = node.parentElement;
-  }
-  return null;
-}
-
-if (editOverlay) {
-  editOverlay.addEventListener('mousemove', (e) => {
-    if (!_editModeActive) return;
-    const el = _edFindNode(e.clientX, e.clientY);
-    if (!el) { _edHideBox(_edGetHoverBox()); return; }
-    const nodeId = el.getAttribute('data-zyra-id');
-    if (nodeId === _edNodeId) { _edHideBox(_edGetHoverBox()); return; }
-    _edPositionBox(_edGetHoverBox(), _edIframeRectToMain(el.getBoundingClientRect()));
-  });
-
-  editOverlay.addEventListener('mouseleave', () => {
-    _edHideBox(_edGetHoverBox());
-  });
-
-  editOverlay.addEventListener('click', (e) => {
-    if (!_editModeActive) return;
-    e.preventDefault();
-    const el = _edFindNode(e.clientX, e.clientY);
-    if (!el) { _edDeselect(); return; }
-    const nodeId = el.getAttribute('data-zyra-id');
-    if (nodeId) _edSelectById(nodeId);
-    else _edDeselect();
-  });
-}
-
-// ── Toolbar controls ──────────────────────────────────────────────────────────
-
-function _etbOn(id, event, fn) {
-  const el = $(id);
-  if (el) el.addEventListener(event, fn);
-}
-
-_etbOn('etb-text',       'input',  () => _edApplyText($('etb-text').value));
-_etbOn('etb-font-family','change', () => _edApplyStyle('fontFamily',       $('etb-font-family').value));
-_etbOn('etb-font-size',  'change', () => { const v = $('etb-font-size').value; if (v) _edApplyStyle('fontSize', v + 'px'); });
-_etbOn('etb-bold',       'click',  () => {
-  const btn = $('etb-bold');
-  btn.classList.toggle('etb-toggle-btn--on');
+_etbOn('etb-text',        'input',  () => _edApplyText($('etb-text').value));
+_etbOn('etb-font-family', 'change', () => _edApplyStyle('fontFamily',     $('etb-font-family').value));
+_etbOn('etb-font-size',   'change', () => { const v = $('etb-font-size').value;  if (v) _edApplyStyle('fontSize', v + 'px'); });
+_etbOn('etb-bold',        'click',  () => {
+  const btn = $('etb-bold'); btn.classList.toggle('etb-toggle-btn--on');
   _edApplyStyle('fontWeight', btn.classList.contains('etb-toggle-btn--on') ? '700' : '400');
 });
-_etbOn('etb-italic',     'click',  () => {
-  const btn = $('etb-italic');
-  btn.classList.toggle('etb-toggle-btn--on');
-  _edApplyStyle('fontStyle', btn.classList.contains('etb-toggle-btn--on') ? 'italic' : 'normal');
+_etbOn('etb-italic',      'click',  () => {
+  const btn = $('etb-italic'); btn.classList.toggle('etb-toggle-btn--on');
+  _edApplyStyle('fontStyle',  btn.classList.contains('etb-toggle-btn--on') ? 'italic' : 'normal');
 });
-_etbOn('etb-text-color', 'input',  () => _edApplyStyle('color',           $('etb-text-color').value));
-_etbOn('etb-bg-color',   'input',  () => {
+_etbOn('etb-text-color',  'input',  () => _edApplyStyle('color',           $('etb-text-color').value));
+_etbOn('etb-bg-color',    'input',  () => {
   const v = $('etb-bg-color').value;
-  const sw = $('etb-bg-swatch');
-  if (sw) sw.style.background = v;
+  const sw = $('etb-bg-swatch'); if (sw) sw.style.background = v;
   _edApplyStyle('backgroundColor', v);
 });
-_etbOn('etb-width',      'change', () => { const v = $('etb-width').value;   if (v) _edApplyStyle('width',        v + 'px'); });
-_etbOn('etb-height',     'change', () => { const v = $('etb-height').value;  if (v) _edApplyStyle('height',       v + 'px'); });
-_etbOn('etb-radius',     'change', () => { const v = $('etb-radius').value;  if (v !== '') _edApplyStyle('borderRadius', v + 'px'); });
-_etbOn('etb-opacity',    'input',  () => {
+_etbOn('etb-width',       'change', () => { const v = $('etb-width').value;   if (v) _edApplyStyle('width',        v + 'px'); });
+_etbOn('etb-height',      'change', () => { const v = $('etb-height').value;  if (v) _edApplyStyle('height',       v + 'px'); });
+_etbOn('etb-radius',      'change', () => { const v = $('etb-radius').value;  if (v !== '') _edApplyStyle('borderRadius', v + 'px'); });
+_etbOn('etb-opacity',     'input',  () => {
   const v = $('etb-opacity').value;
   if (v !== '') _edApplyStyle('opacity', (parseFloat(v) / 100).toFixed(2));
 });
-_etbOn('etb-close',      'click',  () => _edDeselect());
+_etbOn('etb-close', 'click', () => {
+  // Tell iframe to deselect; toolbar will hide via ZYRA_ELEMENT_DESELECTED
+  try { previewIframe.contentWindow.postMessage({ type: 'ZYRA_DESELECT' }, '*'); } catch (_) {}
+  _edNodeId = null;
+  if (editToolbar) editToolbar.style.display = 'none';
+});
 
 if (editModeBtn) editModeBtn.addEventListener('click', () => _setEditMode(!_editModeActive));
 
-// Esc: deselect → exit edit mode
+// Esc at parent level: if nothing selected in iframe, exit edit mode
 document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
-  if (_edNodeId) _edDeselect();
-  else if (_editModeActive) _setEditMode(false);
+  if (e.key === 'Escape' && _editModeActive && !_edNodeId) _setEditMode(false);
 });
 
-// Reposition on resize
-window.addEventListener('resize', () => {
-  if (_editModeActive) _edRepositionOverlay();
-  if (_edNodeId) {
-    const doc = previewIframe && previewIframe.contentDocument;
-    if (!doc) return;
-    const el = doc.querySelector(`[data-zyra-id="${_edNodeId}"]`);
-    if (el) {
-      const mainRect = _edIframeRectToMain(el.getBoundingClientRect());
-      _edPositionBox(_edGetSelectBox(), mainRect);
-      _edPositionToolbar(mainRect);
-    }
-  }
-});
-
-// ── postMessage: iframe bridge events ─────────────────────────────────────────
-
+// ── postMessage from iframe ───────────────────────────────────────────────────
 window.addEventListener('message', (e) => {
   const msg = e.data;
   if (!msg || !msg.type) return;
 
-  // Bridge loaded — apply saved overrides + reposition overlay
+  // Bridge booted — re-send edit mode state + saved overrides
   if (msg.type === 'ZYRA_EDIT_READY') {
-    _edRepositionOverlay();
+    if (_editModeActive) {
+      try { previewIframe.contentWindow.postMessage({ type: 'ZYRA_EDIT_MODE', enabled: true }, '*'); } catch (_) {}
+    }
     if (currentSlug && _visualOverrides[currentSlug]) {
       try {
         previewIframe.contentWindow.postMessage({
@@ -1989,30 +1824,36 @@ window.addEventListener('message', (e) => {
         }, '*');
       } catch (_) {}
     }
-    // Listen to iframe scroll to reposition selection box
-    try {
-      previewIframe.contentWindow.addEventListener('scroll', () => {
-        if (!_edNodeId) return;
-        const doc = previewIframe.contentDocument;
-        const el  = doc && doc.querySelector(`[data-zyra-id="${_edNodeId}"]`);
-        if (!el) return;
-        const mainRect = _edIframeRectToMain(el.getBoundingClientRect());
-        _edPositionBox(_edGetSelectBox(), mainRect);
-        _edPositionToolbar(mainRect);
-      }, { passive: true });
-    } catch (_) {}
   }
 
-  // Node info response — populate toolbar after selection
-  if (msg.type === 'ZYRA_NODE_INFO' && msg.info) {
-    _edPopulateToolbar(msg.info);
-    if (msg.info.rect) {
-      const mainRect = _edIframeRectToMain(msg.info.rect);
-      _edPositionToolbar(mainRect);
-    }
+  // User clicked an element inside iframe → show + position toolbar
+  if (msg.type === 'ZYRA_ELEMENT_SELECTED') {
+    _edNodeId = msg.nodeId;
+    if (msg.info)  _edPopulateToolbar(msg.info);
+    if (msg.rect)  _edPositionToolbar(_edIframeRectToMain(msg.rect));
   }
 
-  // ZYRA_RUNTIME_ERROR is handled elsewhere
+  // User deselected (clicked empty area or pressed Esc)
+  if (msg.type === 'ZYRA_ELEMENT_DESELECTED') {
+    _edNodeId = null;
+    if (editToolbar) editToolbar.style.display = 'none';
+  }
+
+  // Inline text edit was committed — persist the text override
+  if (msg.type === 'ZYRA_TEXT_COMMITTED' && msg.saved && msg.nodeId) {
+    if (!_visualOverrides[currentSlug]) _visualOverrides[currentSlug] = {};
+    if (!_visualOverrides[currentSlug][msg.nodeId]) _visualOverrides[currentSlug][msg.nodeId] = {};
+    _visualOverrides[currentSlug][msg.nodeId].text = msg.text;
+    _edSaveDebounced();
+    // Keep toolbar text input in sync
+    const etText = $('etb-text');
+    if (etText && _edNodeId === msg.nodeId) etText.value = msg.text || '';
+  }
+
+  // Iframe asks parent to exit edit mode (Esc pressed when nothing is selected)
+  if (msg.type === 'ZYRA_REQUEST_EXIT_EDIT_MODE') _setEditMode(false);
+
+  // ZYRA_RUNTIME_ERROR handled by its own listener below
 });
 
 // ── Preview controls ──────────────────────────────────────────────────────────
@@ -2583,7 +2424,7 @@ function isBreakingError(msg) {
 
 function canAutoFix() {
   if (!currentSlug) return false;
-  if (isGenerating) return false;
+  if (currentJobId) return false;
   if (_runtimeFixPending) return false;
   if (Date.now() < _runtimeFixCooldown) return false;
   return true;
