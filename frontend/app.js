@@ -938,7 +938,11 @@ async function pollJob(jobId) {
               initiatePreview(slug);
             }
           } else {
-            initiatePreview(slug);
+            // New game: run silent quality pipeline before revealing to user
+            setPreviewState('loading', _QP_MSGS[0], '');
+            runQualityPipeline(slug, _lastGenerationPrompt || '')
+              .catch(() => {}) // never block reveal on pipeline failure
+              .then(() => initiatePreview(slug));
           }
         }
       } else {
@@ -1592,6 +1596,221 @@ function updateLoadingMessage(msg, sub) {
   const lm = $('loading-message'); const ls = $('loading-sub');
   if (lm) lm.textContent = msg;
   if (ls && sub !== undefined) ls.textContent = sub;
+}
+
+// ── Quality Pipeline — silent sandbox test-and-fix before showing the game ────
+//
+// Flow: freshly-generated code → load in hidden iframe → run 7 checks → if
+// any fail, POST errors to /api/fix/quality/:slug → Claude fixes the file →
+// re-test. Up to 3 rounds (1 initial test + 2 fix-and-retest). The user sees
+// only generic loading messages and never knows about the error loop.
+// If all attempts fail we show the best version anyway — silent degradation.
+
+// Error collector injected into the hidden sandbox before the game code loads.
+// Captures window.onerror, unhandled rejections, and console.error calls.
+const _QP_COLLECTOR = `<script>
+window.__zyraErrors=[];
+window.onerror=function(m,s,l,c,e){window.__zyraErrors.push({type:'runtime',message:m,line:l,stack:e?e.stack:null});return true;};
+window.addEventListener('unhandledrejection',function(e){window.__zyraErrors.push({type:'promise',message:e.reason?(e.reason.message||String(e.reason)):'Unhandled rejection'});});
+var _ce=console.error;console.error=function(){window.__zyraErrors.push({type:'console',message:Array.from(arguments).map(function(a){return typeof a==='object'?JSON.stringify(a):String(a);}).join(' ')});_ce.apply(console,arguments);};
+</script>`;
+
+// Loading messages cycled for each pipeline stage (friendly, no mention of errors)
+const _QP_MSGS = [
+  'Creating your game\u2026',
+  'Polishing the gameplay\u2026',
+  'Adding finishing touches\u2026',
+];
+
+function _qpCreateSandbox() {
+  const old = document.getElementById('zyra-test-sandbox');
+  if (old) old.remove();
+  const sb = document.createElement('iframe');
+  sb.id = 'zyra-test-sandbox';
+  sb.style.cssText = 'position:fixed;top:-20000px;left:-20000px;width:375px;height:812px;border:none;visibility:hidden;pointer-events:none;';
+  document.body.appendChild(sb);
+  return sb;
+}
+
+function _qpDestroySandbox() {
+  const sb = document.getElementById('zyra-test-sandbox');
+  if (sb) sb.remove();
+}
+
+async function _qpFetchHtml(slug) {
+  const res = await fetch('/preview/' + encodeURIComponent(slug) + '/');
+  if (!res.ok) throw new Error('Preview fetch failed: ' + res.status);
+  return res.text();
+}
+
+// Prepend error collector + <base> tag so relative assets (CSS, JS) still resolve
+function _qpPrepareHtml(html, slug) {
+  const base = `<base href="${location.origin}/preview/${encodeURIComponent(slug)}/">`;
+  // Inject <base> at start of <head>
+  if (/<head[^>]*>/i.test(html)) {
+    html = html.replace(/(<head[^>]*>)/i, '$1' + base);
+  } else {
+    html = base + html;
+  }
+  // Inject error collector just after <body> opens
+  if (/<body[^>]*>/i.test(html)) {
+    html = html.replace(/(<body[^>]*>)/i, '$1' + _QP_COLLECTOR);
+  } else {
+    html = _QP_COLLECTOR + html;
+  }
+  return html;
+}
+
+async function _qpRunChecks(slug) {
+  let sb;
+  try {
+    sb = _qpCreateSandbox();
+    const raw  = await _qpFetchHtml(slug);
+    const html = _qpPrepareHtml(raw, slug);
+
+    // Load game code in sandbox and wait for it to initialise
+    await new Promise((resolve) => {
+      const safetyTimer = setTimeout(resolve, 8000);
+      sb.onload = () => setTimeout(() => { clearTimeout(safetyTimer); resolve(); }, 2500);
+      sb.srcdoc = html;
+    });
+
+    const doc = sb.contentDocument;
+    const win = sb.contentWindow;
+    if (!doc || !win) {
+      return { pass: false, errors: [{ check: 'sandbox', message: 'Cannot access sandbox content.' }] };
+    }
+
+    const errors    = [];
+    const jsErrors  = (win.__zyraErrors || []);
+
+    // ── 1. JS runtime errors (filter out CORS noise from external resources) ─
+    const runtimeErrs = jsErrors.filter(e =>
+      e.type === 'runtime' &&
+      e.message &&
+      !e.message.includes('cross-origin') &&
+      !e.message.toLowerCase().includes('cors') &&
+      !e.message.includes('Script error')
+    );
+    runtimeErrs.slice(0, 3).forEach(e => {
+      errors.push({ check: 'js_error', message: `JS error: "${e.message}"` + (e.line ? ` (line ${e.line})` : '') });
+    });
+
+    // ── 2. Blank / near-empty screen ─────────────────────────────────────────
+    const bodyHtml = doc.body ? doc.body.innerHTML.trim() : '';
+    const elCount  = doc.querySelectorAll('*').length;
+    if (bodyHtml.length < 10 || elCount < 3) {
+      errors.push({ check: 'blank_screen', message: `Game renders blank. ${elCount} DOM elements, ${bodyHtml.length} chars.` });
+    }
+
+    // ── 3. Horizontal overflow on 375px mobile viewport ──────────────────────
+    const overflow = [];
+    doc.querySelectorAll('*').forEach(el => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0 && (r.right > 400 || r.left < -25)) {
+        overflow.push(el.tagName + (el.className ? '.' + String(el.className).split(' ')[0] : ''));
+      }
+    });
+    if (overflow.length > 3) {
+      errors.push({ check: 'overflow', message: `${overflow.length} elements overflow 375px viewport. E.g.: ${overflow.slice(0, 4).join(', ')}` });
+    }
+
+    // ── 4. No interactivity (only flag if no canvas either) ──────────────────
+    const hasCanvas = !!doc.querySelector('canvas');
+    const btns = Array.from(doc.querySelectorAll('button,[role="button"],a[href],[onclick],input[type="submit"]'))
+      .filter(b => {
+        const r = b.getBoundingClientRect();
+        const s = win.getComputedStyle(b);
+        return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+      });
+    if (btns.length === 0 && !hasCanvas) {
+      errors.push({ check: 'no_interactivity', message: 'No visible buttons or canvas found — game has no interactivity.' });
+    }
+
+    // ── 5. Click the first button — does it throw? ────────────────────────────
+    if (btns.length > 0) {
+      const before = jsErrors.length;
+      try { btns[0].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); } catch (_) {}
+      await new Promise(r => setTimeout(r, 500));
+      const newErrs = (win.__zyraErrors || []).slice(before).filter(e => e.type !== 'console');
+      if (newErrs.length > 0) {
+        errors.push({ check: 'click_crash', message: `Clicking "${(btns[0].textContent || '').trim().slice(0, 30)}" threw errors: ${newErrs.map(e => e.message).join('; ')}` });
+      }
+    }
+
+    // ── 6. Broken external images ─────────────────────────────────────────────
+    const brokenImgs = Array.from(doc.querySelectorAll('img')).filter(img => {
+      if ((img.src || '').startsWith('data:')) return false;
+      return !img.complete || img.naturalWidth === 0;
+    });
+    if (brokenImgs.length > 0) {
+      errors.push({ check: 'broken_images', message: `${brokenImgs.length} image(s) failed to load: ${brokenImgs.map(i => (i.getAttribute('src') || '').slice(0, 60)).join(', ')}` });
+    }
+
+    // ── 7. Invisible text elements ────────────────────────────────────────────
+    let invisCount = 0;
+    doc.querySelectorAll('h1,h2,h3,p,span,button,a,label').forEach(el => {
+      if (el.textContent.trim() && el.offsetParent !== null) {
+        const s = win.getComputedStyle(el);
+        if (parseFloat(s.fontSize) < 1 || s.opacity === '0') invisCount++;
+      }
+    });
+    if (invisCount > 2) {
+      errors.push({ check: 'invisible_text', message: `${invisCount} text elements are invisible (font-size:0 or opacity:0).` });
+    }
+
+    return { pass: errors.length === 0, errors, errorCount: errors.length };
+  } catch (err) {
+    // Any unexpected failure — let the pipeline log and proceed
+    return { pass: false, errors: [{ check: 'sandbox_error', message: err.message }] };
+  } finally {
+    _qpDestroySandbox();
+  }
+}
+
+// ── Main pipeline loop ────────────────────────────────────────────────────────
+// Called after a job completes (non-edit only). Tests the generated code,
+// requests fixes for any failures, and resolves when ready to show the user.
+const MAX_QP_ATTEMPTS = 3; // 1 initial test + up to 2 fix-and-retest rounds
+
+async function runQualityPipeline(slug, originalPrompt) {
+  for (let attempt = 0; attempt < MAX_QP_ATTEMPTS; attempt++) {
+    updateLoadingMessage(_QP_MSGS[attempt] || _QP_MSGS[_QP_MSGS.length - 1], '');
+
+    let result;
+    try {
+      result = await _qpRunChecks(slug);
+    } catch (e) {
+      console.warn('[QP] test threw unexpectedly:', e.message);
+      return; // proceed to show game
+    }
+
+    if (result.pass) {
+      console.debug(`[QP] "${slug}" passed on attempt ${attempt + 1}`);
+      return; // clean bill of health
+    }
+
+    console.debug(`[QP] "${slug}" attempt ${attempt + 1} — ${result.errorCount} issue(s):`,
+      result.errors.map(e => e.check).join(', '));
+
+    // Last attempt — show whatever we have
+    if (attempt === MAX_QP_ATTEMPTS - 1) {
+      console.debug('[QP] max attempts reached, showing best version');
+      return;
+    }
+
+    // Ask the server to fix the code with Claude
+    try {
+      await apiFetch(`/api/fix/quality/${encodeURIComponent(slug)}`, {
+        method: 'POST',
+        body: JSON.stringify({ errors: result.errors, originalPrompt: originalPrompt || '' }),
+      });
+    } catch (e) {
+      console.warn('[QP] fix request failed:', e.message);
+      return; // show game anyway
+    }
+    // Loop: re-fetch the updated file on the next iteration
+  }
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
