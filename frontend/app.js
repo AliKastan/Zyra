@@ -310,6 +310,17 @@ const codeFileList = $('code-file-list');
 const codeText     = $('code-text');
 const codeFileName = $('code-file-name');
 
+// ── Logo → Projects navigation ────────────────────────────────────────────────
+// Intercepts the logo link click so we can guard against in-progress generation.
+// If no job is running, standard link navigation takes over (no JS reload needed).
+document.getElementById('brand-logo-link')?.addEventListener('click', (e) => {
+  if (!currentJobId) return; // let href handle it
+  e.preventDefault();
+  if (window.confirm('A generation is in progress. Leave and go to Projects?')) {
+    window.location.href = '/projects';
+  }
+});
+
 // ── Health ────────────────────────────────────────────────────────────────────
 async function checkHealth() {
   try {
