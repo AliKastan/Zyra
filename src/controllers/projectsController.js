@@ -10,7 +10,7 @@ const {
   getStoredFiles,
   backfillProjectFiles,
 } = require('../storage/projectStore');
-const { getProjectFiles, listProjects } = require('../generators/projectGenerator');
+const { getProjectFiles } = require('../generators/projectGenerator');
 const { now } = require('../utils/timestamps');
 
 const GENERATED_DIR = path.resolve(__dirname, '../../generated-projects');
@@ -19,7 +19,7 @@ const GENERATED_DIR = path.resolve(__dirname, '../../generated-projects');
  * GET /api/projects
  * Returns saved project metadata list, annotated with whether files are restorable.
  */
-async function handleListProjects(req, res) {
+async function handleListProjects(_req, res) {
   try {
     const projects = await listProjectMeta();
     // Annotate each project with filesystem availability (non-blocking)
@@ -36,14 +36,41 @@ async function handleListProjects(req, res) {
 
 /**
  * GET /api/projects/:name
+ * Returns project metadata + filesystem availability.
  */
 async function handleGetProject(req, res) {
   const { name } = req.params;
   if (!/^[a-z0-9-]+$/.test(name)) return res.status(400).json({ error: 'Invalid project name' });
-  const projectDir = path.join(GENERATED_DIR, name);
-  const exists = await fse.pathExists(projectDir);
-  if (!exists) return res.status(404).json({ error: 'Project not found', exists: false });
-  return res.json({ exists: true, slug: name });
+  try {
+    const meta = await getProject(name);
+    const projectDir = path.join(GENERATED_DIR, name);
+    const filesOnDisk = await fse.pathExists(projectDir).catch(() => false);
+    const canRestore  = filesOnDisk ? false : await hasStoredFiles(name).catch(() => false);
+    if (!meta && !filesOnDisk) return res.status(404).json({ error: 'Project not found', exists: false });
+    return res.json({ exists: true, slug: name, _filesOnDisk: filesOnDisk, _canRestore: canRestore, ...(meta || {}) });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * PATCH /api/projects/:name
+ * Updates editable project fields (displayName, description).
+ */
+async function handleUpdateProject(req, res) {
+  const { name } = req.params;
+  if (!/^[a-z0-9-]+$/.test(name)) return res.status(400).json({ error: 'Invalid project name' });
+  const { displayName, description } = req.body;
+  const updates = {};
+  if (displayName !== undefined) updates.displayName = String(displayName).slice(0, 100).trim();
+  if (description !== undefined) updates.description = String(description).slice(0, 500).trim();
+  if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No valid fields to update' });
+  try {
+    const updated = await updateProject(name, updates);
+    return res.json({ success: true, project: updated });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
 }
 
 /**
@@ -166,6 +193,6 @@ async function handleRestoreProject(req, res) {
 }
 
 module.exports = {
-  handleListProjects, handleGetProject, handleGetProjectFiles, handleDeleteProject,
-  handleOpenProject, handleRestoreProject, handleGetStoredFiles,
+  handleListProjects, handleGetProject, handleUpdateProject, handleGetProjectFiles,
+  handleDeleteProject, handleOpenProject, handleRestoreProject, handleGetStoredFiles,
 };

@@ -440,6 +440,11 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
     await log('Finalizing project...');
 
     const generatedBy = codeOutput._advanced ? 'advanced' : codeOutput._template ? 'template' : codeOutput._fallback ? 'fallback' : 'coder';
+    // Derive display name from prompt (first 6 words, title-cased)
+    const _dWords = userPrompt.trim().split(/\s+/).slice(0, 6);
+    const displayName = _dWords.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') +
+                        (userPrompt.trim().split(/\s+/).length > 6 ? '...' : '');
+    const gameType = mode === '3d' ? '3d' : '2d';
     await withTimeout(
       saveProject(projectSlug, {
         jobId, prompt: userPrompt, mode, complexity,
@@ -451,6 +456,11 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
         appType:      complexity.appType,
         blueprint:    codeOutput._blueprint   || undefined,
         validation:   codeOutput._validation  || undefined,
+        // Project workspace fields
+        userId,
+        displayName,
+        gameType,
+        status: 'ready',
       }),
       limits.FINALIZE_TIMEOUT_MS,
       'Project save',

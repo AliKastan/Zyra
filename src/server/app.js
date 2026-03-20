@@ -114,6 +114,11 @@ app.get('/app', requireGate, (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/index.html'));
 });
 
+// Projects dashboard: gate-protected
+app.get('/projects', requireGate, (_req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../frontend/projects.html'));
+});
+
 // Login page — gate-protected (login is post-access, within the product)
 app.get('/login', requireGate, (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/login.html'));

@@ -103,6 +103,14 @@ function createNewConversation() {
   return conv;
 }
 
+/** Updates the header project name breadcrumb. */
+function _updateHeaderProject(name) {
+  const el = document.getElementById('header-project-name');
+  if (!el) return;
+  el.textContent = name || '';
+  el.style.display = name ? 'inline' : 'none';
+}
+
 function switchToConversation(convId) {
   const conv = conversations.find(c => c.id === convId);
   if (!conv || convId === activeConvId) return;
@@ -127,6 +135,7 @@ function switchToConversation(convId) {
   renderAllMessages();
   renderHistory();
   updateDeployButton(currentSlug);
+  _updateHeaderProject(conv.projectSlug ? conv.title : '');
 
   if (currentSlug) {
     loadCodeFileList(currentSlug);
@@ -2026,6 +2035,48 @@ const _avatarBtn = $('account-avatar-btn');
 if (_avatarBtn) _avatarBtn.classList.add('hidden');
 
 loadAllData();
+
+// ── URL param: open a specific project ────────────────────────────────────────
+(function applyUrlParams() {
+  const params      = new URLSearchParams(window.location.search);
+  const projectSlug = params.get('project');
+  const isNew       = params.get('new');
+
+  if (projectSlug) {
+    // Find an existing conversation linked to this project
+    const existing = conversations.find(c => c.projectSlug === projectSlug);
+    if (existing) {
+      activeConvId = existing.id;
+      messages     = existing.messages;
+    } else {
+      // Project exists on server but not in local storage — create a thin shell
+      const humanName = projectSlug.split('-')
+        .map(w => w ? w.charAt(0).toUpperCase() + w.slice(1) : '').join(' ');
+      const conv = {
+        id: uid(), title: humanName, messages: [],
+        createdAt: Date.now(), updatedAt: Date.now(),
+        starred: false, projectSlug, previewUrl: null, _titled: true,
+      };
+      conversations.unshift(conv);
+      activeConvId = conv.id;
+      messages     = conv.messages;
+      saveAllData();
+      // Fetch real display name from server and update title
+      apiFetch(`/api/projects/${encodeURIComponent(projectSlug)}`).then(data => {
+        if (data.displayName) { conv.title = data.displayName; saveAllData(); renderHistory(); }
+        _updateHeaderProject(conv.title);
+      }).catch(() => {});
+    }
+  } else if (isNew) {
+    createNewConversation();
+  }
+
+  // Clean the URL so refreshing doesn't re-run this
+  if (projectSlug || isNew) {
+    window.history.replaceState({}, '', '/app');
+  }
+})();
+
 renderAllMessages();
 renderHistory();
 checkHealth();

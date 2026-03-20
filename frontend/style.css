@@ -318,6 +318,39 @@ html, body {
   color: rgba(255,255,255,0.92);
 }
 
+/* ── Header project breadcrumb ─────────────────────────────────────────────── */
+.header-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.78rem;
+  font-weight: 500;
+  transition: color var(--ease), background var(--ease);
+  white-space: nowrap;
+}
+.header-back-btn:hover { color: var(--text-dim); background: var(--surface2); }
+
+.header-brand-sep {
+  color: var(--border-mid);
+  font-size: 0.85rem;
+  user-select: none;
+}
+
+.header-project-name {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: none;
+}
+
 /* ── Account menu ──────────────────────────────────────────────────────────── */
 .account-menu-wrap { position: relative; }
 
