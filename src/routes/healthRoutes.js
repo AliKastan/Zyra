@@ -6,17 +6,19 @@ const limits = require('../config/limits');
 
 const router = Router();
 
-router.get('/', (req, res) => {
+router.get('/', (_req, res) => {
   res.json({
-    status: 'ok',
-    service: 'zyra',
-    time: now(),
-    routing: getRoutingConfig(),
+    status:     'ok',
+    service:    'zyra',
+    time:       now(),
+    routing:    getRoutingConfig(),
     activeJobs: getActiveJobCount(),
     limits: {
-      maxJobDurationMs: limits.MAX_JOB_DURATION_MS,
+      maxJobDurationMs:  limits.MAX_JOB_DURATION_MS,
       maxConcurrentJobs: limits.MAX_CONCURRENT_JOBS,
     },
+    // Exposed to frontend via apiFetch('/api/health')
+    privateBeta: process.env.DISABLE_APP_BILLING_FOR_PRIVATE_BETA === 'true',
   });
 });
 

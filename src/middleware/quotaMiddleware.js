@@ -70,12 +70,14 @@ async function enforceQuota(req, res, next) {
   // Without it, ALL authenticated users generate freely — no credit checks.
   // This is the correct default for private beta and development.
   if (process.env.ENFORCE_BILLING !== 'true') {
+    logger.info('[GEN] billing_guard_result=SKIPPED reason=billing_not_enforced user=' + (req.user?.id || 'anon'));
     req.userPlan = 'beta';
     return next();
   }
 
   // ── Legacy bypass flags (still respected when ENFORCE_BILLING=true) ──────
   if (process.env.DISABLE_APP_BILLING_FOR_PRIVATE_BETA === 'true') {
+    logger.info('[GEN] billing_guard_result=SKIPPED reason=private_beta_flag user=' + (req.user?.id || 'anon'));
     logger.info(`[quota] Private-beta flag: billing gate skipped for ${req.user?.email || req.user?.id}`);
     req.userPlan = 'beta';
     return next();

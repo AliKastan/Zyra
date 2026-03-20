@@ -10,7 +10,6 @@ const { runPlanner } = require('./plannerService');
 const { runCoder, injectViewportNormalize, injectRuntimeErrorCatcher } = require('./coderService');
 const { runAdvancedPipeline, shouldUseAdvancedPipeline } = require('../generation/orchestrator');
 const { generateFallback } = require('../generators/fallbackGenerator');
-const { getFallbackFiles } = require('../generators/devFallback');
 const { runReviewer } = require('./reviewerService');
 const { generateProject } = require('../generators/projectGenerator');
 const { createCostTracker } = require('../utils/costTracker');
@@ -134,6 +133,7 @@ async function startGeneration(userPrompt, mode = 'balanced', options = {}) {
 async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, startedAt, userId, sessionId) {
   // Normalize UI modes to internal pipeline modes
   if (mode === '2d') mode = 'balanced';
+  logger.info(`[GEN] provider_selected mode=${mode} complexity=${complexity.level} appType=${complexity.appType} job=${jobId}`);
   const pipelineStart = startedAt ? new Date(startedAt).getTime() : Date.now();
   const deadline      = pipelineStart + limits.MAX_JOB_DURATION_MS;
   const cost          = createCostTracker();
@@ -155,12 +155,11 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
   // Evolve the session's product vision before requirement normalisation.
   // Non-fatal — pipeline continues even if intent memory fails.
   let intentMemory = null;
-  let intentSummary = '';
   const effectiveSessionId = sessionId || userId || jobId;
   try {
     const intentResult = updateIntentMemory(effectiveSessionId, userPrompt);
     intentMemory  = intentResult.intentMemory;
-    intentSummary = getIntentSummary(intentMemory);
+    getIntentSummary(intentMemory); // prime the summary cache
     logger.info(`[job:${jobId}] intent: session="${effectiveSessionId}" prompts=${intentMemory.promptCount} features=[${intentMemory.coreFeatures.join(',')}]`);
     if (intentResult.wasReset) {
       logger.info(`[job:${jobId}] intent: session reset — new project started`);
@@ -213,7 +212,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
 
       if (shouldUseAdvancedPipeline(mode, complexity)) {
         // ── Advanced 7-stage pipeline (medium/complex + balanced/quality) ───────
-        logger.info(`[job:${jobId}] using advanced pipeline`);
+        logger.info(`[GEN] provider_request_started pipeline=advanced job=${jobId}`);
 
         const codingStart   = Date.now();
         const stopHeartbeat = startHeartbeat(log, codingStart, 20_000);
@@ -245,11 +244,13 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
           _repair:      advResult.repairReport,
         };
 
+        logger.info(`[GEN] provider_response_received pipeline=advanced files=${advResult.files.length} score=${advResult.validationReport.score} job=${jobId}`);
         const note = `Advanced pipeline complete — ${advResult.files.length} files (score: ${advResult.validationReport.score})`;
         await log(note);
 
       } else {
         // ── Legacy pipeline (simple prompts or 3D) ──────────────────────────────
+        logger.info(`[GEN] provider_request_started pipeline=legacy complexity=${complexity.level} job=${jobId}`);
         const willSkip = complexity.level === 'simple';
         await log(willSkip ? 'Quick planning...' : 'Planning app structure...');
 
@@ -319,6 +320,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
 
       // Everything else: log it and fall back to the template generator.
       // generateFallback never throws — it always produces a working landing page.
+      logger.warn(`[GEN] provider_response_parse_failed reason="${pipelineErr.message}" errorType=${pipelineErr.errorType || 'unknown'} job=${jobId}`);
       logger.warn(`[job:${jobId}] pipeline error — using fallback (${pipelineErr.message})`);
       await log('Encountered an issue — generating from template...');
       codeOutput = generateFallback(userPrompt, null);
@@ -369,6 +371,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
 
     // ── Writing files ─────────────────────────────────────────────────────────
     await checkpoint('before writing files');
+    logger.info(`[GEN] project_save_started slug=${projectSlug} files=${codeOutput.files.length} job=${jobId}`);
     await log(`Saving → generated-projects/${projectSlug}/`);
 
     const { projectDir, written, failed } = await withTimeout(
@@ -376,6 +379,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
       limits.FINALIZE_TIMEOUT_MS,
       'File writing',
     );
+    logger.info(`[GEN] project_save_succeeded slug=${projectSlug} written=${written.length} failed=${failed.length} job=${jobId}`);
     await log(`${written.length} files saved${failed.length ? `, ${failed.length} failed` : ''}`);
 
     // Persist file contents so the project can be restored if disk artifacts are lost.
@@ -474,6 +478,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
       sessionId:     effectiveSessionId,
     });
 
+    logger.info(`[GEN] job_completed slug=${projectSlug} duration=${duration} calls=${costSummary.calls} tokens=${costSummary.totalTokens} cost=$${costSummary.estimatedCostUSD} job=${jobId}`);
     logger.success(`generationService: job ${jobId} completed — "${projectSlug}" in ${duration}`);
 
     // ── Charge usage (non-fatal) ──────────────────────────────────────────────

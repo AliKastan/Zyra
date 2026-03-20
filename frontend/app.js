@@ -214,6 +214,7 @@ function generateTitle(msgs) {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let currentMode              = '2d';
+let _privateBeta             = false; // set from /api/health on init
 let currentJobId             = null;
 let pollInterval             = null;
 let activeMessageId          = null;   // ID of the currently-generating assistant message
@@ -302,7 +303,10 @@ const codeFileName = $('code-file-name');
 
 // ── Health ────────────────────────────────────────────────────────────────────
 async function checkHealth() {
-  try { await apiFetch('/api/health'); } catch (_) {}
+  try {
+    const h = await apiFetch('/api/health');
+    if (typeof h.privateBeta === 'boolean') _privateBeta = h.privateBeta;
+  } catch (_) {}
 }
 
 // ── Mode selection ────────────────────────────────────────────────────────────
@@ -608,12 +612,13 @@ async function handlePromptSubmit(prefill) {
   if (!prompt) { promptError.textContent = 'Please describe what you want to build.'; return; }
   if (prompt.length > MAX_CHARS) { promptError.textContent = 'Prompt is too long.'; return; }
 
-  // Auth gate
-  if (!window._zyraAuth?.getToken()) {
+  // Auth gate — skipped in private beta mode (access-code gate is sufficient)
+  if (!_privateBeta && !window._zyraAuth?.getToken()) {
     _pendingPrompt = prompt;
     openAuthModal('Sign in to generate your app.');
     return;
   }
+  console.debug('[GEN] submit_clicked mode=' + currentMode + ' privateBeta=' + _privateBeta);
 
   const activeConv   = getActiveConv();
   const activeSlug   = activeConv?.projectSlug || null;
@@ -653,10 +658,12 @@ async function startGeneration(prompt, isPrefill = false) {
   setPreviewState('loading', 'Generating your app...', '');
 
   try {
+    console.debug('[GEN] api_request_started endpoint=/api/generate mode=' + currentMode);
     const data = await apiFetch('/api/generate', {
       method: 'POST',
       body: JSON.stringify({ prompt, mode: currentMode }),
     });
+    console.debug('[GEN] api_request_succeeded jobId=' + data.jobId);
     currentJobId = data.jobId;
     _lastGenerationPrompt = prompt;
     startPolling(currentJobId);
@@ -687,10 +694,12 @@ async function startGeneration(prompt, isPrefill = false) {
     }
     // Quota/billing block from server — show clean message, keep workspace usable
     if (err.code === 'CREDITS_EXHAUSTED' || err.httpStatus === 402) {
+      console.warn('[GEN] client_received_failure step=billing_gate code=' + err.code + ' status=' + err.httpStatus);
       stopGenerationTimer();
       setGenerating(false);
-      updateMessage(asstMsgId, { status: 'failed', error: 'Generation is unavailable right now. Please try again in a moment.' });
-      showToast('Generation is unavailable right now. Please try again.', 'warning');
+      const billingMsg = err.message || 'Generation limit reached.';
+      updateMessage(asstMsgId, { status: 'failed', error: billingMsg });
+      showToast(billingMsg, 'warning');
       setPreviewState('empty');
       activeMessageId = null;
       return;
@@ -885,8 +894,9 @@ async function pollJob(jobId) {
         const isExpired = errMsg.toLowerCase().includes('not found') || errMsg.toLowerCase().includes('expired');
         const errorTitle = isCancelled ? 'Cancelled' : job.isEdit ? 'Edit failed' : 'Generation failed';
 
+        console.warn('[GEN] client_received_failure step=job_poll status=' + job.status + ' error=' + errMsg);
         setPreviewState('error', errorTitle,
-          isCancelled ? '' : 'Generation is unavailable right now. Please try again in a moment.',
+          isCancelled ? '' : (errMsg || 'Generation could not complete. Please try again.'),
           { showRegenerate: isExpired });
       }
     }
