@@ -129,10 +129,17 @@ function switchToConversation(convId) {
   // Reset edit mode when switching conversations
   _editModeActive = false;
   _edNodeId = null;
+  _undoStack = [];
   if (editModeBtn) editModeBtn.classList.toggle('hidden', !currentSlug);
   if (editModeBtn) editModeBtn.classList.remove('edit-mode-btn--active');
   if (editToolbar) editToolbar.style.display = 'none';
+  if (editBanner)  editBanner.classList.add('hidden');
   if (previewIframe) previewIframe.classList.remove('preview-edit-active');
+  // Reset button label/icon back to Edit state
+  const iconEl  = $('edit-mode-icon');
+  const labelEl = $('edit-mode-label');
+  if (iconEl)  iconEl.innerHTML   = _PENCIL_SVG;
+  if (labelEl) labelEl.textContent = 'Edit';
   // Show/hide scope bar based on whether this conversation has a project
   if (scopeBar) scopeBar.classList.toggle('hidden', !currentSlug);
   // Reset scope to auto when switching conversations
@@ -256,6 +263,9 @@ let _editModeActive  = false;
 let _edNodeId        = null;   // data-zyra-id of currently selected element (set by ZYRA_ELEMENT_SELECTED)
 let _visualOverrides = {};     // { [slug]: { [nodeId]: { styles:{}, text:'' } } }
 let _viSaveTimer     = null;
+let _undoStack       = [];     // [{ type:'style'|'text', nodeId, prop?, prevValue?, prevText? }]
+const _PENCIL_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+const _PLAY_SVG   = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
 
 // ── Generation timer helpers ──────────────────────────────────────────────────
 function formatElapsedMs(ms) {
@@ -329,8 +339,10 @@ const codeText     = $('code-text');
 const codeFileName = $('code-file-name');
 
 // Visual edit
-const editModeBtn = $('edit-mode-btn');
-const editToolbar = $('edit-toolbar');
+const editModeBtn   = $('edit-mode-btn');
+const editToolbar   = $('edit-toolbar');
+const editBanner    = $('zyra-edit-banner');
+const editBannerClose = $('zyra-edit-banner-close');
 
 // ── Logo → Projects navigation ────────────────────────────────────────────────
 // Intercepts the logo link click so we can guard against in-progress generation.
@@ -1493,8 +1505,12 @@ function activatePreview(preview) {
   browserUrlDisplay.textContent = fullUrl.replace(/^https?:\/\//, '');
   previewUrlText.textContent = fullUrl.replace(/^https?:\/\//, '');
 
-  // Show edit mode button
+  // Show edit mode button and reset to Play state (new preview = fresh play mode)
   if (editModeBtn) editModeBtn.classList.remove('hidden');
+  if (_editModeActive) {
+    // If edit mode was on before this load, turn it off so game plays normally
+    _setEditMode(false);
+  }
 
   // Fade iframe in on load
   previewIframe.style.opacity = '0';
@@ -1506,6 +1522,8 @@ function activatePreview(preview) {
     previewIframe.style.opacity = '1';
     previewIframe.removeEventListener('load', onLoad);
     previewIframe.removeEventListener('error', onError);
+    // Always inject the edit bridge so it's ready when the user activates edit mode
+    _injectEditScript();
   };
   const onError = () => {
     // iframe error events are rare for same-origin; just show the frame anyway
@@ -1513,6 +1531,7 @@ function activatePreview(preview) {
     previewIframe.style.opacity = '1';
     previewIframe.removeEventListener('load', onLoad);
     previewIframe.removeEventListener('error', onError);
+    _injectEditScript();
   };
   previewIframe.addEventListener('load', onLoad);
   previewIframe.addEventListener('error', onError);
@@ -1631,6 +1650,23 @@ function _edIframeRectToMain(rect) {
   };
 }
 
+// ── Inject zyra-edit.js into the preview iframe ───────────────────────────────
+// Called on iframe load (always eager) so the bridge is ready when edit mode activates.
+function _injectEditScript() {
+  if (!previewIframe) return;
+  try {
+    const doc = previewIframe.contentDocument;
+    if (!doc || !doc.body) return;
+    if (doc.getElementById('zyra-edit-script')) return; // already present
+    const s = doc.createElement('script');
+    s.id  = 'zyra-edit-script';
+    s.src = '/zyra-edit.js';
+    doc.body.appendChild(s);
+  } catch (_) {
+    // Cross-origin guard — shouldn't happen for /preview/* which is same-origin
+  }
+}
+
 // ── Floating toolbar positioning ──────────────────────────────────────────────
 function _edPositionToolbar(mainRect) {
   if (!editToolbar) return;
@@ -1704,6 +1740,11 @@ function _edApplyStyle(prop, value) {
   const el = doc.querySelector(`[data-zyra-id="${_edNodeId}"]`);
   if (!el) return;
 
+  // Record previous value for undo
+  const prevValue = el.style[prop] || '';
+  _undoStack.push({ type: 'style', nodeId: _edNodeId, prop, prevValue });
+  if (_undoStack.length > 60) _undoStack.shift();
+
   // Direct DOM — instant visual feedback, no postMessage round-trip needed
   try { el.style[prop] = value; } catch (_) {}
 
@@ -1725,7 +1766,14 @@ function _edApplyText(text) {
   const doc = previewIframe && previewIframe.contentDocument;
   if (!doc) return;
   const el = doc.querySelector(`[data-zyra-id="${_edNodeId}"]`);
-  if (el && el.childNodes.length <= 1) el.textContent = text;
+  if (!el) return;
+
+  // Record previous text for undo
+  const prevText = el.textContent || '';
+  _undoStack.push({ type: 'text', nodeId: _edNodeId, prevText });
+  if (_undoStack.length > 60) _undoStack.shift();
+
+  if (el.childNodes.length <= 1) el.textContent = text;
 
   if (!_visualOverrides[currentSlug]) _visualOverrides[currentSlug] = {};
   if (!_visualOverrides[currentSlug][_edNodeId]) _visualOverrides[currentSlug][_edNodeId] = {};
@@ -1749,8 +1797,20 @@ function _setEditMode(active) {
   _editModeActive = active;
   if (editModeBtn) editModeBtn.classList.toggle('edit-mode-btn--active', active);
 
-  // Visual indicator: amber outline on iframe when edit mode is on
+  // Update button icon and label to reflect current mode
+  const iconEl  = $('edit-mode-icon');
+  const labelEl = $('edit-mode-label');
+  if (iconEl)  iconEl.innerHTML  = active ? _PLAY_SVG  : _PENCIL_SVG;
+  if (labelEl) labelEl.textContent = active ? 'Play' : 'Edit';
+
+  // Cyan glow on iframe when edit mode is on
   if (previewIframe) previewIframe.classList.toggle('preview-edit-active', active);
+
+  // Show / hide the edit mode banner
+  if (editBanner) editBanner.classList.toggle('hidden', !active);
+
+  // Ensure the edit bridge is loaded in the iframe
+  if (active) _injectEditScript();
 
   // Tell iframe to activate/deactivate its own event interceptors
   try {
@@ -1761,6 +1821,7 @@ function _setEditMode(active) {
 
   if (!active) {
     _edNodeId = null;
+    _undoStack = [];
     if (editToolbar) editToolbar.style.display = 'none';
   }
 }
@@ -1801,9 +1862,60 @@ _etbOn('etb-close', 'click', () => {
 
 if (editModeBtn) editModeBtn.addEventListener('click', () => _setEditMode(!_editModeActive));
 
-// Esc at parent level: if nothing selected in iframe, exit edit mode
+// Banner dismiss
+if (editBannerClose) editBannerClose.addEventListener('click', () => {
+  if (editBanner) editBanner.classList.add('hidden');
+});
+
+// Keyboard shortcuts (only when not typing in an input)
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && _editModeActive && !_edNodeId) _setEditMode(false);
+  const tag = document.activeElement?.tagName;
+  const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable;
+
+  // Esc: exit edit mode when nothing is selected in iframe
+  if (e.key === 'Escape' && _editModeActive && !_edNodeId) {
+    _setEditMode(false);
+    return;
+  }
+
+  // E key: toggle edit mode (only when a project is loaded and not typing)
+  if ((e.key === 'e' || e.key === 'E') && !isTyping && !e.ctrlKey && !e.metaKey) {
+    if (currentSlug && editModeBtn && !editModeBtn.classList.contains('hidden')) {
+      _setEditMode(!_editModeActive);
+    }
+    return;
+  }
+
+  // Ctrl+Z / Cmd+Z: undo last visual change (only in edit mode)
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && _editModeActive) {
+    e.preventDefault();
+    const entry = _undoStack.pop();
+    if (!entry || !previewIframe) return;
+    const doc = previewIframe.contentDocument;
+    if (!doc) return;
+    const el = doc.querySelector(`[data-zyra-id="${entry.nodeId}"]`);
+    if (!el) return;
+
+    if (entry.type === 'style') {
+      try { el.style[entry.prop] = entry.prevValue; } catch (_) {}
+      // Sync override store
+      const ov = _visualOverrides[currentSlug]?.[entry.nodeId]?.styles;
+      if (ov) ov[entry.prop] = entry.prevValue;
+    } else if (entry.type === 'text') {
+      if (el.childNodes.length <= 1) el.textContent = entry.prevText;
+      if (_visualOverrides[currentSlug]?.[entry.nodeId]) {
+        _visualOverrides[currentSlug][entry.nodeId].text = entry.prevText;
+      }
+      // Keep toolbar text input in sync if this node is still selected
+      if (_edNodeId === entry.nodeId) {
+        const etText = $('etb-text');
+        if (etText) etText.value = entry.prevText || '';
+      }
+    }
+
+    try { previewIframe.contentWindow.__zyraEdit.repositionSel(); } catch (_) {}
+    _edSaveDebounced();
+  }
 });
 
 // ── postMessage from iframe ───────────────────────────────────────────────────

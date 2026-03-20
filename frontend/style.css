@@ -1460,20 +1460,88 @@ textarea::placeholder {
 .download-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* ── Edit Mode toggle button ─────────────────────────────────────────────────── */
-.edit-mode-btn { color: var(--text-muted); }
-.edit-mode-btn--active {
-  color: #FBBF24 !important;
-  border-color: rgba(251,191,36,0.28) !important;
-  background: rgba(251,191,36,0.09) !important;
+.edit-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 11px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: var(--radius-sm);
+  color: rgba(255,255,255,0.38);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--ease);
+  outline: none;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
-.edit-mode-btn--active:hover { background: rgba(251,191,36,0.15) !important; }
+.edit-mode-toggle:hover {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.75);
+  border-color: rgba(255,255,255,0.14);
+}
+.edit-mode-toggle.edit-mode-btn--active {
+  color: #00ffff;
+  border-color: rgba(0,255,255,0.3);
+  background: rgba(0,255,255,0.08);
+  box-shadow: 0 0 12px rgba(0,255,255,0.08);
+}
+.edit-mode-toggle.edit-mode-btn--active:hover {
+  background: rgba(0,255,255,0.13);
+  border-color: rgba(0,255,255,0.45);
+}
+.edit-mode-btn-icon { display: flex; align-items: center; flex-shrink: 0; }
 
-/* ── Edit mode active: amber outline on iframe (visual indicator only) ────────── */
+/* ── Edit mode active: cyan glow on iframe ───────────────────────────────────── */
 /* All selection boxes and hover highlights are drawn INSIDE the iframe by zyra-edit.js */
 #preview-iframe.preview-edit-active {
-  outline: 2px solid rgba(246, 173, 85, 0.45);
-  outline-offset: -2px;
+  box-shadow: 0 0 0 2px rgba(0,255,255,0.35), 0 0 28px rgba(0,255,255,0.06);
+  outline: none;
 }
+
+/* ── Edit mode banner ────────────────────────────────────────────────────────── */
+.zyra-edit-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px 5px 16px;
+  background: rgba(0,25,25,0.82);
+  border: 1px solid rgba(0,255,255,0.22);
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: rgba(0,255,255,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  white-space: nowrap;
+  pointer-events: all;
+  animation: banner-in 0.25s ease-out;
+}
+.zyra-edit-banner.hidden { display: none; }
+@keyframes banner-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.zyra-edit-banner-close {
+  display: flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px;
+  background: none; border: none;
+  color: rgba(0,255,255,0.5);
+  font-size: 0.65rem; cursor: pointer;
+  border-radius: 50%;
+  transition: color 0.1s, background 0.1s;
+  padding: 0; line-height: 1;
+}
+.zyra-edit-banner-close:hover { color: rgba(0,255,255,0.9); background: rgba(0,255,255,0.1); }
 
 /* ── Floating Edit Toolbar ───────────────────────────────────────────────────── */
 .edit-toolbar {
@@ -1593,9 +1661,9 @@ textarea::placeholder {
 }
 .etb-btn:hover { background: rgba(255,255,255,0.09); color: var(--text); }
 .etb-toggle-btn--on {
-  background: rgba(246,173,85,0.15) !important;
-  border-color: rgba(246,173,85,0.4) !important;
-  color: #FBBF24 !important;
+  background: rgba(0,255,255,0.1) !important;
+  border-color: rgba(0,255,255,0.35) !important;
+  color: #00ffff !important;
 }
 
 /* Close button */
