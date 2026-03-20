@@ -512,6 +512,34 @@ function injectEnvLoader(files, projectSlug) {
   });
 }
 
+// ── Visual edit bridge injection ───────────────────────────────────────────────
+
+/**
+ * Injects <script src="/zyra-edit.js"></script> into every HTML file.
+ * The bridge runs inside the iframe and enables the Figma-style visual edit mode
+ * in the Zyra studio (postMessage-based element selection + style overrides).
+ *
+ * @param {Array<{path: string, content: string}>} files
+ * @returns {Array<{path: string, content: string}>}
+ */
+function injectVisualEditBridge(files) {
+  const tag = `  <script src="/zyra-edit.js" data-zyra="edit-bridge"></script>`;
+  return files.map((f) => {
+    if (!f.path.endsWith('.html')) return f;
+    let content = f.content || '';
+    if (content.includes('data-zyra="edit-bridge"')) return f; // already injected
+    // Inject just before </head> so it loads after app scripts are declared
+    if (/<\/head>/i.test(content)) {
+      content = content.replace(/<\/head>/i, `${tag}\n</head>`);
+    } else if (/<head(\s[^>]*)?\s*>/i.test(content)) {
+      content = content.replace(/(<head(\s[^>]*)?\s*>)/i, `$1\n${tag}`);
+    } else {
+      content = `${tag}\n` + content;
+    }
+    return { ...f, content };
+  });
+}
+
 // ── Backend SDK injection ───────────────────────────────────────────────────────
 
 /**
@@ -591,4 +619,4 @@ function enforceOutputLimits(data, maxFiles) {
   return { ...data, files };
 }
 
-module.exports = { runCoder, injectBackendSDK, injectEnvLoader, injectViewportNormalize, injectRuntimeErrorCatcher };
+module.exports = { runCoder, injectBackendSDK, injectEnvLoader, injectViewportNormalize, injectRuntimeErrorCatcher, injectVisualEditBridge };

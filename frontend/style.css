@@ -1166,8 +1166,8 @@ textarea {
   padding: 0.65rem 0.85rem 0.4rem;
   resize: none;
   line-height: 1.6;
-  min-height: 72px;
-  max-height: 160px;
+  min-height: 110px;
+  max-height: 220px;
   overflow-y: auto;
 }
 textarea::placeholder { color: var(--text-muted); }
@@ -1280,6 +1280,7 @@ textarea::placeholder { color: var(--text-muted); }
   flex-direction: column;
   overflow: hidden;
   background: var(--bg);
+  position: relative;
   min-width: 0;
   animation: mainIn 0.4s ease both 0.08s;
 }
@@ -1452,6 +1453,136 @@ textarea::placeholder { color: var(--text-muted); }
 }
 .download-btn:active { transform: translateY(0); }
 .download-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── Edit Mode button ──────────────────────────────────────────────────────── */
+.edit-mode-btn { color: var(--text-muted); }
+.edit-mode-btn--active {
+  color: #FBBF24 !important;
+  border-color: rgba(251,191,36,0.3) !important;
+  background: rgba(251,191,36,0.08) !important;
+}
+.edit-mode-btn--active:hover {
+  background: rgba(251,191,36,0.14) !important;
+}
+
+/* ── Visual Inspector Panel ─────────────────────────────────────────────────── */
+.visual-inspector {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 230px;
+  background: rgba(24,24,26,0.97);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4);
+  z-index: 9999;
+  overflow: hidden;
+  font-size: 0.78rem;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.vi-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 7px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.vi-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+  flex-shrink: 0;
+}
+.vi-path {
+  flex: 1;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vi-close {
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); border-radius: 4px;
+  flex-shrink: 0;
+  transition: color var(--ease), background var(--ease);
+}
+.vi-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+.vi-empty {
+  padding: 14px 12px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  text-align: center;
+}
+.vi-body { padding: 6px 0 8px; }
+.vi-section {
+  padding: 4px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.vi-section:last-child { border-bottom: none; }
+.vi-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+.vi-label {
+  width: 68px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+.vi-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 0.75rem;
+  padding: 3px 6px;
+  outline: none;
+  font-family: var(--font);
+  transition: border-color var(--ease), background var(--ease);
+}
+.vi-input:focus { border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.07); }
+.vi-input:disabled { opacity: 0.3; cursor: not-allowed; }
+.vi-input.vi-short { width: 72px; flex: none; }
+.vi-select {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 0.75rem;
+  padding: 3px 4px;
+  outline: none;
+  font-family: var(--font);
+  transition: border-color var(--ease);
+}
+.vi-select:focus { border-color: rgba(255,255,255,0.22); }
+.vi-color-wrap {
+  width: 22px; height: 22px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.12);
+  cursor: pointer;
+}
+.vi-color {
+  width: 36px; height: 36px;
+  border: none; padding: 0;
+  cursor: pointer; background: none;
+  margin: -7px 0 0 -7px;
+}
+.vi-color-text { flex: 1; }
 
 /* ── Handoff / run-instructions panel ─────────────────────────────────────── */
 .handoff-panel {

@@ -126,6 +126,12 @@ function switchToConversation(convId) {
 
   currentSlug       = conv.projectSlug || null;
   currentPreviewUrl = conv.previewUrl  || null;
+  // Reset edit mode when switching conversations
+  _editModeActive = false;
+  _editSelectedPath = null;
+  if (editModeBtn) editModeBtn.classList.toggle('hidden', !currentSlug);
+  if (editModeBtn) editModeBtn.classList.remove('edit-mode-btn--active');
+  if (viInspector) viInspector.classList.add('hidden');
   // Show/hide scope bar based on whether this conversation has a project
   if (scopeBar) scopeBar.classList.toggle('hidden', !currentSlug);
   // Reset scope to auto when switching conversations
@@ -142,8 +148,13 @@ function switchToConversation(convId) {
     // Always route through initiatePreview so the server can auto-restore missing files.
     // For static projects the preview service responds immediately (sub-100ms).
     initiatePreview(currentSlug);
-    // Fire-and-forget: record that user opened this project
+    // Fire-and-forget: record that user opened this project + fetch overrides
     apiFetch(`/api/projects/${encodeURIComponent(currentSlug)}/open`, { method: 'POST' }).catch(() => {});
+    apiFetch(`/api/projects/${encodeURIComponent(currentSlug)}`).then((data) => {
+      if (data.visualOverrides && typeof data.visualOverrides === 'object') {
+        _visualOverrides[currentSlug] = data.visualOverrides;
+      }
+    }).catch(() => {});
   } else {
     setPreviewState('empty');
     previewUrlBar.style.display = 'none';
@@ -239,6 +250,12 @@ let currentDevice       = 'mobile';
 let currentTab          = 'preview';
 let currentScope        = 'auto'; // 'auto' | 'ui' | 'logic' | 'component' | 'page'
 
+// Visual edit
+let _editModeActive     = false;
+let _editSelectedPath   = null;  // CSS path of selected element
+let _visualOverrides    = {};    // { [slug]: { [cssPath]: { prop: val } } }
+let _viSaveTimer        = null;
+
 // ── Generation timer helpers ──────────────────────────────────────────────────
 function formatElapsedMs(ms) {
   const s = Math.floor(ms / 1000);
@@ -309,6 +326,23 @@ const codeArea     = $('code-area');
 const codeFileList = $('code-file-list');
 const codeText     = $('code-text');
 const codeFileName = $('code-file-name');
+
+// Visual edit
+const editModeBtn    = $('edit-mode-btn');
+const viInspector    = $('visual-inspector');
+const viPath         = $('vi-path');
+const viEmpty        = $('vi-empty');
+const viBody         = $('vi-body');
+const viClose        = $('vi-close');
+const viTextInput    = $('vi-text');
+const viColor        = $('vi-color');
+const viColorText    = $('vi-color-text');
+const viBg           = $('vi-bg');
+const viBgText       = $('vi-bg-text');
+const viFontSize     = $('vi-font-size');
+const viFontWeight   = $('vi-font-weight');
+const viRadius       = $('vi-radius');
+const viOpacity      = $('vi-opacity');
 
 // ── Logo → Projects navigation ────────────────────────────────────────────────
 // Intercepts the logo link click so we can guard against in-progress generation.
@@ -1471,6 +1505,9 @@ function activatePreview(preview) {
   browserUrlDisplay.textContent = fullUrl.replace(/^https?:\/\//, '');
   previewUrlText.textContent = fullUrl.replace(/^https?:\/\//, '');
 
+  // Show edit mode button now that we have a live preview
+  if (editModeBtn) editModeBtn.classList.remove('hidden');
+
   // Fade iframe in on load
   previewIframe.style.opacity = '0';
   previewIframe.src = fullUrl;
@@ -1570,6 +1607,158 @@ $('device-btns').addEventListener('click', (e) => {
   document.querySelectorAll('.device-btn').forEach((b) => b.classList.remove('device-btn--active'));
   btn.classList.add('device-btn--active');
   deviceWrapper.dataset.device = currentDevice;
+});
+
+// ── Visual Edit Mode ──────────────────────────────────────────────────────────
+
+function _cssColorToHex(color) {
+  // Converts "rgb(r, g, b)" or "rgba(r,g,b,a)" to "#rrggbb" for <input type=color>
+  if (!color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)') return '#000000';
+  if (color.startsWith('#')) return color.slice(0, 7);
+  const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!m) return '#000000';
+  return '#' + [m[1], m[2], m[3]].map(n => parseInt(n).toString(16).padStart(2, '0')).join('');
+}
+
+function _sendToIframe(msg) {
+  try {
+    if (previewIframe && previewIframe.contentWindow) {
+      previewIframe.contentWindow.postMessage(msg, '*');
+    }
+  } catch (_) {}
+}
+
+function _setEditMode(active) {
+  _editModeActive = active;
+  if (editModeBtn) editModeBtn.classList.toggle('edit-mode-btn--active', active);
+  _sendToIframe({ type: 'ZYRA_EDIT_MODE', enabled: active });
+  if (!active) {
+    _editSelectedPath = null;
+    if (viInspector) viInspector.classList.add('hidden');
+  } else {
+    if (viInspector) viInspector.classList.remove('hidden');
+    if (viEmpty)  viEmpty.classList.remove('hidden');
+    if (viBody)   viBody.classList.add('hidden');
+  }
+}
+
+function _getOverridesForSlug() {
+  if (!currentSlug) return {};
+  return _visualOverrides[currentSlug] || {};
+}
+
+function _saveOverridesDebounced() {
+  if (_viSaveTimer) clearTimeout(_viSaveTimer);
+  _viSaveTimer = setTimeout(() => {
+    if (!currentSlug) return;
+    apiFetch(`/api/projects/${encodeURIComponent(currentSlug)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ visualOverrides: _visualOverrides[currentSlug] || {} }),
+    }).catch(() => {});
+  }, 600);
+}
+
+function _applyVisualProp(prop, value) {
+  if (!_editSelectedPath || !currentSlug) return;
+  if (!_visualOverrides[currentSlug]) _visualOverrides[currentSlug] = {};
+  if (!_visualOverrides[currentSlug][_editSelectedPath]) _visualOverrides[currentSlug][_editSelectedPath] = {};
+  _visualOverrides[currentSlug][_editSelectedPath][prop] = value;
+
+  _sendToIframe({ type: 'ZYRA_APPLY_STYLES', cssPath: _editSelectedPath, styles: { [prop]: value } });
+  _saveOverridesDebounced();
+}
+
+function _loadOverridesIntoIframe(slug) {
+  const overrides = _visualOverrides[slug];
+  if (overrides && Object.keys(overrides).length > 0) {
+    _sendToIframe({ type: 'ZYRA_LOAD_OVERRIDES', overrides });
+  }
+}
+
+function _populateInspector(data) {
+  _editSelectedPath = data.cssPath;
+  if (viPath) viPath.textContent = data.tagName + (data.cssPath.length > 30 ? '' : '');
+  if (viEmpty) viEmpty.classList.add('hidden');
+  if (viBody)  viBody.classList.remove('hidden');
+
+  const s = data.styles || {};
+  if (viTextInput) {
+    viTextInput.value = data.textContent != null ? data.textContent : '';
+    viTextInput.disabled = data.textContent == null;
+    viTextInput.placeholder = data.textContent == null ? '(complex element)' : '';
+  }
+  if (viColor)     viColor.value     = _cssColorToHex(s.color);
+  if (viColorText) viColorText.value = s.color || '';
+  if (viBg)        viBg.value        = _cssColorToHex(s.background);
+  if (viBgText)    viBgText.value    = s.background || '';
+  if (viFontSize)  viFontSize.value  = s.fontSize  || '';
+  if (viFontWeight) {
+    const w = parseInt(s.fontWeight) || 400;
+    const opt = viFontWeight.querySelector(`option[value="${w}"]`);
+    if (opt) viFontWeight.value = String(w);
+  }
+  if (viRadius)  viRadius.value  = s.borderRadius || '';
+  if (viOpacity) viOpacity.value = parseFloat(s.opacity) || 1;
+}
+
+// Wire inspector inputs
+if (viTextInput) viTextInput.addEventListener('input', () => {
+  if (!_editSelectedPath) return;
+  _sendToIframe({ type: 'ZYRA_APPLY_TEXT', cssPath: _editSelectedPath, text: viTextInput.value });
+});
+if (viColor) viColor.addEventListener('input', () => {
+  if (viColorText) viColorText.value = viColor.value;
+  _applyVisualProp('color', viColor.value);
+});
+if (viColorText) viColorText.addEventListener('change', () => {
+  _applyVisualProp('color', viColorText.value);
+});
+if (viBg) viBg.addEventListener('input', () => {
+  if (viBgText) viBgText.value = viBg.value;
+  _applyVisualProp('background', viBg.value);
+});
+if (viBgText) viBgText.addEventListener('change', () => {
+  _applyVisualProp('background', viBgText.value);
+});
+if (viFontSize) viFontSize.addEventListener('change', () => {
+  _applyVisualProp('font-size', viFontSize.value);
+});
+if (viFontWeight) viFontWeight.addEventListener('change', () => {
+  _applyVisualProp('font-weight', viFontWeight.value);
+});
+if (viRadius) viRadius.addEventListener('change', () => {
+  _applyVisualProp('border-radius', viRadius.value);
+});
+if (viOpacity) viOpacity.addEventListener('input', () => {
+  _applyVisualProp('opacity', viOpacity.value);
+});
+if (viClose) viClose.addEventListener('click', () => _setEditMode(false));
+
+if (editModeBtn) editModeBtn.addEventListener('click', () => {
+  _setEditMode(!_editModeActive);
+});
+
+// postMessage listener for iframe bridge messages
+window.addEventListener('message', (e) => {
+  const msg = e.data;
+  if (!msg || !msg.type) return;
+
+  if (msg.type === 'ZYRA_EDIT_READY') {
+    // Bridge loaded — push existing overrides
+    if (currentSlug) _loadOverridesIntoIframe(currentSlug);
+    // Also re-enable edit mode if it was active before the iframe reloaded
+    if (_editModeActive) _sendToIframe({ type: 'ZYRA_EDIT_MODE', enabled: true });
+  }
+
+  if (msg.type === 'ZYRA_ELEMENT_SELECTED' && msg.data) {
+    _populateInspector(msg.data);
+  }
+
+  if (msg.type === 'ZYRA_ELEMENT_DESELECTED') {
+    _editSelectedPath = null;
+    if (viEmpty) viEmpty.classList.remove('hidden');
+    if (viBody)  viBody.classList.add('hidden');
+  }
 });
 
 // ── Preview controls ──────────────────────────────────────────────────────────

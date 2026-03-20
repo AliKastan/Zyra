@@ -175,6 +175,11 @@ app.get('/zyra-sdk.js', (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/zyra-sdk.js'));
 });
 
+// Serve visual-edit bridge (loaded inside preview iframe for edit mode)
+app.get('/zyra-edit.js', (_req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../frontend/zyra-edit.js'));
+});
+
 // Serve per-project env vars as a JS file — no auth (loaded by generated apps in iframes)
 // Same pattern as /zyra-sdk.js — accessible to iframe content, never logs raw values
 app.get('/zyra-env/:slugjs', serveEnvScript);

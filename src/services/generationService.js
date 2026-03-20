@@ -7,7 +7,7 @@ const { assessComplexity } = require('../generators/complexityLimiter');
 const { withTimeout } = require('../utils/withTimeout');
 const { assertProviderAvailable } = require('./orchestrator');
 const { runPlanner } = require('./plannerService');
-const { runCoder, injectViewportNormalize, injectRuntimeErrorCatcher } = require('./coderService');
+const { runCoder, injectViewportNormalize, injectRuntimeErrorCatcher, injectVisualEditBridge } = require('./coderService');
 const { runAdvancedPipeline, shouldUseAdvancedPipeline } = require('../generation/orchestrator');
 const { generateFallback } = require('../generators/fallbackGenerator');
 const { runReviewer } = require('./reviewerService');
@@ -368,6 +368,9 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
 
     // Inject runtime error catcher into all HTML files
     codeOutput = { ...codeOutput, files: injectRuntimeErrorCatcher(codeOutput.files) };
+
+    // Inject visual edit bridge so the studio can enable Figma-style element editing
+    codeOutput = { ...codeOutput, files: injectVisualEditBridge(codeOutput.files) };
 
     // ── Writing files ─────────────────────────────────────────────────────────
     await checkpoint('before writing files');

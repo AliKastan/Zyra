@@ -134,7 +134,7 @@
         <div class="input-box">
           <textarea
             id="prompt-input"
-            rows="3"
+            rows="5"
             maxlength="3000"
             placeholder="Describe the mobile game you want to build. E.g. 'Make a hypercasual runner game where the player dodges traffic by swiping left and right'"
           ></textarea>
@@ -183,7 +183,10 @@
             </button>
           </div>
           <div class="preview-action-btns">
-            <button id="refresh-preview-btn" class="icon-btn" title="Refresh" type="button">
+            <button id="edit-mode-btn" class="icon-btn edit-mode-btn hidden" title="Visual Edit" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button id="refresh-preview-btn" class="icon-btn" title="Refresh" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
             </button>
             <button id="open-tab-btn" class="icon-btn" title="Open in new tab" type="button">
@@ -212,6 +215,66 @@
           <button id="handoff-close-btn" class="handoff-close-btn" title="Dismiss" type="button">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
+        </div>
+      </div>
+
+      <!-- Visual Inspector Panel -->
+      <div class="visual-inspector hidden" id="visual-inspector">
+        <div class="vi-header">
+          <span class="vi-title">Inspector</span>
+          <span class="vi-path" id="vi-path"></span>
+          <button class="vi-close" id="vi-close" title="Exit edit mode" type="button">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="vi-empty" id="vi-empty">Click an element in the preview to inspect it</div>
+        <div class="vi-body hidden" id="vi-body">
+          <div class="vi-section">
+            <div class="vi-row">
+              <label class="vi-label">Text</label>
+              <input class="vi-input vi-text-input" id="vi-text" type="text" placeholder="—" />
+            </div>
+          </div>
+          <div class="vi-section">
+            <div class="vi-row">
+              <label class="vi-label">Color</label>
+              <div class="vi-color-wrap"><input class="vi-color" id="vi-color" type="color" /></div>
+              <input class="vi-input vi-color-text" id="vi-color-text" type="text" maxlength="25" />
+            </div>
+            <div class="vi-row">
+              <label class="vi-label">Background</label>
+              <div class="vi-color-wrap"><input class="vi-color" id="vi-bg" type="color" /></div>
+              <input class="vi-input vi-color-text" id="vi-bg-text" type="text" maxlength="25" />
+            </div>
+          </div>
+          <div class="vi-section">
+            <div class="vi-row">
+              <label class="vi-label">Font size</label>
+              <input class="vi-input vi-short" id="vi-font-size" type="text" maxlength="10" />
+            </div>
+            <div class="vi-row">
+              <label class="vi-label">Font weight</label>
+              <select class="vi-select" id="vi-font-weight">
+                <option value="300">300</option>
+                <option value="400">400</option>
+                <option value="500">500</option>
+                <option value="600">600</option>
+                <option value="700">700</option>
+                <option value="800">800</option>
+                <option value="900">900</option>
+              </select>
+            </div>
+          </div>
+          <div class="vi-section">
+            <div class="vi-row">
+              <label class="vi-label">Radius</label>
+              <input class="vi-input vi-short" id="vi-radius" type="text" maxlength="12" />
+            </div>
+            <div class="vi-row">
+              <label class="vi-label">Opacity</label>
+              <input class="vi-input vi-short" id="vi-opacity" type="number" min="0" max="1" step="0.05" />
+            </div>
+          </div>
         </div>
       </div>
 

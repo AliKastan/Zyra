@@ -60,10 +60,13 @@ async function handleGetProject(req, res) {
 async function handleUpdateProject(req, res) {
   const { name } = req.params;
   if (!/^[a-z0-9-]+$/.test(name)) return res.status(400).json({ error: 'Invalid project name' });
-  const { displayName, description } = req.body;
+  const { displayName, description, visualOverrides } = req.body;
   const updates = {};
   if (displayName !== undefined) updates.displayName = String(displayName).slice(0, 100).trim();
   if (description !== undefined) updates.description = String(description).slice(0, 500).trim();
+  if (visualOverrides !== undefined && typeof visualOverrides === 'object' && !Array.isArray(visualOverrides)) {
+    updates.visualOverrides = visualOverrides;
+  }
   if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No valid fields to update' });
   try {
     const updated = await updateProject(name, updates);
