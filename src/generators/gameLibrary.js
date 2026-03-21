@@ -101,31 +101,6 @@ canvas.addEventListener('pointerdown', e => {
   handleTap(tx, ty);
 });`.trim();
 
-// ── Virtual joystick ───────────────────────────────────────────────────────────
-const VIRTUAL_JOYSTICK = `
-// Virtual joystick
-const joystick = { active: false, startX: 0, startY: 0, dx: 0, dy: 0, radius: 55, x: 80, y: 0 };
-canvas.addEventListener('pointerdown', e => {
-  const r = canvas.getBoundingClientRect();
-  const tx = (e.clientX - r.left) * (canvas.width  / r.width);
-  const ty = (e.clientY - r.top)  * (canvas.height / r.height);
-  if (tx < canvas.width / 2) {
-    joystick.active = true; joystick.startX = tx; joystick.startY = ty;
-    joystick.x = tx; joystick.y = ty;
-  }
-});
-canvas.addEventListener('pointermove', e => {
-  if (!joystick.active) return;
-  const r = canvas.getBoundingClientRect();
-  const tx = (e.clientX - r.left) * (canvas.width  / r.width);
-  const ty = (e.clientY - r.top)  * (canvas.height / r.height);
-  const ddx = tx - joystick.startX, ddy = ty - joystick.startY;
-  const dist = Math.sqrt(ddx*ddx + ddy*ddy);
-  joystick.dx = dist > 1 ? ddx / Math.max(dist, joystick.radius) : 0;
-  joystick.dy = dist > 1 ? ddy / Math.max(dist, joystick.radius) : 0;
-});
-canvas.addEventListener('pointerup', () => { joystick.active = false; joystick.dx = 0; joystick.dy = 0; });`.trim();
-
 // ── Restart / full state reset ─────────────────────────────────────────────────
 const RESTART_PATTERN = `
 // Restart — full state reset
@@ -184,14 +159,10 @@ ASSET DISCIPLINE (non-negotiable):
  * Returns a compact game library block suitable for coder prompt injection.
  * Includes canonical patterns for the most common failure points.
  *
- * @param {{ controls?: string, needsJoystick?: boolean }} [options]
+ * @param {{ controls?: string }} [options]
  * @returns {string}
  */
 function buildGameLibraryBlock(options = {}) {
-  const { needsJoystick = false } = options;
-
-  const inputSnippet = needsJoystick ? VIRTUAL_JOYSTICK : TAP_INPUT;
-
   return `## CANONICAL GAME PATTERNS (use these exact implementations — do not invent variants)
 
 ### Game loop (copy verbatim):
@@ -204,7 +175,7 @@ ${GAME_LOOP}
 ${CANVAS_SETUP}
 \`\`\`
 
-### Input (${needsJoystick ? 'virtual joystick' : 'tap'}):
+### Input (tap/swipe/drag):
 \`\`\`js
 ${inputSnippet}
 \`\`\`

@@ -168,9 +168,6 @@
         </div>
 
         <div class="preview-controls">
-          <button id="vpad-toggle-btn" class="icon-btn vpad-toggle-btn hidden" title="Virtual gamepad" type="button">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="10" r="1.5" fill="currentColor"/><circle cx="12" cy="14" r="1.5" fill="currentColor"/><circle cx="16" cy="12" r="1.5" fill="currentColor"/></svg>
-          </button>
           <div class="preview-action-btns">
             <button id="edit-mode-btn" class="edit-mode-toggle hidden" title="Toggle visual edit mode (E)" type="button">
               <span class="edit-mode-btn-icon" id="edit-mode-icon">
@@ -341,33 +338,6 @@
             <iframe id="preview-iframe" title="Game preview"></iframe>
           </div>
 
-            <!-- Virtual gamepad — for testing keyboard-controlled apps on touch devices -->
-            <div class="virtual-pad hidden" id="virtual-pad" aria-label="Virtual gamepad">
-              <div class="vpad-inner">
-                <div class="vpad-dpad">
-                  <button class="vpad-btn vpad-up"    data-key="ArrowUp"    data-code="ArrowUp"    aria-label="Up"    type="button">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
-                  </button>
-                  <div class="vpad-mid-row">
-                    <button class="vpad-btn vpad-left"  data-key="ArrowLeft"  data-code="ArrowLeft"  aria-label="Left"  type="button">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-                    </button>
-                    <div class="vpad-center"></div>
-                    <button class="vpad-btn vpad-right" data-key="ArrowRight" data-code="ArrowRight" aria-label="Right" type="button">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
-                  </div>
-                  <button class="vpad-btn vpad-down"   data-key="ArrowDown"  data-code="ArrowDown"  aria-label="Down"  type="button">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-                  </button>
-                </div>
-                <div class="vpad-actions">
-                  <button class="vpad-btn vpad-action-btn vpad-b" data-key="Escape"  data-code="Escape" aria-label="Escape" type="button">esc</button>
-                  <button class="vpad-btn vpad-action-btn vpad-a" data-key=" "        data-code="Space"  aria-label="Space"  type="button">A</button>
-                  <button class="vpad-btn vpad-action-btn vpad-enter" data-key="Enter" data-code="Enter" aria-label="Enter"  type="button">&#9166;</button>
-                </div>
-              </div>
-            </div>
         </div>
 
         <div class="preview-state hidden" id="state-error">

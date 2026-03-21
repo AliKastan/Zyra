@@ -123,14 +123,15 @@ const GENRE_RULES = {
 
   'top-down': {
     required: [
-      'Virtual joystick for movement (bottom-left of screen)',
-      'Shoot or action button (bottom-right of screen, or auto-fire option)',
+      'Drag-to-move controls: player follows touch position (or use left/right tap zones)',
+      'Shoot or action button (bottom-right of screen, or auto-fire toward nearest enemy)',
       'Enemy AI — minimum: enemies chase player (dx = target.x - self.x)',
       'Player health bar',
       'Game over screen with retry on player death',
     ],
     forbidden: [
-      'WASD keyboard-only controls — always provide virtual joystick',
+      'Virtual joystick overlays — use drag-to-move or tap-zone controls instead',
+      'WASD keyboard-only controls — always provide touch equivalents',
       'Complex navmesh pathfinding — use simple direct-chase vectors',
       'Destructible terrain in the initial build',
       'More than 3 distinct enemy types in initial build',

@@ -2903,22 +2903,6 @@ window.addEventListener('resize', () => {
   }
 });
 
-// ── Virtual gamepad ───────────────────────────────────────────────────────────
-
-const virtualPad       = $('virtual-pad');
-const vpadToggleBtn    = $('vpad-toggle-btn');
-let   vpadVisible      = false;
-
-function showVpad(show) {
-  vpadVisible = show;
-  if (virtualPad)    virtualPad.classList.toggle('hidden', !show);
-  if (vpadToggleBtn) vpadToggleBtn.classList.toggle('vpad-on', show);
-}
-
-if (vpadToggleBtn) {
-  vpadToggleBtn.addEventListener('click', () => showVpad(!vpadVisible));
-}
-
 // Dispatch keyboard events into the preview iframe
 function dispatchKeyToIframe(key, code, type) {
   const iframe = $('preview-iframe');
@@ -2942,39 +2926,3 @@ function dispatchKeyToIframe(key, code, type) {
   }
 }
 
-// Wire up virtual pad buttons with press/release for proper keydown+keyup
-if (virtualPad) {
-  virtualPad.addEventListener('pointerdown', (e) => {
-    const btn = e.target.closest('.vpad-btn');
-    if (!btn) return;
-    e.preventDefault();
-    const key  = btn.dataset.key;
-    const code = btn.dataset.code;
-    if (!key) return;
-    btn.classList.add('vpad-pressed');
-    dispatchKeyToIframe(key, code, 'keydown');
-
-    // Auto-repeat while held
-    let repeatTimer = setInterval(() => dispatchKeyToIframe(key, code, 'keydown'), 80);
-
-    const release = () => {
-      btn.classList.remove('vpad-pressed');
-      clearInterval(repeatTimer);
-      dispatchKeyToIframe(key, code, 'keyup');
-      window.removeEventListener('pointerup',     release);
-      window.removeEventListener('pointercancel', release);
-    };
-    window.addEventListener('pointerup',     release, { once: true });
-    window.addEventListener('pointercancel', release, { once: true });
-  });
-}
-
-// Show vpad toggle button whenever there's an active preview
-const _vpadPreviewObserver = new MutationObserver(() => {
-  const sf = $('state-frame');
-  if (!sf) return;
-  const hasPreview = !sf.classList.contains('hidden');
-  if (vpadToggleBtn) vpadToggleBtn.classList.toggle('hidden', !hasPreview);
-  if (!hasPreview) showVpad(false);
-});
-if (stateFrame) _vpadPreviewObserver.observe(stateFrame, { attributes: true, attributeFilter: ['class'] });

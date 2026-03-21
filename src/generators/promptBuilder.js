@@ -50,7 +50,7 @@ Schema:
   "genre": "hypercasual|arcade|puzzle|idle-clicker|runner|platformer|survival|top-down|reflex|strategy",
   "orientation": "portrait|landscape",
   "camera": "2D-fixed|top-down|side-scrolling|isometric",
-  "controls": "tap|swipe|drag|virtual-joystick|tap-buttons|tilt",
+  "controls": "tap|swipe|drag|tap-buttons|tilt",
   "mechanics": ["core action in ≤10 words", "secondary mechanic if any"],
   "win_condition": "how the player succeeds or progresses",
   "lose_condition": "how the game ends or player fails",
@@ -61,7 +61,7 @@ Schema:
 }
 Rules:
 - orientation: portrait for runners/tap/clicker/puzzle, landscape for platformers/top-down arenas
-- controls: always mobile-first — tap for simple games, virtual-joystick for movement-based games
+- controls: always mobile-first — tap, swipe, drag, or tap-buttons; never virtual-joystick overlays
 - screens: only include screens the game actually needs — never add fake or placeholder screens
 - files: 4-8 files max — focused, working game over large skeleton
 - steps: describe the actual game loop, not file creation
@@ -89,10 +89,11 @@ MOBILE GAME RULES (all mandatory):
 TOUCH CONTROLS — every game must have working touch controls:
 - tap games: addEventListener('pointerdown') on canvas or button
 - swipe games: track pointerdown + pointermove + pointerup, compute direction delta
-- virtual joystick: fixed circle on screen, thumb drags within it, compute dx/dy for movement
-- on-screen buttons: large fixed-position buttons (left/right/jump/shoot), pointer events
+- movement games: drag anywhere on screen to move (compute dx/dy from pointer position vs player), or use large tap-button zones (left half / right half of screen)
+- on-screen buttons: large fixed-position buttons (left/right/jump/shoot), pointer events — minimum 56×56px
 - Never require keyboard as the ONLY control — always add touch equivalents
 - Never require mouse hover — touch has no hover
+- Design all game controls for direct touch input — tap to interact, swipe to move, drag to position. Do NOT add virtual joysticks or gamepad overlays. Keep controls intuitive and touch-native.
 
 GAME LOOP — all games must have a real requestAnimationFrame loop:
 \`\`\`js
@@ -250,37 +251,9 @@ The game boots, shows a main menu, starts when Play is tapped, has working touch
 index.html      — game shell: canvas, HUD divs, meta viewport, font loading
 css/style.css   — mobile reset, canvas fill, HUD layers, button/overlay styles, animations
 js/game.js      — main game: init, game loop (update+draw), entities, collision, spawn, difficulty ramp
-js/input.js     — input handler: pointer events for tap/swipe/joystick, keyboard fallback
+js/input.js     — input handler: pointer events for tap/swipe/drag, keyboard fallback
 js/ui.js        — UI screens: renderMenu(), renderPause(), renderGameOver(), renderHUD(), updateScore()
 README.md       — how to run locally, controls guide, game description
-
-## VIRTUAL JOYSTICK PATTERN (for movement-based games):
-\`\`\`js
-const joystick = {
-  active: false, startX: 0, startY: 0, dx: 0, dy: 0, radius: 60,
-  x: 80, y: 0, // positioned bottom-left; set y in resizeCanvas
-};
-canvas.addEventListener('pointerdown', e => {
-  const r = canvas.getBoundingClientRect();
-  const tx = e.clientX - r.left, ty = e.clientY - r.top;
-  // Left half of screen = joystick
-  if (tx < canvas.width / 2) {
-    joystick.active = true; joystick.startX = tx; joystick.startY = ty;
-    joystick.x = tx; joystick.y = ty;
-  }
-});
-canvas.addEventListener('pointermove', e => {
-  if (!joystick.active) return;
-  const r = canvas.getBoundingClientRect();
-  const tx = e.clientX - r.left, ty = e.clientY - r.top;
-  const ddx = tx - joystick.startX, ddy = ty - joystick.startY;
-  const dist = Math.sqrt(ddx*ddx + ddy*ddy);
-  const maxDist = joystick.radius;
-  joystick.dx = (dist > 1 ? ddx / Math.max(dist, maxDist) : 0);
-  joystick.dy = (dist > 1 ? ddy / Math.max(dist, maxDist) : 0);
-});
-canvas.addEventListener('pointerup', () => { joystick.active = false; joystick.dx = 0; joystick.dy = 0; });
-\`\`\`
 
 ## TAP/SWIPE PATTERN (for tap and runner games):
 \`\`\`js
@@ -319,7 +292,7 @@ css/hud.css      — HUD-specific: score display, health bar, wave counter, paus
 js/game.js       — core game: init, game loop, state machine, spawn manager, difficulty curve
 js/player.js     — player entity: position, velocity, health, draw(), update(), reset()
 js/enemies.js    — enemy types: spawn(), update(), draw(), collision(), pool management
-js/input.js      — input manager: pointer events, joystick, swipe detection, keyboard fallback
+js/input.js      — input manager: pointer events, swipe detection, drag tracking, keyboard fallback
 js/ui.js         — UI: renderMenu(), renderPause(), renderGameOver(), renderHUD(), showToast()
 js/audio.js      — audio: Web Audio API, playSound(type), sounds for hit/score/death/powerup
 js/storage.js    — persistence: saveBestScore(), loadBestScore(), saveSettings(), loadSettings()

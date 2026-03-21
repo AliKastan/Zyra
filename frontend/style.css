@@ -3211,115 +3211,6 @@ textarea::placeholder {
   background: var(--surface2);
 }
 
-/* ── Virtual gamepad ───────────────────────────────────────────────────────── */
-.virtual-pad {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 50;
-  display: flex;
-  justify-content: center;
-  padding: 10px 20px 14px;
-  background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 80%, transparent 100%);
-  pointer-events: all;
-  animation: fadeIn 0.2s ease;
-}
-
-.vpad-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  max-width: 340px;
-  gap: 24px;
-}
-
-.vpad-dpad {
-  display: grid;
-  grid-template-rows: 1fr auto 1fr;
-  align-items: center;
-  gap: 3px;
-}
-
-.vpad-mid-row {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.vpad-center {
-  width: 44px;
-  height: 44px;
-  background: rgba(255,255,255,0.04);
-  border-radius: 50%;
-  border: 1px solid rgba(255,255,255,0.08);
-}
-
-.vpad-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.10);
-  border: 1px solid rgba(255,255,255,0.15);
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-  transition: background 0.1s ease, transform 0.08s ease;
-}
-
-.vpad-btn:active,
-.vpad-btn.vpad-pressed {
-  background: rgba(255,255,255,0.22);
-  transform: scale(0.92);
-}
-
-.vpad-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.vpad-action-btn {
-  min-width: 48px;
-  width: auto;
-  padding: 0 10px;
-  font-size: 0.72rem;
-}
-
-.vpad-a {
-  background: rgba(99,102,241,0.22);
-  border-color: rgba(99,102,241,0.35);
-  color: rgba(200,201,255,0.9);
-}
-
-.vpad-enter {
-  background: rgba(52,211,153,0.18);
-  border-color: rgba(52,211,153,0.30);
-  color: rgba(130,240,200,0.9);
-}
-
-.vpad-b {
-  font-size: 0.6rem;
-  background: rgba(255,255,255,0.06);
-}
-
-
-/* Toggle button active state */
-.vpad-toggle-btn.vpad-on {
-  color: var(--accent);
-  background: var(--accent-dim);
-}
-
 /* ── Mobile bottom nav ─────────────────────────────────────────────────────── */
 .mobile-bottom-nav {
   display: none;
@@ -3435,11 +3326,6 @@ textarea::placeholder {
   .mobile-nav-btn[data-has-preview="true"] span::after {
     content: ' •';
     color: var(--emerald);
-  }
-
-  /* Virtual pad toggle — always visible on mobile when preview is active */
-  .vpad-toggle-btn {
-    display: flex !important;
   }
 
   /* Code viewer on mobile — single column */

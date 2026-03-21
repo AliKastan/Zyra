@@ -101,7 +101,7 @@ const TEMPLATES = {
     summary: 'A mobile platformer game with on-screen left/right/jump controls, platforms, and a goal to reach.',
     stack: 'HTML5 Canvas + JavaScript',
     orientation: 'landscape',
-    controls: 'virtual-joystick',
+    controls: 'tap-buttons',
     files: ['index.html', 'css/style.css', 'js/game.js', 'js/input.js', 'js/ui.js'],
     steps: [
       'Build landscape canvas with tile-based or freeform platform layout',
@@ -115,14 +115,14 @@ const TEMPLATES = {
 
   // ── Survival ────────────────────────────────────────────────────────────────
   'survival': {
-    summary: 'A wave-survival mobile game where the player fights off escalating enemy waves with a virtual joystick.',
+    summary: 'A wave-survival mobile game where the player fights off escalating enemy waves using drag-to-move controls.',
     stack: 'HTML5 Canvas + JavaScript',
     orientation: 'portrait',
-    controls: 'virtual-joystick',
+    controls: 'drag',
     files: ['index.html', 'css/style.css', 'js/game.js', 'js/input.js', 'js/ui.js'],
     steps: [
       'Build portrait canvas arena with player at center',
-      'Implement virtual joystick for player movement (touch drag from fixed origin)',
+      'Implement drag-to-move: player moves toward touch position on canvas',
       'Spawn enemies that move toward the player each wave',
       'Implement player attack (auto-fire toward nearest enemy, or tap to shoot)',
       'Track health bar, wave number, and score (enemies killed)',
@@ -132,14 +132,14 @@ const TEMPLATES = {
 
   // ── Top-down ─────────────────────────────────────────────────────────────────
   'top-down': {
-    summary: 'A top-down action mobile game with virtual joystick movement and touch-to-shoot controls.',
+    summary: 'A top-down action mobile game with drag-to-move controls and touch-to-shoot mechanics.',
     stack: 'HTML5 Canvas + JavaScript',
     orientation: 'portrait',
-    controls: 'virtual-joystick',
+    controls: 'drag',
     files: ['index.html', 'css/style.css', 'js/game.js', 'js/input.js', 'js/ui.js'],
     steps: [
       'Build top-down canvas view, player centered on screen',
-      'Implement virtual left joystick for movement + auto-fire or right-side tap to shoot',
+      'Implement drag-to-move: player follows touch/pointer position; auto-fire toward nearest enemy',
       'Spawn enemies from screen edges that move toward player',
       'Implement bullets/projectiles, collision detection for hits and player damage',
       'Display health bar, score, and wave number as HUD overlay',
