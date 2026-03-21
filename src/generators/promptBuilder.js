@@ -55,7 +55,7 @@ Schema:
   "win_condition": "how the player succeeds or progresses",
   "lose_condition": "how the game ends or player fails",
   "screens": ["main-menu","gameplay","pause","game-over"],
-  "stack": "HTML5 Canvas + JavaScript",
+  "stack": "HTML5 Canvas + JavaScript + planck.js physics",
   "files": ["index.html","css/style.css","js/game.js","js/input.js","js/ui.js","README.md"],
   "steps": ["step description — max 6 steps, describe WHAT to implement not which files"]
 }
@@ -181,6 +181,70 @@ COMPLETENESS: Every button must do something real. No dead buttons, no TODO logi
 HONESTY: Never fake features. If a feature requires real backend (multiplayer, cloud save, leaderboards), do NOT include it or clearly mark it as a local-only simulation.
 SELF-REPAIR: Before finalizing output — verify all functions called are defined, all canvas IDs exist in HTML, all game states are handled, touch events are bound.`;
 
+// ── Physics engine ──────────────────────────────────────────────────────────
+
+const PHYSICS_ENGINE = `
+PHYSICS ENGINE — planck.js (loaded globally as \`planck\`):
+Include <script src="/planck.min.js"></script> in index.html BEFORE any game scripts.
+Use planck.js for ALL physics: gravity, bouncing, friction, collisions, projectiles. Never write manual physics code.
+
+When to use: platformers, falling objects, bouncing, collisions, projectiles, stacking, vehicles, ragdoll.
+When NOT to use: match-3, card games, sudoku, word games, quizzes, turn-based.
+
+Setup:
+\`\`\`js
+const world = planck.World({ gravity: planck.Vec2(0, 20) });
+const SCALE = 30;
+function toWorld(px) { return px / SCALE; }
+function toScreen(m) { return m * SCALE; }
+\`\`\`
+
+Static body (ground/walls):
+\`\`\`js
+const ground = world.createBody({ type: 'static', position: planck.Vec2(toWorld(187), toWorld(800)) });
+ground.createFixture({ shape: planck.Box(toWorld(187), toWorld(10)), friction: 0.6 });
+\`\`\`
+
+Dynamic body (player/balls):
+\`\`\`js
+const ball = world.createBody({ type: 'dynamic', position: planck.Vec2(toWorld(x), toWorld(y)), bullet: true });
+ball.createFixture({ shape: planck.Circle(toWorld(15)), density: 1.0, friction: 0.3, restitution: 0.7 });
+ball.setUserData({ type: 'ball', element: domElement });
+\`\`\`
+
+Physics in game loop:
+\`\`\`js
+world.step(1/60, 8, 3);
+for (let body = world.getBodyList(); body; body = body.getNext()) {
+  const pos = body.getPosition();
+  const data = body.getUserData();
+  if (data) { /* update render position from toScreen(pos.x), toScreen(pos.y) */ }
+}
+\`\`\`
+
+Collisions:
+\`\`\`js
+world.on('begin-contact', function(contact) {
+  const a = contact.getFixtureA().getBody().getUserData();
+  const b = contact.getFixtureB().getBody().getUserData();
+  // handle collision based on a.type and b.type
+});
+\`\`\`
+
+Controls: body.applyLinearImpulse(planck.Vec2(0, -8), body.getWorldCenter()) for jump.
+body.setLinearVelocity(planck.Vec2(dir * 5, body.getLinearVelocity().y)) for move.
+
+Always create boundary walls (left, right, ceiling, floor) so nothing flies off screen.
+
+Physics values by genre:
+- Platformer: gravity 20, restitution 0.0, friction 0.6
+- Bounce game: gravity 12, restitution 0.7, friction 0.3
+- Angry Birds: gravity 15, restitution 0.3, friction 0.6
+- Space: gravity 0, restitution 0.9, friction 0.0
+- Pinball: gravity 18, restitution 0.6, friction 0.2
+
+Rules: Always use SCALE conversion. Always create walls. Always setUserData. Use bullet:true on fast objects. Call world.step() once per frame.`;
+
 // ── JS reliability rules ──────────────────────────────────────────────────────
 
 const CODE_RELIABILITY = `
@@ -229,6 +293,7 @@ css/style.css — mobile reset, canvas fill, HUD positioning, button styles
 js/game.js   — complete game: loop, entities, collision, score, input, states
 
 ${VISUAL_IDENTITY}
+${PHYSICS_ENGINE}
 ${MOBILE_GAME_RULES}${CORRECTNESS_RULES}${MOBILE_LAYOUT}${CODE_RELIABILITY}`,
 
 // ── BALANCED: full mobile game with all screens and polish ────────────────────
@@ -273,6 +338,7 @@ canvas.addEventListener('pointerup', e => {
 });
 \`\`\`
 ${VISUAL_IDENTITY}
+${PHYSICS_ENGINE}
 ${MOBILE_GAME_RULES}${CORRECTNESS_RULES}${MOBILE_LAYOUT}${CODE_RELIABILITY}`,
 
 // ── QUALITY: polished mobile game with full progression and juice ──────────────
@@ -312,6 +378,7 @@ Rule: effects must serve feedback, not decorate. If an effect doesn't tell the p
 - Unlock: after reaching score milestone, unlock a new power or game speed
 
 ${VISUAL_IDENTITY}
+${PHYSICS_ENGINE}
 ${MOBILE_GAME_RULES}${CORRECTNESS_RULES}${MOBILE_LAYOUT}${CODE_RELIABILITY}`,
 
 };

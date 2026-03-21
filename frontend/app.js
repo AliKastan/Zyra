@@ -254,7 +254,7 @@ let generationStartMs   = null;   // Date.now() when generation started
 let currentSlug         = null;
 let currentPreviewUrl   = null;
 let previewPollInterval = null;
-let currentDevice       = 'mobile';
+
 let currentTab          = 'preview';
 let currentScope        = 'auto'; // 'auto' | 'ui' | 'logic' | 'component' | 'page'
 
@@ -1620,6 +1620,8 @@ const _QP_MSGS = [
   'Creating your game\u2026',
   'Polishing the gameplay\u2026',
   'Adding finishing touches\u2026',
+  'Almost there\u2026',
+  'Final polish\u2026',
 ];
 
 function _qpCreateSandbox() {
@@ -1771,7 +1773,7 @@ async function _qpRunChecks(slug) {
 // ── Main pipeline loop ────────────────────────────────────────────────────────
 // Called after a job completes (non-edit only). Tests the generated code,
 // requests fixes for any failures, and resolves when ready to show the user.
-const MAX_QP_ATTEMPTS = 3; // 1 initial test + up to 2 fix-and-retest rounds
+const MAX_QP_ATTEMPTS = 5; // 1 initial test + up to 4 fix-and-retest rounds
 
 async function runQualityPipeline(slug, originalPrompt) {
   for (let attempt = 0; attempt < MAX_QP_ATTEMPTS; attempt++) {

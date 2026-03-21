@@ -180,6 +180,11 @@ app.get('/zyra-edit.js', (_req, res) => {
   res.sendFile(path.resolve(__dirname, '../../frontend/zyra-edit.js'));
 });
 
+// Serve planck.js physics engine (loaded by generated games that need physics)
+app.get('/planck.min.js', (_req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../frontend/planck.min.js'));
+});
+
 // Serve per-project env vars as a JS file — no auth (loaded by generated apps in iframes)
 // Same pattern as /zyra-sdk.js — accessible to iframe content, never logs raw values
 app.get('/zyra-env/:slugjs', serveEnvScript);
