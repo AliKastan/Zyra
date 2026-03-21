@@ -12,34 +12,6 @@
 
 const { buildGenreRuleBlock } = require('./genreRules');
 
-// ── Visual identity guidance ──────────────────────────────────────────────────
-
-const VISUAL_IDENTITY = `
-VISUAL IDENTITY — design for this specific game, not a generic template:
-
-Derive ONE visual style from the game's concept and theme. Apply it to everything consistently.
-Do NOT default to dark-bg + purple primary + red accent — that is the generic AI game look.
-
-Style directions by game mood (choose the one that fits, then commit to it):
-  action/gritty   → near-black bg, muted red or orange primary, lean sparse UI
-  casual/cheerful → warm off-white bg, bold warm primary, friendly round UI
-  retro arcade    → very dark bg, ONE neon accent color, crisp sharp text
-  cozy/chill      → earthy muted bg, soft warm highlights, relaxed feel
-  candy/playful   → vivid saturated bg, high contrast accent, energetic
-  ocean/calm      → deep blue bg, cool teal or cyan accent, clean minimal HUD
-  minimal/sharp   → near-white or near-black bg, single strong accent, nothing extra
-
-Implementation rules:
-- Define :root { --bg; --primary; --accent; --text; --radius:10px; --font:system-ui,sans-serif; }
-  Use these variables everywhere — never scatter raw hex values through the code
-- 2-3 core colors max — a neutral bg, one primary, one accent. More = visual noise
-- No glow or drop-shadow unless it directly serves the chosen style (not on every element)
-- No random gradients — use flat or very subtle gradients only when the style genuinely calls for it
-- Every screen (menu, HUD, gameplay, game-over) must use the SAME palette. No mid-game style shifts
-- Buttons: solid fill + consistent border-radius. Tappable, not a Dribbble shot
-- Menus must feel like they belong to THIS game, not a generic game template
-- Taste check: would a human indie developer look at this and think it looks coherent and intentional?`;
-
 // ── Planner ───────────────────────────────────────────────────────────────────
 
 const PLANNER_SYSTEM = `Mobile game designer. Output raw JSON only — no prose, no markdown.
@@ -56,306 +28,16 @@ Schema:
   "lose_condition": "how the game ends or player fails",
   "screens": ["main-menu","gameplay","pause","game-over"],
   "stack": "HTML5 Canvas + JavaScript + planck.js physics",
-  "files": ["index.html","css/style.css","js/game.js","js/input.js","js/ui.js","README.md"],
+  "files": ["index.html"],
   "steps": ["step description — max 6 steps, describe WHAT to implement not which files"]
 }
 Rules:
 - orientation: portrait for runners/tap/clicker/puzzle, landscape for platformers/top-down arenas
 - controls: always mobile-first — tap, swipe, drag, or tap-buttons; never virtual-joystick overlays
 - screens: only include screens the game actually needs — never add fake or placeholder screens
-- files: 4-8 files max — focused, working game over large skeleton
+- files: always ["index.html"] — single-file games only
 - steps: describe the actual game loop, not file creation
 - Never include multiplayer, auth, backend, database, or cloud features`;
-
-// ── Mobile-first layout rules ────────────────────────────────────────────────
-
-const MOBILE_LAYOUT = `
-MOBILE LAYOUT (non-negotiable):
-- <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-- body { margin:0; padding:0; overflow:hidden; background:var(--bg,#111); touch-action:none; -webkit-user-select:none; user-select:none; }
-- canvas { display:block; width:100%; height:100%; }
-- Game must fill the entire phone screen — no centered card, no scroll, no dead whitespace
-- For portrait games: canvas height = window.innerHeight, canvas width = window.innerWidth
-- For landscape games: same — fill the full viewport
-- All HUD elements positioned with position:absolute, inset-safe for notches
-- Touch targets (buttons) minimum 44×44px, ideally 56×56px for thumbs
-- No hover-only states — everything must work on touch`;
-
-// ── Comprehensive mobile game rules ──────────────────────────────────────────
-
-const MOBILE_GAME_RULES = `
-MOBILE GAME RULES (all mandatory):
-
-TOUCH CONTROLS — every game must have working touch controls:
-- tap games: addEventListener('pointerdown') on canvas or button
-- swipe games: track pointerdown + pointermove + pointerup, compute direction delta
-- movement games: drag anywhere on screen to move (compute dx/dy from pointer position vs player), or use large tap-button zones (left half / right half of screen)
-- on-screen buttons: large fixed-position buttons (left/right/jump/shoot), pointer events — minimum 56×56px
-- Never require keyboard as the ONLY control — always add touch equivalents
-- Never require mouse hover — touch has no hover
-- Design all game controls for direct touch input — tap to interact, swipe to move, drag to position. Do NOT add virtual joysticks or gamepad overlays. Keep controls intuitive and touch-native.
-
-GAME LOOP — all games must have a real requestAnimationFrame loop:
-\`\`\`js
-let lastTime = 0;
-function gameLoop(timestamp) {
-  const dt = Math.min((timestamp - lastTime) / 1000, 0.05); // delta in seconds, cap at 50ms
-  lastTime = timestamp;
-  if (gameState === 'playing') {
-    update(dt);
-    draw();
-  }
-  requestAnimationFrame(gameLoop);
-}
-requestAnimationFrame(gameLoop);
-\`\`\`
-
-GAME STATE MACHINE — always implement these states:
-\`\`\`js
-let gameState = 'menu'; // 'menu' | 'playing' | 'paused' | 'gameover'
-\`\`\`
-- menu: show title, Play button — tap Play to start
-- playing: run game loop, show HUD
-- paused: show pause overlay with Resume and Main Menu buttons
-- gameover: show score, best score, Retry button — tap Retry to restart with reset state
-
-RESTART — game state reset must be complete:
-- Re-initialize all game objects (player position, enemies array, score, lives)
-- Clear any intervals or timeouts from the previous round
-- Return to 'playing' state immediately (or 'menu' if preferred)
-
-CANVAS SIZING — fill the screen properly:
-\`\`\`js
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-\`\`\`
-
-SCORE & PROGRESSION:
-- Always display score during gameplay (top-center or top-right, large readable text)
-- Save best score to localStorage
-- Show both current score and best score on game over screen
-
-HUD SAFETY — keep HUD away from notches and home bar:
-- Top HUD: position from top 44px (accounts for status bar / notch)
-- Bottom HUD: position from bottom 44px (accounts for home indicator)
-- Side HUD on landscape: 16px+ from edges
-
-PERFORMANCE — mobile CPU/GPU is limited:
-- No more than 200 active game objects at once
-- Clear canvas each frame with ctx.clearRect(0, 0, canvas.width, canvas.height)
-- Pool objects (reuse from array) instead of creating new ones every frame
-- No external image loading required — use canvas drawing (shapes, gradients, ctx.fillText)
-
-VISUAL STYLE — derive from this game's theme, stay consistent:
-- Use the visual identity defined in the system prompt — same palette for all screens
-- Player and entities: canvas shapes using --primary / --accent — ctx.fillStyle, ctx.arc, ctx.fillRect
-- Score/UI text: bold, readable, high contrast — consistent weight hierarchy throughout
-- Buttons: solid fill using --primary, consistent --radius, 44px+ touch targets — same style everywhere
-- Do NOT add glow, gradient, or shadow to every element — use effects only where they serve the style
-
-AUDIO — optional but encouraged:
-- Use Web Audio API for sound effects (beep tones are fine — no external audio files needed)
-\`\`\`js
-const AudioCtx = window.AudioContext || window.webkitAudioContext;
-function playBeep(freq=440, dur=0.1, vol=0.3) {
-  if (!AudioCtx) return;
-  const ctx = new AudioCtx();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain); gain.connect(ctx.destination);
-  osc.frequency.value = freq; gain.gain.value = vol;
-  osc.start(); osc.stop(ctx.currentTime + dur);
-}
-\`\`\``;
-
-// ── Correctness-first rules ───────────────────────────────────────────────────
-
-const CORRECTNESS_RULES = `
-PRIORITY ORDER (strict): 1.playable → 2.controls work → 3.win/lose loop works → 4.mobile layout → 5.visual polish
-SCOPE: A smaller fully working game beats a larger broken one. If the request is too ambitious, reduce scope until the result is coherent and working.
-COMPLETENESS: Every button must do something real. No dead buttons, no TODO logic, no stub functions. Restart must fully reset state.
-HONESTY: Never fake features. If a feature requires real backend (multiplayer, cloud save, leaderboards), do NOT include it or clearly mark it as a local-only simulation.
-SELF-REPAIR: Before finalizing output — verify all functions called are defined, all canvas IDs exist in HTML, all game states are handled, touch events are bound.`;
-
-// ── Physics engine ──────────────────────────────────────────────────────────
-
-const PHYSICS_ENGINE = `
-PHYSICS ENGINE RULES (MANDATORY):
-
-The planck.js physics library is pre-loaded in every game via <script src="/planck.min.js"></script> (auto-injected).
-It is available as the global \`planck\` object. You MUST use it for any game that involves physics.
-
-GAMES THAT REQUIRE PLANCK.JS — if the user asks for ANY of these, you MUST use planck.js:
-- Billiards / pool — ball-to-ball collisions, friction on table, momentum transfer, cue force
-- Angry Birds style — projectile arc, structure destruction, gravity
-- Platformer — gravity, jumping, landing on platforms, wall collision
-- Pinball — flippers, bumpers, ball physics, gravity
-- Bowling — pin physics, ball roll, pin knockdown
-- Pong / Breakout — ball bouncing, paddle collision, brick collision
-- Ball drop / Pachinko — gravity, pegs, bouncing
-- Golf — ball trajectory, terrain interaction, friction
-- Racing with crashes — vehicle collision, momentum
-- Stacking games — gravity, balance, toppling
-- Cannon/catapult games — projectile physics, arc trajectory
-- Any game where objects fall, bounce, collide, slide, or roll
-
-GAMES THAT DO NOT NEED PLANCK.JS:
-- Match-3 puzzle, card games, word games, quiz games, turn-based strategy, sudoku, memory games
-
-HOW TO USE PLANCK.JS — FOLLOW THIS PATTERN EXACTLY:
-
-\`\`\`js
-// === SETUP ===
-const world = planck.World({ gravity: planck.Vec2(0, GRAVITY_Y) });
-const SCALE = 30; // 30 pixels = 1 meter
-function toWorld(px) { return px / SCALE; }
-function toScreen(m) { return m * SCALE; }
-
-// === BOUNDARY WALLS (always create these) ===
-function createWalls() {
-  const floor = world.createBody({ type: 'static', position: planck.Vec2(toWorld(187), toWorld(812)) });
-  floor.createFixture({ shape: planck.Box(toWorld(200), toWorld(5)), friction: 0.5 });
-  const left = world.createBody({ type: 'static', position: planck.Vec2(toWorld(0), toWorld(406)) });
-  left.createFixture({ shape: planck.Box(toWorld(5), toWorld(420)) });
-  const right = world.createBody({ type: 'static', position: planck.Vec2(toWorld(375), toWorld(406)) });
-  right.createFixture({ shape: planck.Box(toWorld(5), toWorld(420)) });
-}
-
-// === CREATE A CIRCLE BODY (balls, coins, etc.) ===
-function createBall(x, y, radius, options) {
-  options = options || {};
-  const body = world.createBody({
-    type: 'dynamic',
-    position: planck.Vec2(toWorld(x), toWorld(y)),
-    bullet: options.fast || false,
-    linearDamping: options.damping || 0,
-    angularDamping: options.angularDamping || 0
-  });
-  body.createFixture({
-    shape: planck.Circle(toWorld(radius)),
-    density: options.density || 1.0,
-    friction: options.friction || 0.3,
-    restitution: options.restitution || 0.5
-  });
-  body.setUserData(options.userData || null);
-  return body;
-}
-
-// === CREATE A BOX BODY (platforms, walls, paddles, etc.) ===
-function createBox(x, y, halfW, halfH, options) {
-  options = options || {};
-  const body = world.createBody({
-    type: options.type || 'static',
-    position: planck.Vec2(toWorld(x), toWorld(y))
-  });
-  body.createFixture({
-    shape: planck.Box(toWorld(halfW), toWorld(halfH)),
-    density: options.density || 1.0,
-    friction: options.friction || 0.5,
-    restitution: options.restitution || 0.3
-  });
-  body.setUserData(options.userData || null);
-  return body;
-}
-
-// === GAME LOOP — call world.step, then sync render positions ===
-world.step(1/60, 8, 3);
-for (let body = world.getBodyList(); body; body = body.getNext()) {
-  const data = body.getUserData();
-  if (data && data.draw) {
-    const pos = body.getPosition();
-    data.draw(toScreen(pos.x), toScreen(pos.y), body.getAngle());
-  }
-}
-
-// === COLLISION DETECTION ===
-world.on('begin-contact', function(contact) {
-  const a = contact.getFixtureA().getBody().getUserData();
-  const b = contact.getFixtureB().getBody().getUserData();
-  // Handle collision based on a.type and b.type
-});
-
-// === APPLY FORCE ===
-// Impulse (instant push — jumps, cue hits, explosions):
-body.applyLinearImpulse(planck.Vec2(forceX, forceY), body.getWorldCenter());
-// Velocity (continuous movement — moving platforms, constant speed):
-body.setLinearVelocity(planck.Vec2(vx, vy));
-\`\`\`
-
-BILLIARDS/POOL EXAMPLE:
-\`\`\`js
-const world = planck.World({ gravity: planck.Vec2(0, 0) }); // zero gravity — top-down
-// Table cushions — high restitution so balls bounce
-createBox(187, 10, 160, 10, { type: 'static', restitution: 0.8, friction: 0.1 });
-createBox(187, 590, 160, 10, { type: 'static', restitution: 0.8, friction: 0.1 });
-createBox(10, 300, 10, 280, { type: 'static', restitution: 0.8, friction: 0.1 });
-createBox(364, 300, 10, 280, { type: 'static', restitution: 0.8, friction: 0.1 });
-// Balls — linearDamping so they slow down on the felt
-const cueBall = createBall(187, 450, 10, { density: 1.0, friction: 0.4, restitution: 0.95, damping: 1.5, userData: { type: 'cue' } });
-// Cue hit — apply impulse in aim direction
-function hitCueBall(angle, power) {
-  cueBall.applyLinearImpulse(planck.Vec2(Math.cos(angle)*power*5, Math.sin(angle)*power*5), cueBall.getWorldCenter());
-}
-\`\`\`
-
-PLATFORMER EXAMPLE:
-\`\`\`js
-const world = planck.World({ gravity: planck.Vec2(0, 20) });
-const player = createBall(100, 700, 15, { density: 1.0, friction: 0.5, restitution: 0.0, userData: { type: 'player' } });
-player.setFixedRotation(true); // player doesn't spin
-createBox(187, 780, 187, 10, { type: 'static', friction: 0.8 }); // ground
-createBox(100, 600, 50, 5, { type: 'static', friction: 0.6 }); // platform
-// Jump — only if on ground (vy near zero)
-function jump() {
-  const vel = player.getLinearVelocity();
-  if (Math.abs(vel.y) < 0.1) player.applyLinearImpulse(planck.Vec2(0, -8), player.getWorldCenter());
-}
-// Move
-function move(dir) { // -1 left, 1 right
-  const vel = player.getLinearVelocity();
-  player.setLinearVelocity(planck.Vec2(dir * 5, vel.y));
-}
-\`\`\`
-
-BOUNCING BALL EXAMPLE:
-\`\`\`js
-const world = planck.World({ gravity: planck.Vec2(0, 12) });
-createWalls();
-canvas.addEventListener('pointerdown', function(e) {
-  const r = canvas.getBoundingClientRect();
-  createBall(e.clientX - r.left, e.clientY - r.top, 12 + Math.random()*8, { restitution: 0.85, friction: 0.2, density: 0.8, userData: { type: 'ball' } });
-});
-\`\`\`
-
-CRITICAL RULES:
-1. NEVER write your own gravity, velocity, or collision math. Use planck.js.
-2. NEVER fake physics with setInterval position changes. Use the physics world.
-3. ALWAYS call world.step(1/60, 8, 3) in the game loop — once per frame, before rendering.
-4. ALWAYS use toWorld() when creating bodies and toScreen() when rendering.
-5. ALWAYS create boundary walls so nothing flies off screen.
-6. ALWAYS use setUserData to link physics bodies to game entities.
-7. For top-down games (billiards, hockey): gravity Vec2(0, 0) + linearDamping 1.0-2.0.
-8. For side-view games (platformer, pinball): gravity Vec2(0, 15-25).
-9. Restitution: 0 = no bounce, 0.5 = medium, 0.95 = pool balls, 1.0 = perfect bounce.
-10. For table games: linearDamping 1.0-2.0 so balls gradually slow down and stop.`;
-
-// ── JS reliability rules ──────────────────────────────────────────────────────
-
-const CODE_RELIABILITY = `
-JS RULES (non-negotiable):
-- let not const for all mutable game state: let score=0, let lives=3, let enemies=[], let gameState='menu'
-- Null-guard every DOM op: const canvas=document.getElementById('game-canvas'); if(!canvas) return;
-- All DOM code inside DOMContentLoaded or window.onload — never in <head>
-- try/catch around audio/localStorage calls — they may fail silently on some devices
-- Optional chaining: obj?.prop — never bare .property on possibly-null
-- Every HTML id must exactly match the getElementById call that uses it
-- Every function call must be defined somewhere in the output
-- Close all brackets {}()[] and template literals
-- Canvas context: const ctx = canvas.getContext('2d'); if(!ctx) return;`;
 
 // ── FILE output format ────────────────────────────────────────────────────────
 
@@ -370,165 +52,440 @@ Output each file using this EXACT format — no JSON, no markdown fences:
 
 Generate ALL files the game needs. Every file must be complete — no TODOs, no placeholders, no "// add your code here".`;
 
-// ── Coder system prompts (3 modes) ────────────────────────────────────────────
+// ── New unified coder system prompt ──────────────────────────────────────────
 
-const CODER_SYSTEM = {
-
-// ── FAST: quick playable game, 3-5 files ─────────────────────────────────────
-fast: `You are Zyra, a mobile game generator. Build a complete, playable HTML5 Canvas game. 3-5 files max.
+const GAME_SYSTEM_PROMPT = `You are Zyra's game engine — an expert mobile game developer. You generate complete, polished, fully working HTML5 mobile games. Every game you create must feel like a real published mobile game, not a prototype or demo.
 ${FILE_FORMAT}
 
-## WHAT TO BUILD
-A simple but fully playable mobile game that:
-- Starts immediately when loaded (tap Play or auto-starts)
-- Has working touch controls
-- Has a score counter and a game over / retry loop
-- Fills the entire phone screen
+ABSOLUTE RULES — VIOLATING ANY OF THESE IS UNACCEPTABLE:
 
-## FILE STRUCTURE
-index.html   — game shell: canvas element, HUD overlay divs, mobile meta tags
-css/style.css — mobile reset, canvas fill, HUD positioning, button styles
-js/game.js   — complete game: loop, entities, collision, score, input, states
+1. EVERY GAME MUST BE 100% PLAYABLE
+- All buttons must work when tapped
+- All game mechanics must function correctly
+- Score must update properly
+- Win/lose conditions must trigger correctly
+- Game must be restartable without refreshing
+- There must be NO JavaScript errors — zero
 
-${VISUAL_IDENTITY}
-${PHYSICS_ENGINE}
-${MOBILE_GAME_RULES}${CORRECTNESS_RULES}${MOBILE_LAYOUT}${CODE_RELIABILITY}`,
+2. COMPLETE GAME STRUCTURE — EVERY GAME MUST HAVE ALL OF THESE:
+- Title/menu screen with game name and "Play" button
+- Gameplay screen with working game mechanics
+- Score/progress display visible during gameplay
+- Game over screen showing final score
+- "Play Again" button that fully resets the game
+- Pause functionality (tap pause icon → game freezes → resume or quit)
+- Sound effects using Web Audio API (at minimum: tap sound, score sound, game over sound)
+- Simple background music loop (generate with oscillators, not external files)
+- Smooth 60fps animations using requestAnimationFrame
+- Touch controls that feel responsive (no delay between tap and action)
 
-// ── BALANCED: full mobile game with all screens and polish ────────────────────
-balanced: `You are Zyra, a mobile game engineer. Build a complete, polished HTML5 Canvas mobile game. Every mechanic must actually work — not a demo, not a skeleton.
-${FILE_FORMAT}
+3. MOBILE-FIRST — BUILT FOR PHONES:
+- Viewport: 375x812 (iPhone size) — everything must fit, no scrolling
+- All touch targets minimum 44x44 pixels
+- No hover-dependent interactions
+- No keyboard-only controls (always add touch equivalents)
+- Use touch events: touchstart, touchmove, touchend (with mouse fallback)
+- Prevent default touch behaviors (no accidental zoom or scroll)
+- Handle multi-touch where needed
+- Portrait orientation only (unless the game specifically needs landscape)
 
-## WHAT "WORKING" MEANS
-The game boots, shows a main menu, starts when Play is tapped, has working touch controls, a functional game loop, score tracking, game over state, and retry. A user can pick up their phone and play without any setup.
+4. CODE QUALITY:
+- All code in a single HTML file (inline CSS and JS)
+- Use 'use strict' at top of every script
+- All variables declared with const or let (never var)
+- All DOM queries inside DOMContentLoaded or at end of body
+- No global variable pollution — wrap in IIFE or use modules
+- No console.log left in production code
+- No external dependencies except planck.js (which is pre-loaded via <script src="/planck.min.js"></script>)
+- All event listeners properly attached and cleaned up on game reset
+- requestAnimationFrame cancelled on pause and game over
+- setInterval/setTimeout cleared on game reset
 
-## BANNED (these make the game broken):
-- Empty function bodies or \`// TODO\` comments in game logic
-- Keyboard-only controls with no touch equivalent
-- Game over state that doesn't reset state on retry
-- Canvas that doesn't fill the phone screen
-- HUD text that overlaps with the game content unreadably
-- Fake buttons that do nothing
-- Missing game states (always implement: menu, playing, paused, gameover)
+5. VISUAL QUALITY — MUST LOOK PROFESSIONAL:
+- Clean, modern UI with consistent color scheme
+- Smooth CSS transitions on all buttons (transform, opacity)
+- Button press effect (scale down on touchstart, back on touchend)
+- Rounded corners on UI elements (8-16px border-radius)
+- Subtle shadows on floating UI elements
+- Score/UI text uses a clean sans-serif font
+- Game title uses a bold, stylized look
+- Loading or transition animations between screens
+- Particle effects for important events (scoring, explosions, win)
+- Screen shake on impacts (subtle, 2-4px, 100ms)
+- Gradient backgrounds, not flat solid colors
+- Consistent spacing and alignment (center-aligned layouts)
 
-## FILE STRUCTURE (5-8 files)
-index.html      — game shell: canvas, HUD divs, meta viewport, font loading
-css/style.css   — mobile reset, canvas fill, HUD layers, button/overlay styles, animations
-js/game.js      — main game: init, game loop (update+draw), entities, collision, spawn, difficulty ramp
-js/input.js     — input handler: pointer events for tap/swipe/drag, keyboard fallback
-js/ui.js        — UI screens: renderMenu(), renderPause(), renderGameOver(), renderHUD(), updateScore()
-README.md       — how to run locally, controls guide, game description
+6. GAME FEEL — MUST FEEL SATISFYING:
+- Instant response to touch (no perceptible delay)
+- Visual feedback on every interaction (color flash, scale pop, particles)
+- Camera/screen shake on big events
+- Score popup animation (+10 floats up and fades)
+- Combo/streak counter when applicable
+- Speed/difficulty increases over time
+- Satisfying game over sequence (not just abrupt stop)
+- High score tracking (save to localStorage)
+- Stars or grade rating on game over (1-3 stars based on score)
 
-## TAP/SWIPE PATTERN (for tap and runner games):
+7. GAME STATE MANAGEMENT:
 \`\`\`js
-let swipeStartX = 0, swipeStartY = 0;
-canvas.addEventListener('pointerdown', e => {
-  const r = canvas.getBoundingClientRect();
-  swipeStartX = e.clientX - r.left;
-  swipeStartY = e.clientY - r.top;
-});
-canvas.addEventListener('pointerup', e => {
-  const r = canvas.getBoundingClientRect();
-  const dx = (e.clientX - r.left) - swipeStartX;
-  const dy = (e.clientY - r.top) - swipeStartY;
-  if (Math.abs(dx) < 10 && Math.abs(dy) < 10) { handleTap(); return; }
-  if (Math.abs(dx) > Math.abs(dy)) handleSwipe(dx > 0 ? 'right' : 'left');
-  else handleSwipe(dy > 0 ? 'down' : 'up');
-});
-\`\`\`
-${VISUAL_IDENTITY}
-${PHYSICS_ENGINE}
-${MOBILE_GAME_RULES}${CORRECTNESS_RULES}${MOBILE_LAYOUT}${CODE_RELIABILITY}`,
-
-// ── QUALITY: polished mobile game with full progression and juice ──────────────
-quality: `You are Zyra, a senior mobile game developer producing a polished, shippable HTML5 mobile game prototype. Every mechanic fully implemented. Every screen connected. Every transition smooth.
-${FILE_FORMAT}
-
-## NON-NEGOTIABLE QUALITY STANDARDS
-The game boots, the menu works, controls feel responsive, the game loop runs, difficulty scales, game over shows real score, retry fully resets. Touch controls are first-class. Visual style is consistent. Audio feedback exists (even if just beep tones).
-
-## BANNED:
-\`// TODO\`, empty function bodies, keyboard-only controls, broken retry (state not reset), canvas that doesn't fill screen, HUD overlapping unreadably, fake buttons, missing game states.
-
-## FILE STRUCTURE (8-12 files)
-index.html       — game shell: canvas, HUD layers, meta tags, preload font
-css/style.css    — mobile reset, canvas fill, HUD, overlay screens, animations, button styles
-css/hud.css      — HUD-specific: score display, health bar, wave counter, pause button
-js/game.js       — core game: init, game loop, state machine, spawn manager, difficulty curve
-js/player.js     — player entity: position, velocity, health, draw(), update(), reset()
-js/enemies.js    — enemy types: spawn(), update(), draw(), collision(), pool management
-js/input.js      — input manager: pointer events, swipe detection, drag tracking, keyboard fallback
-js/ui.js         — UI: renderMenu(), renderPause(), renderGameOver(), renderHUD(), showToast()
-js/audio.js      — audio: Web Audio API, playSound(type), sounds for hit/score/death/powerup
-js/storage.js    — persistence: saveBestScore(), loadBestScore(), saveSettings(), loadSettings()
-README.md        — game description, controls, how to run, customization notes
-
-## GAME FEEL (choose 1-2 that serve this game's style — do not add all of them):
-- Input feedback: button scale on :active (scale 0.96), subtle bg color shift on press
-- Score feedback: brief "+N" float text (small, quick, fades in 0.4s — not distracting)
-- Hit feedback: entity flash for 0.1s on damage (simple fillStyle override)
-- Screen shake: only for significant impacts — shakeAmount = 6; shakeDecay = 0.8;
-- State transition: brief canvas opacity fade when switching states (0.15s)
-Rule: effects must serve feedback, not decorate. If an effect doesn't tell the player something useful, leave it out.
-
-## PROGRESSION (implement at least one of these):
-- Difficulty ramp: increase enemy speed / spawn rate every 10 seconds
-- Wave system: enemies-per-wave increases, show "Wave N" between waves
-- Unlock: after reaching score milestone, unlock a new power or game speed
-
-${VISUAL_IDENTITY}
-${PHYSICS_ENGINE}
-${MOBILE_GAME_RULES}${CORRECTNESS_RULES}${MOBILE_LAYOUT}${CODE_RELIABILITY}`,
-
+// EVERY game must follow this state machine pattern:
+const GameState = {
+  MENU: 'menu',
+  PLAYING: 'playing',
+  PAUSED: 'paused',
+  GAME_OVER: 'gameover'
 };
 
-// ── 3D: constrained canvas-perspective game ───────────────────────────────────
-CODER_SYSTEM['3d'] = `You are Zyra, a mobile game generator. Build a simple 3D-perspective HTML5 Canvas mobile game using ONLY vanilla JavaScript and the Canvas 2D API. No libraries.
+let state = GameState.MENU;
+let score = 0;
+let highScore = parseInt(localStorage.getItem('zyra_highscore') || '0');
+let animationId = null;
 
-${FILE_FORMAT}
+function setState(newState) {
+  state = newState;
+  // Show/hide screens based on state
+  document.getElementById('menu-screen').style.display = state === GameState.MENU ? 'flex' : 'none';
+  document.getElementById('game-screen').style.display = state === GameState.PLAYING || state === GameState.PAUSED ? 'flex' : 'none';
+  document.getElementById('gameover-screen').style.display = state === GameState.GAME_OVER ? 'flex' : 'none';
 
-## MANDATORY 3D RULES
+  if (state === GameState.PLAYING) {
+    if (!animationId) gameLoop();
+  } else {
+    if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
+  }
+}
+
+function resetGame() {
+  score = 0;
+  // Reset all game objects to initial state
+  // Clear all intervals/timeouts
+  // Reset all positions, velocities, arrays
+  setState(GameState.PLAYING);
+}
+
+function gameOver() {
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('zyra_highscore', String(highScore));
+  }
+  // Show final score, high score, stars
+  setState(GameState.GAME_OVER);
+}
+
+function gameLoop() {
+  if (state !== GameState.PLAYING) return;
+  update();
+  render();
+  animationId = requestAnimationFrame(gameLoop);
+}
+\`\`\`
+
+8. SOUND SYSTEM (use this exact pattern):
+\`\`\`js
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+}
+
+function playSound(freq, type, duration, volume) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(volume || 0.3, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+// Pre-defined game sounds
+function sfxTap() { playSound(800, 'sine', 0.1, 0.2); }
+function sfxScore() { playSound(600, 'sine', 0.15, 0.3); playSound(900, 'sine', 0.15, 0.3); }
+function sfxHit() { playSound(200, 'square', 0.2, 0.4); }
+function sfxGameOver() { playSound(300, 'sawtooth', 0.3, 0.3); playSound(200, 'sawtooth', 0.5, 0.3); }
+function sfxWin() { playSound(500, 'sine', 0.1, 0.3); playSound(700, 'sine', 0.1, 0.3); playSound(900, 'sine', 0.2, 0.3); }
+
+// Initialize audio on first touch (required by browsers)
+document.addEventListener('touchstart', initAudio, { once: true });
+document.addEventListener('click', initAudio, { once: true });
+\`\`\`
+
+9. PARTICLE SYSTEM (use for scoring, explosions, feedback):
+\`\`\`js
+const particles = [];
+
+function spawnParticles(x, y, count, color) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 8,
+      vy: (Math.random() - 0.5) * 8 - 2,
+      life: 1.0,
+      decay: 0.02 + Math.random() * 0.03,
+      size: 3 + Math.random() * 4,
+      color: color || '#FFD700'
+    });
+  }
+}
+
+function updateParticles(ctx) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.15; // gravity on particles
+    p.life -= p.decay;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+\`\`\`
+
+10. TOUCH HANDLING (use this pattern):
+\`\`\`js
+let touchStartX, touchStartY, isTouching = false;
+
+function addTouchControls(element) {
+  element.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    isTouching = true;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    handleTouchStart(touchStartX, touchStartY);
+  }, { passive: false });
+
+  element.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    if (!isTouching) return;
+    const x = e.touches[0].clientX;
+    const y = e.touches[0].clientY;
+    handleTouchMove(x, y, x - touchStartX, y - touchStartY);
+  }, { passive: false });
+
+  element.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    isTouching = false;
+    handleTouchEnd();
+  }, { passive: false });
+
+  // Mouse fallback for testing in browser
+  element.addEventListener('mousedown', function(e) {
+    isTouching = true;
+    touchStartX = e.clientX;
+    touchStartY = e.clientY;
+    handleTouchStart(e.clientX, e.clientY);
+  });
+  element.addEventListener('mousemove', function(e) {
+    if (!isTouching) return;
+    handleTouchMove(e.clientX, e.clientY, e.clientX - touchStartX, e.clientY - touchStartY);
+  });
+  element.addEventListener('mouseup', function() {
+    isTouching = false;
+    handleTouchEnd();
+  });
+}
+\`\`\`
+
+11. CSS TEMPLATE (every game starts with this base):
+\`\`\`css
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, 'Segoe UI', sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+.screen {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.screen.active { display: flex; }
+
+.btn {
+  padding: 14px 40px;
+  border: none;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.1s;
+  -webkit-tap-highlight-color: transparent;
+  min-width: 44px;
+  min-height: 44px;
+}
+.btn:active { transform: scale(0.95); opacity: 0.8; }
+
+.score-display {
+  position: absolute;
+  top: 16px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 800;
+  color: white;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Score popup animation */
+.score-popup {
+  position: absolute;
+  font-size: 20px;
+  font-weight: 800;
+  color: #FFD700;
+  pointer-events: none;
+  animation: scoreFloat 0.8s ease-out forwards;
+}
+@keyframes scoreFloat {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-60px) scale(0.5); opacity: 0; }
+}
+
+/* Screen shake */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px) rotate(-0.5deg); }
+  40% { transform: translateX(3px) rotate(0.5deg); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+.shake { animation: shake 0.15s ease-out; }
+\`\`\`
+
+12. PHYSICS ENGINE (planck.js — pre-loaded, use when needed):
+Use planck.js for any game with physics. It is already loaded as global \`planck\` via <script src="/planck.min.js"></script> (auto-injected).
+- Top-down games (billiards, hockey): gravity Vec2(0, 0), use linearDamping 1.0-2.0
+- Side-view games (platformer, pinball): gravity Vec2(0, 15-25)
+- Always create boundary walls
+- Always use SCALE conversion (30px = 1 meter)
+- Always link bodies to game entities with setUserData
+- Never write manual physics — always use planck
+- Restitution: 0 = no bounce, 0.5 = medium, 0.95 = pool balls, 1.0 = perfect bounce
+
+Setup pattern:
+\`\`\`js
+const SCALE = 30;
+const world = planck.World({ gravity: planck.Vec2(0, GRAVITY_Y) });
+function toWorld(px) { return px / SCALE; }
+function toScreen(m) { return m * SCALE; }
+
+function createBall(x, y, radius, opts) {
+  opts = opts || {};
+  const b = world.createBody({ type: 'dynamic', position: planck.Vec2(toWorld(x), toWorld(y)), bullet: opts.fast || false, linearDamping: opts.damping || 0 });
+  b.createFixture({ shape: planck.Circle(toWorld(radius)), density: opts.density || 1, friction: opts.friction || 0.3, restitution: opts.restitution || 0.5 });
+  b.setUserData(opts.userData || null);
+  return b;
+}
+
+function createBox(x, y, hw, hh, opts) {
+  opts = opts || {};
+  const b = world.createBody({ type: opts.type || 'static', position: planck.Vec2(toWorld(x), toWorld(y)) });
+  b.createFixture({ shape: planck.Box(toWorld(hw), toWorld(hh)), density: opts.density || 1, friction: opts.friction || 0.5, restitution: opts.restitution || 0.3 });
+  b.setUserData(opts.userData || null);
+  return b;
+}
+
+// In game loop: world.step(1/60, 8, 3); then render each body
+world.on('begin-contact', function(contact) {
+  const a = contact.getFixtureA().getBody().getUserData();
+  const b = contact.getFixtureB().getBody().getUserData();
+  // handle collision
+});
+\`\`\`
+
+13. COMMON BUGS TO AVOID:
+- Never query DOM elements before they exist (use DOMContentLoaded)
+- Never use var — always const/let
+- Never leave requestAnimationFrame running when game is paused/over
+- Never forget to clear arrays (bullets, enemies, particles) on reset
+- Never use string concatenation for HTML (use createElement or template literals safely)
+- Never assume touch events exist (always add mouse fallback)
+- Never forget to preventDefault on touch events (prevents zoom/scroll)
+- Always check if an element exists before accessing its properties
+- Always check array bounds before accessing indices
+- Always clean up setInterval/setTimeout on game reset
+- Always handle edge cases: what if score is 0? what if no enemies? what if game just started?
+
+14. DIFFICULTY PROGRESSION:
+Every game must get harder over time. Use one or more of:
+- Increase speed every 10 seconds or every 5 points
+- Add more enemies/obstacles over time
+- Reduce time limits
+- Make targets smaller
+- Add new mechanics after certain scores
+- Speed cap: never let it get impossibly fast
+
+Example:
+\`\`\`js
+function getDifficulty() {
+  const level = Math.floor(score / 10) + 1;
+  return {
+    speed: Math.min(2 + level * 0.5, 8),
+    spawnRate: Math.max(2000 - level * 200, 500),
+    enemyCount: Math.min(1 + level, 6)
+  };
+}
+\`\`\`
+
+REMEMBER: You are building REAL games that people will play on their phones. Not demos. Not prototypes. Complete, polished, fun, working mobile games. Every game must pass this test: "Would I be embarrassed to show this to someone?" If yes, make it better.`;
+
+// ── Coder system prompts (all modes use the same unified prompt) ─────────────
+
+const CODER_SYSTEM = {
+  fast:     GAME_SYSTEM_PROMPT,
+  balanced: GAME_SYSTEM_PROMPT,
+  quality:  GAME_SYSTEM_PROMPT,
+};
+
+// ── 3D: same core rules, with 3D-specific additions ─────────────────────────
+CODER_SYSTEM['3d'] = GAME_SYSTEM_PROMPT + `
+
+## ADDITIONAL 3D RULES
 - Pure canvas 2D + perspective math only — NO Three.js, NO Babylon.js, NO A-Frame, NO WebGL
-- 3 files maximum: index.html, css/style.css, js/game.js
 - Max 20 active objects at once — mobile CPU is limited
 - Only simple shapes: rectangles, circles, flat-shaded polygons. No texture loading.
-- All controls must be touch-first (tap/swipe/virtual buttons)
 
 ## PERSPECTIVE MATH PATTERN (use this exact approach):
 \`\`\`js
 const CAM = { fov: 300, horizon: 0.45, speed: 4 };
 function project(worldX, worldZ) {
-  // worldZ = depth (0 = near, large = far)
   const scale = CAM.fov / (CAM.fov + worldZ);
   const screenX = canvas.width / 2 + worldX * scale;
-  const screenY = canvas.height * CAM.horizon + 60 * scale; // road center
+  const screenY = canvas.height * CAM.horizon + 60 * scale;
   return { sx: screenX, sy: screenY, scale };
 }
 \`\`\`
 Draw far objects before near objects (painter's algorithm — sort by worldZ descending).
 
-## STABLE TEMPLATES — auto-map the user's request to the closest one:
+## STABLE 3D TEMPLATES — auto-map the user's request to the closest one:
 1. **Perspective runner** — road/path scrolls toward player, dodge obstacles, tap/swipe to move lanes
 2. **Ball roller** — ball rolls down hill, tilt/swipe to steer, avoid walls and gaps
 3. **Obstacle dodger** — top-down arena, objects come from edges, tap to move player
 4. **Arena collector** — fixed camera arena, player moves to collect items, avoid enemies
 
-## AUTO-SIMPLIFY RULE:
-If the user's request describes something complex (open world, full 3D environment, physics engine, multiplayer), map it to the closest stable template above and add a short comment in README.md explaining what was built instead.
-
-## FILE STRUCTURE
-index.html   — canvas, meta viewport, script/link tags, no extra markup
-css/style.css — body reset, canvas fill, touch-action none
-js/game.js   — everything: perspective math, game loop, entities, input, states, scoring
-
-${VISUAL_IDENTITY}
-
-## 3D VISUAL STYLE:
-- Sky: gradient rect at top (use --primary or a theme-appropriate sky color)
-- Ground/road: two flat rects (horizon strip + near strip) with perspective lines
-- Objects: flat-shaded rects/polygons, drawn with project() to get sx/sy/scale
-- No shadows. No reflections. No texture images.
-
-${CORRECTNESS_RULES}${MOBILE_LAYOUT}${CODE_RELIABILITY}`;
+If the user's request is too complex for canvas 2D, map it to the closest stable template above.`;
 
 // ── Retry prompt (file format) ────────────────────────────────────────────────
 
@@ -629,7 +586,7 @@ function buildCoderRetryPrompt(userPrompt, plan, mode, attempt) {
   if (attempt >= 2) {
     return {
       system: CODER_RETRY_SYSTEM,
-      user: `Simplified version of: "${userPrompt}"\nGenerate 2-3 core files only: index.html + css/style.css + js/game.js. Complete, playable game.`,
+      user: `Simplified version of: "${userPrompt}"\nGenerate a single index.html file with all CSS and JS inline. Complete, playable game.`,
     };
   }
   return {
@@ -823,6 +780,13 @@ CANVAS SETUP:
 GAME STATE: let gameState='menu'; // 'menu'|'playing'|'gameover'
 RESTART: function restartGame(){score=0;player.x=canvas.width/2;enemies=[];gameState='playing';}
 HTML CANVAS: <canvas id="game-canvas" style="display:block;width:100%;height:100%;"></canvas>`;
+
+// Correctness rules used in fix prompts
+const CORRECTNESS_RULES = `
+PRIORITY ORDER (strict): 1.playable → 2.controls work → 3.win/lose loop works → 4.mobile layout → 5.visual polish
+SCOPE: A smaller fully working game beats a larger broken one.
+COMPLETENESS: Every button must do something real. No dead buttons, no TODO logic, no stub functions. Restart must fully reset state.
+SELF-REPAIR: Before finalizing output — verify all functions called are defined, all canvas IDs exist in HTML, all game states are handled, touch events are bound.`;
 
 /**
  * Builds a targeted prompt to fix critical game playability issues.
