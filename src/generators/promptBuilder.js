@@ -184,66 +184,164 @@ SELF-REPAIR: Before finalizing output — verify all functions called are define
 // ── Physics engine ──────────────────────────────────────────────────────────
 
 const PHYSICS_ENGINE = `
-PHYSICS ENGINE — planck.js (loaded globally as \`planck\`):
-Include <script src="/planck.min.js"></script> in index.html BEFORE any game scripts.
-Use planck.js for ALL physics: gravity, bouncing, friction, collisions, projectiles. Never write manual physics code.
+PHYSICS ENGINE RULES (MANDATORY):
 
-When to use: platformers, falling objects, bouncing, collisions, projectiles, stacking, vehicles, ragdoll.
-When NOT to use: match-3, card games, sudoku, word games, quizzes, turn-based.
+The planck.js physics library is pre-loaded in every game via <script src="/planck.min.js"></script> (auto-injected).
+It is available as the global \`planck\` object. You MUST use it for any game that involves physics.
 
-Setup:
+GAMES THAT REQUIRE PLANCK.JS — if the user asks for ANY of these, you MUST use planck.js:
+- Billiards / pool — ball-to-ball collisions, friction on table, momentum transfer, cue force
+- Angry Birds style — projectile arc, structure destruction, gravity
+- Platformer — gravity, jumping, landing on platforms, wall collision
+- Pinball — flippers, bumpers, ball physics, gravity
+- Bowling — pin physics, ball roll, pin knockdown
+- Pong / Breakout — ball bouncing, paddle collision, brick collision
+- Ball drop / Pachinko — gravity, pegs, bouncing
+- Golf — ball trajectory, terrain interaction, friction
+- Racing with crashes — vehicle collision, momentum
+- Stacking games — gravity, balance, toppling
+- Cannon/catapult games — projectile physics, arc trajectory
+- Any game where objects fall, bounce, collide, slide, or roll
+
+GAMES THAT DO NOT NEED PLANCK.JS:
+- Match-3 puzzle, card games, word games, quiz games, turn-based strategy, sudoku, memory games
+
+HOW TO USE PLANCK.JS — FOLLOW THIS PATTERN EXACTLY:
+
 \`\`\`js
-const world = planck.World({ gravity: planck.Vec2(0, 20) });
-const SCALE = 30;
+// === SETUP ===
+const world = planck.World({ gravity: planck.Vec2(0, GRAVITY_Y) });
+const SCALE = 30; // 30 pixels = 1 meter
 function toWorld(px) { return px / SCALE; }
 function toScreen(m) { return m * SCALE; }
-\`\`\`
 
-Static body (ground/walls):
-\`\`\`js
-const ground = world.createBody({ type: 'static', position: planck.Vec2(toWorld(187), toWorld(800)) });
-ground.createFixture({ shape: planck.Box(toWorld(187), toWorld(10)), friction: 0.6 });
-\`\`\`
+// === BOUNDARY WALLS (always create these) ===
+function createWalls() {
+  const floor = world.createBody({ type: 'static', position: planck.Vec2(toWorld(187), toWorld(812)) });
+  floor.createFixture({ shape: planck.Box(toWorld(200), toWorld(5)), friction: 0.5 });
+  const left = world.createBody({ type: 'static', position: planck.Vec2(toWorld(0), toWorld(406)) });
+  left.createFixture({ shape: planck.Box(toWorld(5), toWorld(420)) });
+  const right = world.createBody({ type: 'static', position: planck.Vec2(toWorld(375), toWorld(406)) });
+  right.createFixture({ shape: planck.Box(toWorld(5), toWorld(420)) });
+}
 
-Dynamic body (player/balls):
-\`\`\`js
-const ball = world.createBody({ type: 'dynamic', position: planck.Vec2(toWorld(x), toWorld(y)), bullet: true });
-ball.createFixture({ shape: planck.Circle(toWorld(15)), density: 1.0, friction: 0.3, restitution: 0.7 });
-ball.setUserData({ type: 'ball', element: domElement });
-\`\`\`
+// === CREATE A CIRCLE BODY (balls, coins, etc.) ===
+function createBall(x, y, radius, options) {
+  options = options || {};
+  const body = world.createBody({
+    type: 'dynamic',
+    position: planck.Vec2(toWorld(x), toWorld(y)),
+    bullet: options.fast || false,
+    linearDamping: options.damping || 0,
+    angularDamping: options.angularDamping || 0
+  });
+  body.createFixture({
+    shape: planck.Circle(toWorld(radius)),
+    density: options.density || 1.0,
+    friction: options.friction || 0.3,
+    restitution: options.restitution || 0.5
+  });
+  body.setUserData(options.userData || null);
+  return body;
+}
 
-Physics in game loop:
-\`\`\`js
+// === CREATE A BOX BODY (platforms, walls, paddles, etc.) ===
+function createBox(x, y, halfW, halfH, options) {
+  options = options || {};
+  const body = world.createBody({
+    type: options.type || 'static',
+    position: planck.Vec2(toWorld(x), toWorld(y))
+  });
+  body.createFixture({
+    shape: planck.Box(toWorld(halfW), toWorld(halfH)),
+    density: options.density || 1.0,
+    friction: options.friction || 0.5,
+    restitution: options.restitution || 0.3
+  });
+  body.setUserData(options.userData || null);
+  return body;
+}
+
+// === GAME LOOP — call world.step, then sync render positions ===
 world.step(1/60, 8, 3);
 for (let body = world.getBodyList(); body; body = body.getNext()) {
-  const pos = body.getPosition();
   const data = body.getUserData();
-  if (data) { /* update render position from toScreen(pos.x), toScreen(pos.y) */ }
+  if (data && data.draw) {
+    const pos = body.getPosition();
+    data.draw(toScreen(pos.x), toScreen(pos.y), body.getAngle());
+  }
 }
-\`\`\`
 
-Collisions:
-\`\`\`js
+// === COLLISION DETECTION ===
 world.on('begin-contact', function(contact) {
   const a = contact.getFixtureA().getBody().getUserData();
   const b = contact.getFixtureB().getBody().getUserData();
-  // handle collision based on a.type and b.type
+  // Handle collision based on a.type and b.type
+});
+
+// === APPLY FORCE ===
+// Impulse (instant push — jumps, cue hits, explosions):
+body.applyLinearImpulse(planck.Vec2(forceX, forceY), body.getWorldCenter());
+// Velocity (continuous movement — moving platforms, constant speed):
+body.setLinearVelocity(planck.Vec2(vx, vy));
+\`\`\`
+
+BILLIARDS/POOL EXAMPLE:
+\`\`\`js
+const world = planck.World({ gravity: planck.Vec2(0, 0) }); // zero gravity — top-down
+// Table cushions — high restitution so balls bounce
+createBox(187, 10, 160, 10, { type: 'static', restitution: 0.8, friction: 0.1 });
+createBox(187, 590, 160, 10, { type: 'static', restitution: 0.8, friction: 0.1 });
+createBox(10, 300, 10, 280, { type: 'static', restitution: 0.8, friction: 0.1 });
+createBox(364, 300, 10, 280, { type: 'static', restitution: 0.8, friction: 0.1 });
+// Balls — linearDamping so they slow down on the felt
+const cueBall = createBall(187, 450, 10, { density: 1.0, friction: 0.4, restitution: 0.95, damping: 1.5, userData: { type: 'cue' } });
+// Cue hit — apply impulse in aim direction
+function hitCueBall(angle, power) {
+  cueBall.applyLinearImpulse(planck.Vec2(Math.cos(angle)*power*5, Math.sin(angle)*power*5), cueBall.getWorldCenter());
+}
+\`\`\`
+
+PLATFORMER EXAMPLE:
+\`\`\`js
+const world = planck.World({ gravity: planck.Vec2(0, 20) });
+const player = createBall(100, 700, 15, { density: 1.0, friction: 0.5, restitution: 0.0, userData: { type: 'player' } });
+player.setFixedRotation(true); // player doesn't spin
+createBox(187, 780, 187, 10, { type: 'static', friction: 0.8 }); // ground
+createBox(100, 600, 50, 5, { type: 'static', friction: 0.6 }); // platform
+// Jump — only if on ground (vy near zero)
+function jump() {
+  const vel = player.getLinearVelocity();
+  if (Math.abs(vel.y) < 0.1) player.applyLinearImpulse(planck.Vec2(0, -8), player.getWorldCenter());
+}
+// Move
+function move(dir) { // -1 left, 1 right
+  const vel = player.getLinearVelocity();
+  player.setLinearVelocity(planck.Vec2(dir * 5, vel.y));
+}
+\`\`\`
+
+BOUNCING BALL EXAMPLE:
+\`\`\`js
+const world = planck.World({ gravity: planck.Vec2(0, 12) });
+createWalls();
+canvas.addEventListener('pointerdown', function(e) {
+  const r = canvas.getBoundingClientRect();
+  createBall(e.clientX - r.left, e.clientY - r.top, 12 + Math.random()*8, { restitution: 0.85, friction: 0.2, density: 0.8, userData: { type: 'ball' } });
 });
 \`\`\`
 
-Controls: body.applyLinearImpulse(planck.Vec2(0, -8), body.getWorldCenter()) for jump.
-body.setLinearVelocity(planck.Vec2(dir * 5, body.getLinearVelocity().y)) for move.
-
-Always create boundary walls (left, right, ceiling, floor) so nothing flies off screen.
-
-Physics values by genre:
-- Platformer: gravity 20, restitution 0.0, friction 0.6
-- Bounce game: gravity 12, restitution 0.7, friction 0.3
-- Angry Birds: gravity 15, restitution 0.3, friction 0.6
-- Space: gravity 0, restitution 0.9, friction 0.0
-- Pinball: gravity 18, restitution 0.6, friction 0.2
-
-Rules: Always use SCALE conversion. Always create walls. Always setUserData. Use bullet:true on fast objects. Call world.step() once per frame.`;
+CRITICAL RULES:
+1. NEVER write your own gravity, velocity, or collision math. Use planck.js.
+2. NEVER fake physics with setInterval position changes. Use the physics world.
+3. ALWAYS call world.step(1/60, 8, 3) in the game loop — once per frame, before rendering.
+4. ALWAYS use toWorld() when creating bodies and toScreen() when rendering.
+5. ALWAYS create boundary walls so nothing flies off screen.
+6. ALWAYS use setUserData to link physics bodies to game entities.
+7. For top-down games (billiards, hockey): gravity Vec2(0, 0) + linearDamping 1.0-2.0.
+8. For side-view games (platformer, pinball): gravity Vec2(0, 15-25).
+9. Restitution: 0 = no bounce, 0.5 = medium, 0.95 = pool balls, 1.0 = perfect bounce.
+10. For table games: linearDamping 1.0-2.0 so balls gradually slow down and stop.`;
 
 // ── JS reliability rules ──────────────────────────────────────────────────────
 
