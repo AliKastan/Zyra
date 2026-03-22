@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Test: Puzzle</title>
+</head>
+<body>
+<script src="zyra-engine.js"></script>
+<script>
+ZyraEngine.init({
+  "id": "gem-match",
+  "type": "puzzle",
+  "title": "GEM MATCH",
+  "subtitle": "Match 3 to score",
+  "tutorial": "Tap two adjacent gems to swap<br>Match 3 or more in a row<br>Cascading combos = bonus points!",
+  "theme": {
+    "primary": "#6C5CE7",
+    "secondary": "#A78BFA",
+    "background": "#0A0A2E",
+    "backgroundAlt": "#0D0D3A"
+  },
+  "settings": { "lives": 99, "cols": 7, "rows": 9 },
+  "entityTypes": {
+    "red":    { "color": "#FF6B6B" },
+    "blue":   { "color": "#4ECDC4" },
+    "yellow": { "color": "#FFD93D" },
+    "purple": { "color": "#6C5CE7" },
+    "green":  { "color": "#A8E6CF" },
+    "pink":   { "color": "#FF8B94" }
+  },
+  "levels": [
+    { "name": "Tutorial", "subtitle": "Learn to match", "objective": { "type": "score", "target": 100 }, "speedMultiplier": 1.0 },
+    { "name": "Warming Up", "subtitle": "Score 300", "objective": { "type": "score", "target": 300 }, "speedMultiplier": 1.0 },
+    { "name": "Combo Master", "subtitle": "Destroy 30 gems", "objective": { "type": "destroy", "target": 30 }, "speedMultiplier": 1.0, "newMechanic": "combos" },
+    { "name": "Time Attack", "subtitle": "Beat the clock", "objective": { "type": "score", "target": 600 }, "timeLimit": 60, "speedMultiplier": 1.0, "newMechanic": "time_limit" },
+    { "name": "Grand Master", "subtitle": "The ultimate challenge", "objective": { "type": "score", "target": 1000 }, "timeLimit": 90, "speedMultiplier": 1.0 }
+  ]
+});
+</script>
+</body>
+</html>

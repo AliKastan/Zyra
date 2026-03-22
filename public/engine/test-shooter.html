@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Test: Space Shooter</title>
+</head>
+<body>
+<script src="zyra-engine.js"></script>
+<script>
+ZyraEngine.init({
+  "id": "space-blast",
+  "type": "shooter",
+  "title": "SPACE BLAST",
+  "subtitle": "Defend the Galaxy",
+  "tutorial": "Drag to move your ship<br>Auto-fires at enemies<br>Collect power-ups<br>Don't let enemies reach you",
+  "theme": {
+    "primary": "#00D4FF",
+    "secondary": "#7B2FFF",
+    "background": "#0A0A2E",
+    "backgroundAlt": "#0D0D3A",
+    "accent": "#FF6B6B",
+    "surface": "rgba(255,255,255,0.05)"
+  },
+  "settings": {
+    "lives": 3,
+    "playerSpeed": 6,
+    "playerWidth": 36,
+    "playerHeight": 36,
+    "playerColor": "#00D4FF",
+    "fireRate": 400,
+    "projectileSpeed": 10,
+    "projectileColor": "#FFD700"
+  },
+  "entityTypes": {
+    "basic": { "width": 30, "height": 30, "color": "#FF6B6B", "health": 1, "speed": 2, "points": 10, "shape": "rect" },
+    "fast": { "width": 24, "height": 24, "color": "#FBBF24", "health": 1, "speed": 4, "points": 20, "shape": "circle" },
+    "tank": { "width": 40, "height": 40, "color": "#A78BFA", "health": 3, "speed": 1.2, "points": 50, "shape": "rect" },
+    "shooter": { "width": 34, "height": 34, "color": "#FF4757", "health": 2, "speed": 1.5, "points": 30, "shape": "rect", "shoots": true, "fireRate": 2000 }
+  },
+  "powerUps": {
+    "rapid": { "color": "#FFD700", "icon": "R", "duration": 5 },
+    "shield": { "color": "#00D4FF", "icon": "S", "duration": 8 },
+    "spread": { "color": "#FF6B6B", "icon": "X", "duration": 5 },
+    "extra_life": { "color": "#34D399", "icon": "+", "duration": 0 }
+  },
+  "levels": [
+    {
+      "name": "Patrol Zone",
+      "subtitle": "Easy pickings",
+      "objective": { "type": "score", "target": 100 },
+      "background": "#0A0A2E",
+      "spawnRate": 2000,
+      "spawnTypes": ["basic"],
+      "maxEnemies": 4,
+      "speedMultiplier": 1.0,
+      "powerUpChance": 0.1
+    },
+    {
+      "name": "Border Skirmish",
+      "subtitle": "They're getting faster",
+      "objective": { "type": "score", "target": 250 },
+      "background": "#0D0A2E",
+      "spawnRate": 1600,
+      "spawnTypes": ["basic", "fast"],
+      "maxEnemies": 6,
+      "speedMultiplier": 1.3,
+      "powerUpChance": 0.12
+    },
+    {
+      "name": "Heavy Resistance",
+      "subtitle": "Armored enemies incoming",
+      "objective": { "type": "destroy", "target": 15 },
+      "background": "#0A0D2E",
+      "spawnRate": 1300,
+      "spawnTypes": ["basic", "fast", "tank"],
+      "maxEnemies": 7,
+      "speedMultiplier": 1.5,
+      "powerUpChance": 0.15,
+      "newMechanic": "tank_enemies"
+    },
+    {
+      "name": "Enemy Fire",
+      "subtitle": "They shoot back now",
+      "objective": { "type": "score", "target": 500 },
+      "timeLimit": 60,
+      "background": "#1A0A2E",
+      "spawnRate": 1000,
+      "spawnTypes": ["basic", "fast", "tank", "shooter"],
+      "maxEnemies": 8,
+      "speedMultiplier": 1.7,
+      "powerUpChance": 0.2,
+      "newMechanic": "shooting_enemies"
+    },
+    {
+      "name": "MOTHERSHIP",
+      "subtitle": "The final battle",
+      "objective": { "type": "destroy", "target": 1 },
+      "timeLimit": 90,
+      "background": "#2E0A0A",
+      "spawnRate": 1500,
+      "spawnTypes": ["basic", "fast"],
+      "maxEnemies": 4,
+      "speedMultiplier": 2.0,
+      "powerUpChance": 0.25,
+      "boss": {
+        "name": "MOTHERSHIP",
+        "width": 100,
+        "height": 60,
+        "color": "#FF4757",
+        "health": 15,
+        "patterns": ["spread_shot", "charge", "spawn_minions"],
+        "patternDuration": 3,
+        "pauseDuration": 1.5
+      },
+      "newMechanic": "boss"
+    }
+  ]
+});
+</script>
+</body>
+</html>

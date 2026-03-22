@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Test: Tap Game</title>
+</head>
+<body>
+<script src="zyra-engine.js"></script>
+<script>
+ZyraEngine.init({
+  "id": "fruit-smash",
+  "type": "tap",
+  "title": "FRUIT SMASH",
+  "subtitle": "Tap the fruits!",
+  "tutorial": "Tap the circles before they shrink away<br>Miss one and you lose a life!",
+  "theme": {
+    "primary": "#FF6B6B",
+    "secondary": "#FBBF24",
+    "background": "#1A0A2E",
+    "backgroundAlt": "#120820"
+  },
+  "settings": { "lives": 3 },
+  "entityTypes": {
+    "basic": { "width": 50, "color": "#FF6B6B", "points": 10, "lifetime": 2.5, "shape": "circle" },
+    "small": { "width": 36, "color": "#FBBF24", "points": 25, "lifetime": 1.8, "shape": "circle" },
+    "big":   { "width": 70, "color": "#4ECDC4", "points": 5,  "lifetime": 3.0, "shape": "circle" }
+  },
+  "levels": [
+    { "name": "Easy Start", "subtitle": "Big targets", "objective": { "type": "score", "target": 80 }, "spawnRate": 1800, "spawnTypes": ["basic", "big"], "maxEnemies": 3, "speedMultiplier": 1.0 },
+    { "name": "Getting Faster", "subtitle": "More targets", "objective": { "type": "score", "target": 200 }, "spawnRate": 1400, "spawnTypes": ["basic", "big"], "maxEnemies": 4, "speedMultiplier": 1.2 },
+    { "name": "Small Fry", "subtitle": "Tiny targets appear", "objective": { "type": "destroy", "target": 20 }, "spawnRate": 1200, "spawnTypes": ["basic", "small", "big"], "maxEnemies": 5, "speedMultiplier": 1.4, "newMechanic": "small_targets" },
+    { "name": "Frenzy", "subtitle": "Pure chaos", "objective": { "type": "score", "target": 500 }, "timeLimit": 45, "spawnRate": 800, "spawnTypes": ["basic", "small"], "maxEnemies": 6, "speedMultiplier": 1.6 },
+    { "name": "Master Mode", "subtitle": "The ultimate test", "objective": { "type": "score", "target": 800 }, "timeLimit": 60, "spawnRate": 600, "spawnTypes": ["basic", "small", "big"], "maxEnemies": 8, "speedMultiplier": 2.0, "newMechanic": "ultimate" }
+  ]
+});
+</script>
+</body>
+</html>

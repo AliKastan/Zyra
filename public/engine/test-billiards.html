@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Test: Billiards</title>
+</head>
+<body>
+<script src="zyra-engine.js"></script>
+<script>
+ZyraEngine.init({
+  "id": "pool-master",
+  "type": "physics",
+  "physicsMode": "topdown",
+  "title": "POOL MASTER",
+  "subtitle": "8-Ball Pool",
+  "tutorial": "Drag from cue ball to aim<br>Pull further for more power<br>Pocket all balls to win",
+  "theme": {
+    "primary": "#34D399",
+    "secondary": "#059669",
+    "background": "#0A2E1A",
+    "backgroundAlt": "#0D3A20"
+  },
+  "settings": {
+    "gravity": { "x": 0, "y": 0 },
+    "linearDamping": 1.8,
+    "tableColor": "#0B6623",
+    "cushionColor": "#8B4513",
+    "cushionRestitution": 0.8,
+    "ballRadius": 10,
+    "ballDensity": 1.0,
+    "ballFriction": 0.4,
+    "ballRestitution": 0.95,
+    "maxPower": 8,
+    "pocketRadius": 18
+  },
+  "levels": [
+    { "name": "Easy Break", "subtitle": "3 balls", "objective": { "type": "collect", "target": 3 }, "ballCount": 3 },
+    { "name": "Standard", "subtitle": "6 balls", "objective": { "type": "collect", "target": 6 }, "ballCount": 6 },
+    { "name": "Full Rack", "subtitle": "10 balls", "objective": { "type": "collect", "target": 10 }, "ballCount": 10, "newMechanic": "more_balls" },
+    { "name": "Time Attack", "subtitle": "Beat the clock", "objective": { "type": "collect", "target": 10 }, "ballCount": 10, "timeLimit": 120, "newMechanic": "time_limit" },
+    { "name": "Championship", "subtitle": "15 balls, tight pockets", "objective": { "type": "collect", "target": 15 }, "ballCount": 15 }
+  ]
+});
+</script>
+</body>
+</html>

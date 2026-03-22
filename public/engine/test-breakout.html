@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Test: Breakout</title>
+</head>
+<body>
+<script src="zyra-engine.js"></script>
+<script>
+ZyraEngine.init({
+  "id": "brick-blitz",
+  "type": "breakout",
+  "title": "BRICK BLITZ",
+  "subtitle": "Smash all the bricks",
+  "tutorial": "Drag the paddle left and right<br>Bounce the ball to break bricks<br>Don't let the ball fall!",
+  "theme": {
+    "primary": "#FF6B6B",
+    "secondary": "#FBBF24",
+    "background": "#0A0A2E",
+    "backgroundAlt": "#0D0D3A"
+  },
+  "settings": {
+    "lives": 3,
+    "paddleWidth": 80,
+    "paddleHeight": 14,
+    "paddleColor": "#FF6B6B",
+    "ballRadius": 8,
+    "ballColor": "#FFD700",
+    "ballSpeed": 5,
+    "brickCols": 8,
+    "brickRows": 4
+  },
+  "entityTypes": {
+    "red":    { "color": "#FF6B6B" },
+    "yellow": { "color": "#FBBF24" },
+    "teal":   { "color": "#4ECDC4" },
+    "purple": { "color": "#6C5CE7" },
+    "green":  { "color": "#A8E6CF" }
+  },
+  "powerUps": {
+    "extra_life": { "color": "#34D399", "icon": "+", "duration": 0 }
+  },
+  "levels": [
+    { "name": "Warm Up", "subtitle": "4 rows of bricks", "objective": { "type": "destroy", "target": 32 }, "speedMultiplier": 1.0, "powerUpChance": 0.1 },
+    { "name": "Double Up", "subtitle": "5 rows now", "objective": { "type": "destroy", "target": 40 }, "speedMultiplier": 1.15, "powerUpChance": 0.1 },
+    { "name": "Tough Bricks", "subtitle": "Multi-hit bricks", "objective": { "type": "destroy", "target": 48 }, "speedMultiplier": 1.3, "powerUpChance": 0.15, "newMechanic": "tough_bricks" },
+    { "name": "Speed Run", "subtitle": "Faster ball", "objective": { "type": "destroy", "target": 56 }, "speedMultiplier": 1.5, "timeLimit": 90, "powerUpChance": 0.15 },
+    { "name": "Brick Wall", "subtitle": "The ultimate wall", "objective": { "type": "destroy", "target": 64 }, "speedMultiplier": 1.7, "powerUpChance": 0.2, "newMechanic": "dense_wall" }
+  ]
+});
+</script>
+</body>
+</html>
