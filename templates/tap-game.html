@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Tap Master</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
+body{background:linear-gradient(180deg,#0a0a1a 0%,#1a1a3e 100%);color:#fff;display:flex;justify-content:center;align-items:center;position:relative}
+#game-container{width:100%;max-width:375px;height:100vh;max-height:812px;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+.screen{position:absolute;top:0;left:0;width:100%;height:100%;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:10}
+.screen.active{display:flex}
+.overlay{background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.btn{min-width:44px;min-height:44px;padding:12px 32px;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:transform 0.1s ease,box-shadow 0.1s ease;font-family:inherit;letter-spacing:0.02em}
+.btn:active{transform:scale(0.93)}
+.btn-primary{background:#00ff88;color:#0a0a1a;box-shadow:0 0 20px rgba(0,255,136,0.3)}
+.btn-secondary{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2)}
+.btn-small{padding:8px 20px;font-size:0.85rem}
+.game-title{font-size:2.8rem;font-weight:800;letter-spacing:-0.02em;background:linear-gradient(135deg,#00ff88,#00ccff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:titleGlow 2s ease-in-out infinite alternate;margin-bottom:8px}
+@keyframes titleGlow{0%{filter:drop-shadow(0 0 8px rgba(0,255,136,0.4))}100%{filter:drop-shadow(0 0 20px rgba(0,204,255,0.6))}}
+.subtitle{font-size:0.95rem;color:rgba(255,255,255,0.5);margin-bottom:40px;letter-spacing:0.05em}
+#screen-menu .btn{margin:6px 0;width:200px}
+#screen-menu .menu-footer{position:absolute;bottom:32px;font-size:0.7rem;color:rgba(255,255,255,0.25)}
+#game-stats{position:absolute;top:0;left:0;width:100%;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;z-index:5;pointer-events:none}
+#game-stats>div{pointer-events:auto}
+.stat-label{font-size:0.65rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.08em}
+.stat-val{font-size:1.3rem;font-weight:700;color:#00ff88}
+#score-value{font-size:1.4rem;font-weight:800;color:#00ff88}
+.lives-display{display:flex;gap:4px}
+.life-heart{width:18px;height:18px;background:#ff4466;clip-path:path('M9 16.2l-1.2-1.1C3.4 11.2 0 8.1 0 4.5 0 2 2 0 4.5 0c1.4 0 2.7.6 3.6 1.6L9 2.7l.9-1.1C10.8.6 12.1 0 13.5 0 16 0 18 2 18 4.5c0 3.6-3.4 6.7-7.8 10.6L9 16.2z');transition:opacity 0.3s}
+.life-heart.lost{opacity:0.2}
+#combo-display{position:absolute;top:50px;left:50%;transform:translateX(-50%);font-size:1.6rem;font-weight:800;color:#00ccff;text-shadow:0 0 12px rgba(0,204,255,0.6);opacity:0;transition:opacity 0.2s;z-index:6;pointer-events:none}
+#combo-display.show{opacity:1}
+#btn-pause{background:rgba(255,255,255,0.1);border:none;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer}
+#btn-pause svg{fill:#fff;width:18px;height:18px}
+#screen-pause .pause-title{font-size:1.8rem;font-weight:700;margin-bottom:30px}
+#screen-pause .btn{margin:6px 0;width:180px}
+#screen-gameover{text-align:center}
+.gameover-title{font-size:2rem;font-weight:800;margin-bottom:16px;color:#ff4466}
+#final-score{font-size:3.5rem;font-weight:900;background:linear-gradient(135deg,#00ff88,#00ccff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px}
+#gameover-highscore{font-size:0.85rem;color:rgba(255,255,255,0.5);margin-bottom:8px}
+#new-highscore{font-size:0.9rem;color:#00ff88;font-weight:700;margin-bottom:16px;display:none}
+.stars{display:flex;gap:8px;margin-bottom:20px;justify-content:center}
+.star{width:36px;height:36px;opacity:0.2;transition:opacity 0.3s,transform 0.3s}
+.star.earned{opacity:1;animation:starPop 0.4s ease}
+.star svg{width:100%;height:100%}
+@keyframes starPop{0%{transform:scale(0.3)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+.go-stats{margin-bottom:24px;display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
+.go-stat{text-align:center}
+.go-stat-label{font-size:0.65rem;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.06em}
+.go-stat-val{font-size:1.1rem;font-weight:700}
+#screen-gameover .btn{margin:5px 0;width:200px}
+#screen-tutorial{text-align:center;padding:24px}
+.tutorial-title{font-size:1.5rem;font-weight:700;margin-bottom:20px;color:#00ccff}
+.tutorial-body{font-size:0.9rem;line-height:1.6;color:rgba(255,255,255,0.8);margin-bottom:30px;max-width:280px}
+.tutorial-body strong{color:#00ff88}
+#btn-sound{position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#fff;width:44px;height:44px;border-radius:50%;font-size:1.2rem;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:20}
+</style>
+</head>
+<body>
+<div id="game-container">
+<canvas id="game-area"></canvas>
+<div id="game-stats" style="display:none">
+<div>
+<div class="stat-label">Score</div>
+<div id="score-value">0</div>
+</div>
+<div>
+<div class="stat-label">Lives</div>
+<div class="lives-display">
+<div class="life-heart" id="life-0"></div>
+<div class="life-heart" id="life-1"></div>
+<div class="life-heart" id="life-2"></div>
+</div>
+</div>
+<div id="btn-pause"><svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></div>
+</div>
+<div id="combo-display"></div>
+<div id="screen-menu" class="screen active">
+<div class="game-title">Tap Master</div>
+<div class="subtitle">TAP FAST. SCORE BIG.</div>
+<button class="btn btn-primary" id="btn-play">Play</button>
+<button class="btn btn-secondary" id="btn-howtoplay">How to Play</button>
+<div id="high-score-value" style="margin-top:24px;font-size:0.85rem;color:rgba(255,255,255,0.45)"></div>
+<div class="menu-footer">Zyra Game Engine</div>
+</div>
+<div id="screen-pause" class="screen overlay">
+<div class="pause-title">Paused</div>
+<button class="btn btn-primary" id="btn-resume">Resume</button>
+<button class="btn btn-secondary" id="btn-menu">Menu</button>
+</div>
+<div id="screen-gameover" class="screen overlay">
+<div class="gameover-title">Game Over</div>
+<div id="final-score">0</div>
+<div id="gameover-highscore"></div>
+<div id="new-highscore">New High Score!</div>
+<div class="stars">
+<div class="star" id="star-1"><svg viewBox="0 0 24 24"><polygon points="12,2 15.1,8.3 22,9.2 17,14.1 18.2,21 12,17.8 5.8,21 7,14.1 2,9.2 8.9,8.3" fill="#FFD700"/></svg></div>
+<div class="star" id="star-2"><svg viewBox="0 0 24 24"><polygon points="12,2 15.1,8.3 22,9.2 17,14.1 18.2,21 12,17.8 5.8,21 7,14.1 2,9.2 8.9,8.3" fill="#FFD700"/></svg></div>
+<div class="star" id="star-3"><svg viewBox="0 0 24 24"><polygon points="12,2 15.1,8.3 22,9.2 17,14.1 18.2,21 12,17.8 5.8,21 7,14.1 2,9.2 8.9,8.3" fill="#FFD700"/></svg></div>
+</div>
+<div class="go-stats">
+<div class="go-stat"><div class="go-stat-label">Time</div><div class="go-stat-val" id="stat-time">0s</div></div>
+<div class="go-stat"><div class="go-stat-label">Taps Hit</div><div class="go-stat-val" id="stat-hits">0</div></div>
+<div class="go-stat"><div class="go-stat-label">Missed</div><div class="go-stat-val" id="stat-misses">0</div></div>
+<div class="go-stat"><div class="go-stat-label">Accuracy</div><div class="go-stat-val" id="stat-accuracy">0%</div></div>
+</div>
+<button class="btn btn-primary" id="btn-gameover-restart">Play Again</button>
+<button class="btn btn-secondary" id="btn-gameover-menu">Menu</button>
+</div>
+<div id="screen-tutorial" class="screen overlay">
+<div class="tutorial-title">How to Play</div>
+<div class="tutorial-body">
+<strong>Tap</strong> the colored circles before they disappear!<br><br>
+Smaller circles are worth <strong>3 points</strong>, larger ones <strong>1 point</strong>.<br><br>
+Miss a circle and you <strong>lose a life</strong>. You start with 3 lives.<br><br>
+The game gets <strong>faster</strong> as your score increases. Tap quickly for <strong>combos</strong>!
+</div>
+<button class="btn btn-primary" id="btn-tutorial-ok">Got it!</button>
+</div>
+<button id="btn-sound">&#9834;</button>
+</div>
+<script>
+(function(){'use strict';
+
+document.addEventListener('DOMContentLoaded',function(){
+
+const State={MENU:0,PLAYING:1,PAUSED:2,GAMEOVER:3,TUTORIAL:4};
+let currentState=State.MENU;
+
+const canvas=document.getElementById('game-area');
+const ctx=canvas.getContext('2d');
+const container=document.getElementById('game-container');
+
+const screens={
+menu:document.getElementById('screen-menu'),
+game:document.getElementById('screen-game'),
+pause:document.getElementById('screen-pause'),
+gameover:document.getElementById('screen-gameover'),
+tutorial:document.getElementById('screen-tutorial')
+};
+const gameStats=document.getElementById('game-stats');
+const scoreValue=document.getElementById('score-value');
+const finalScore=document.getElementById('final-score');
+const highScoreValue=document.getElementById('high-score-value');
+const gameoverHighscore=document.getElementById('gameover-highscore');
+const newHighscore=document.getElementById('new-highscore');
+const comboDisplay=document.getElementById('combo-display');
+const star1=document.getElementById('star-1');
+const star2=document.getElementById('star-2');
+const star3=document.getElementById('star-3');
+const statTime=document.getElementById('stat-time');
+const statHits=document.getElementById('stat-hits');
+const statMisses=document.getElementById('stat-misses');
+const statAccuracy=document.getElementById('stat-accuracy');
+
+const btnPlay=document.getElementById('btn-play');
+const btnPause=document.getElementById('btn-pause');
+const btnResume=document.getElementById('btn-resume');
+const btnRestart=document.getElementById('btn-restart');
+const btnMenu=document.getElementById('btn-menu');
+const btnGameoverRestart=document.getElementById('btn-gameover-restart');
+const btnGameoverMenu=document.getElementById('btn-gameover-menu');
+const btnTutorialOk=document.getElementById('btn-tutorial-ok');
+const btnHowtoplay=document.getElementById('btn-howtoplay');
+const btnSound=document.getElementById('btn-sound');
+
+const COLORS=['#ff4466','#00ff88','#00ccff','#ff8844','#cc66ff','#ffdd44','#44ddff','#ff66aa'];
+const SMALL_RADIUS=22;
+const LARGE_RADIUS=38;
+const INITIAL_SPAWN_INTERVAL=1500;
+const MIN_SPAWN_INTERVAL=400;
+const INITIAL_LIFETIME=2000;
+const MIN_LIFETIME=800;
+const MAX_LIVES=3;
+const COMBO_WINDOW=800;
+const LS_HS='zyra_hs';
+const LS_TUT='zyra_tutorial';
+
+let score=0;
+let lives=MAX_LIVES;
+let highScore=0;
+let circles=[];
+let particles=[];
+let popups=[];
+let spawnTimer=0;
+let spawnInterval=INITIAL_SPAWN_INTERVAL;
+let circleLifetime=INITIAL_LIFETIME;
+let gameTime=0;
+let tapsHit=0;
+let tapsMissed=0;
+let comboCount=0;
+let lastTapTime=0;
+let shakeAmount=0;
+let shakeDuration=0;
+let soundEnabled=true;
+let lastFrameTime=0;
+let animFrameId=null;
+let activeTimers=[];
+let pendingTutorial=false;
+
+let audioCtx=null;
+
+function initAudio(){
+if(audioCtx)return;
+try{audioCtx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){audioCtx=null}
+}
+
+function playSound(type){
+if(!soundEnabled||!audioCtx)return;
+try{
+const osc=audioCtx.createOscillator();
+const gain=audioCtx.createGain();
+osc.connect(gain);
+gain.connect(audioCtx.destination);
+const now=audioCtx.currentTime;
+switch(type){
+case'sfxTap':
+osc.type='sine';osc.frequency.setValueAtTime(600,now);osc.frequency.exponentialRampToValueAtTime(900,now+0.08);
+gain.gain.setValueAtTime(0.15,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.12);
+osc.start(now);osc.stop(now+0.12);break;
+case'sfxScore':
+osc.type='sine';osc.frequency.setValueAtTime(880,now);osc.frequency.exponentialRampToValueAtTime(1320,now+0.1);
+gain.gain.setValueAtTime(0.12,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.15);
+osc.start(now);osc.stop(now+0.15);break;
+case'sfxHit':
+osc.type='sawtooth';osc.frequency.setValueAtTime(200,now);osc.frequency.exponentialRampToValueAtTime(60,now+0.2);
+gain.gain.setValueAtTime(0.2,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.25);
+osc.start(now);osc.stop(now+0.25);break;
+case'sfxGameOver':
+osc.type='sawtooth';osc.frequency.setValueAtTime(400,now);osc.frequency.exponentialRampToValueAtTime(80,now+0.5);
+gain.gain.setValueAtTime(0.2,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.6);
+osc.start(now);osc.stop(now+0.6);break;
+case'sfxClick':
+osc.type='sine';osc.frequency.setValueAtTime(500,now);osc.frequency.exponentialRampToValueAtTime(400,now+0.05);
+gain.gain.setValueAtTime(0.1,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.06);
+osc.start(now);osc.stop(now+0.06);break;
+}
+}catch(e){}
+}
+
+function loadHighScore(){
+try{highScore=parseInt(localStorage.getItem(LS_HS))||0}catch(e){highScore=0}
+}
+
+function saveHighScore(){
+try{localStorage.setItem(LS_HS,String(highScore))}catch(e){}
+}
+
+function hasSeenTutorial(){
+try{return localStorage.getItem(LS_TUT)==='1'}catch(e){return false}
+}
+
+function markTutorialSeen(){
+try{localStorage.setItem(LS_TUT,'1')}catch(e){}
+}
+
+function showScreen(name){
+Object.values(screens).forEach(function(s){if(s)s.classList.remove('active')});
+if(screens[name])screens[name].classList.add('active');
+}
+
+function updateHighScoreDisplay(){
+if(highScore>0){
+highScoreValue.textContent='High Score: '+highScore;
+}else{
+highScoreValue.textContent='';
+}
+}
+
+function setState(newState){
+currentState=newState;
+switch(newState){
+case State.MENU:
+showScreen('menu');
+gameStats.style.display='none';
+comboDisplay.classList.remove('show');
+updateHighScoreDisplay();
+break;
+case State.PLAYING:
+showScreen(null);
+gameStats.style.display='flex';
+break;
+case State.PAUSED:
+showScreen('pause');
+break;
+case State.GAMEOVER:
+showScreen('gameover');
+gameStats.style.display='none';
+showGameOver();
+break;
+case State.TUTORIAL:
+showScreen('tutorial');
+break;
+}
+}
+
+function resizeCanvas(){
+const rect=container.getBoundingClientRect();
+canvas.width=rect.width;
+canvas.height=rect.height;
+}
+
+function clearAllTimers(){
+activeTimers.forEach(function(t){clearTimeout(t);clearInterval(t)});
+activeTimers=[];
+}
+
+function addTimer(id){activeTimers.push(id);return id}
+
+function resetGame(){
+clearAllTimers();
+score=0;
+lives=MAX_LIVES;
+circles=[];
+particles=[];
+popups=[];
+spawnTimer=0;
+spawnInterval=INITIAL_SPAWN_INTERVAL;
+circleLifetime=INITIAL_LIFETIME;
+gameTime=0;
+tapsHit=0;
+tapsMissed=0;
+comboCount=0;
+lastTapTime=0;
+shakeAmount=0;
+shakeDuration=0;
+scoreValue.textContent='0';
+updateLivesDisplay();
+comboDisplay.classList.remove('show');
+}
+
+function updateLivesDisplay(){
+for(let i=0;i<MAX_LIVES;i++){
+const el=document.getElementById('life-'+i);
+if(el){
+if(i<lives)el.classList.remove('lost');
+else el.classList.add('lost');
+}
+}
+}
+
+function getDifficulty(){
+const progress=Math.min(score/100,1);
+return{
+spawnInterval:INITIAL_SPAWN_INTERVAL-(INITIAL_SPAWN_INTERVAL-MIN_SPAWN_INTERVAL)*progress,
+lifetime:INITIAL_LIFETIME-(INITIAL_LIFETIME-MIN_LIFETIME)*progress
+};
+}
+
+function spawnCircle(){
+const diff=getDifficulty();
+spawnInterval=diff.spawnInterval;
+circleLifetime=diff.lifetime;
+const isSmall=Math.random()<0.3;
+const radius=isSmall?SMALL_RADIUS:LARGE_RADIUS;
+const padding=radius+10;
+const statsHeight=52;
+const x=padding+Math.random()*(canvas.width-padding*2);
+const y=statsHeight+padding+Math.random()*(canvas.height-statsHeight-padding*2);
+const color=COLORS[Math.floor(Math.random()*COLORS.length)];
+circles.push({
+x:x,y:y,radius:radius,color:color,
+lifetime:circleLifetime,maxLifetime:circleLifetime,
+isSmall:isSmall,points:isSmall?3:1,
+scale:0,spawning:true
+});
+}
+
+function spawnParticles(x,y,color,count){
+for(let i=0;i<count;i++){
+const angle=Math.random()*Math.PI*2;
+const speed=80+Math.random()*160;
+particles.push({
+x:x,y:y,
+vx:Math.cos(angle)*speed,
+vy:Math.sin(angle)*speed,
+radius:2+Math.random()*3,
+color:color,
+life:1,
+decay:1.5+Math.random()*1.5
+});
+}
+}
+
+function spawnPopup(x,y,text,color){
+popups.push({x:x,y:y,text:text,color:color,life:1,vy:-80});
+}
+
+function triggerShake(amount,duration){
+shakeAmount=amount;
+shakeDuration=duration;
+}
+
+function handleTap(cx,cy){
+if(currentState!==State.PLAYING)return;
+let hit=false;
+for(let i=circles.length-1;i>=0;i--){
+const c=circles[i];
+const dx=cx-c.x;
+const dy=cy-c.y;
+const dist=Math.sqrt(dx*dx+dy*dy);
+if(dist<=c.radius*c.scale){
+hit=true;
+score+=c.points;
+tapsHit++;
+scoreValue.textContent=String(score);
+const now=performance.now();
+if(now-lastTapTime<COMBO_WINDOW){
+comboCount++;
+if(comboCount>=2){
+comboDisplay.textContent='Combo x'+comboCount;
+comboDisplay.classList.add('show');
+}
+}else{
+comboCount=1;
+comboDisplay.classList.remove('show');
+}
+lastTapTime=now;
+spawnParticles(c.x,c.y,c.color,12);
+spawnPopup(c.x,c.y-c.radius,'+'+c.points,c.points>1?'#00ccff':'#00ff88');
+playSound('sfxTap');
+if(c.points>1)playSound('sfxScore');
+circles.splice(i,1);
+break;
+}
+}
+if(!hit){
+comboCount=0;
+comboDisplay.classList.remove('show');
+}
+}
+
+function loseLife(){
+lives--;
+tapsMissed++;
+updateLivesDisplay();
+triggerShake(6,200);
+playSound('sfxHit');
+if(lives<=0){
+playSound('sfxGameOver');
+setState(State.GAMEOVER);
+}
+}
+
+function showGameOver(){
+finalScore.textContent=String(score);
+let isNew=false;
+if(score>highScore){
+highScore=score;
+saveHighScore();
+isNew=true;
+}
+gameoverHighscore.textContent='High Score: '+highScore;
+newHighscore.style.display=isNew?'block':'none';
+
+star1.classList.remove('earned');
+star2.classList.remove('earned');
+star3.classList.remove('earned');
+if(score>=1)star1.classList.add('earned');
+if(score>=30)star2.classList.add('earned');
+if(score>=80)star3.classList.add('earned');
+
+const timeSec=Math.floor(gameTime/1000);
+const minutes=Math.floor(timeSec/60);
+const seconds=timeSec%60;
+statTime.textContent=minutes>0?(minutes+'m '+seconds+'s'):(seconds+'s');
+statHits.textContent=String(tapsHit);
+statMisses.textContent=String(tapsMissed);
+const total=tapsHit+tapsMissed;
+const acc=total>0?Math.round(tapsHit/total*100):0;
+statAccuracy.textContent=acc+'%';
+}
+
+function startGame(){
+initAudio();
+resetGame();
+resizeCanvas();
+setState(State.PLAYING);
+lastFrameTime=performance.now();
+if(!animFrameId)gameLoop(lastFrameTime);
+}
+
+function update(dt){
+if(currentState!==State.PLAYING)return;
+gameTime+=dt;
+spawnTimer+=dt;
+if(spawnTimer>=spawnInterval){
+spawnTimer-=spawnInterval;
+spawnCircle();
+}
+if(shakeDuration>0){
+shakeDuration-=dt;
+if(shakeDuration<=0){shakeAmount=0;shakeDuration=0}
+}
+for(let i=circles.length-1;i>=0;i--){
+const c=circles[i];
+if(c.spawning){
+c.scale=Math.min(c.scale+dt*0.006,1);
+if(c.scale>=1)c.spawning=false;
+}
+c.lifetime-=dt;
+if(c.lifetime<=0){
+circles.splice(i,1);
+loseLife();
+}
+}
+for(let i=particles.length-1;i>=0;i--){
+const p=particles[i];
+p.x+=p.vx*(dt/1000);
+p.y+=p.vy*(dt/1000);
+p.vy+=300*(dt/1000);
+p.life-=p.decay*(dt/1000);
+if(p.life<=0)particles.splice(i,1);
+}
+for(let i=popups.length-1;i>=0;i--){
+const pp=popups[i];
+pp.y+=pp.vy*(dt/1000);
+pp.life-=1.5*(dt/1000);
+if(pp.life<=0)popups.splice(i,1);
+}
+const diff=getDifficulty();
+spawnInterval=diff.spawnInterval;
+circleLifetime=diff.lifetime;
+}
+
+function draw(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+ctx.save();
+if(shakeAmount>0&&shakeDuration>0){
+const sx=(Math.random()-0.5)*shakeAmount*2;
+const sy=(Math.random()-0.5)*shakeAmount*2;
+ctx.translate(sx,sy);
+}
+for(let i=0;i<circles.length;i++){
+const c=circles[i];
+const s=c.scale||1;
+const r=c.radius*s;
+ctx.beginPath();
+ctx.arc(c.x,c.y,r,0,Math.PI*2);
+ctx.fillStyle=c.color;
+ctx.globalAlpha=0.25;
+ctx.fill();
+ctx.globalAlpha=1;
+const grad=ctx.createRadialGradient(c.x-r*0.25,c.y-r*0.25,r*0.1,c.x,c.y,r);
+grad.addColorStop(0,'rgba(255,255,255,0.3)');
+grad.addColorStop(0.5,c.color);
+grad.addColorStop(1,c.color);
+ctx.beginPath();
+ctx.arc(c.x,c.y,r,0,Math.PI*2);
+ctx.fillStyle=grad;
+ctx.fill();
+const frac=Math.max(0,c.lifetime/c.maxLifetime);
+const ringR=r+6;
+ctx.beginPath();
+ctx.arc(c.x,c.y,ringR,-Math.PI/2,-Math.PI/2+frac*Math.PI*2);
+ctx.strokeStyle=c.color;
+ctx.lineWidth=3;
+ctx.lineCap='round';
+ctx.globalAlpha=0.6;
+ctx.stroke();
+ctx.globalAlpha=1;
+if(frac<0.3){
+ctx.globalAlpha=0.15+0.15*Math.sin(performance.now()*0.01);
+ctx.beginPath();
+ctx.arc(c.x,c.y,r,0,Math.PI*2);
+ctx.fillStyle='#ff0000';
+ctx.fill();
+ctx.globalAlpha=1;
+}
+}
+for(let i=0;i<particles.length;i++){
+const p=particles[i];
+ctx.globalAlpha=Math.max(0,p.life);
+ctx.beginPath();
+ctx.arc(p.x,p.y,p.radius*p.life,0,Math.PI*2);
+ctx.fillStyle=p.color;
+ctx.fill();
+}
+ctx.globalAlpha=1;
+for(let i=0;i<popups.length;i++){
+const pp=popups[i];
+ctx.globalAlpha=Math.max(0,pp.life);
+ctx.font='bold 20px -apple-system,BlinkMacSystemFont,sans-serif';
+ctx.textAlign='center';
+ctx.fillStyle=pp.color;
+ctx.fillText(pp.text,pp.x,pp.y);
+}
+ctx.globalAlpha=1;
+ctx.restore();
+}
+
+function gameLoop(timestamp){
+const dt=Math.min(timestamp-lastFrameTime,50);
+lastFrameTime=timestamp;
+if(currentState===State.PLAYING){
+update(dt);
+draw();
+}else if(currentState===State.PAUSED||currentState===State.MENU||currentState===State.GAMEOVER||currentState===State.TUTORIAL){
+draw();
+}
+animFrameId=requestAnimationFrame(gameLoop);
+}
+
+function getEventPos(e){
+const rect=canvas.getBoundingClientRect();
+let clientX,clientY;
+if(e.touches&&e.touches.length>0){
+clientX=e.touches[0].clientX;
+clientY=e.touches[0].clientY;
+}else{
+clientX=e.clientX;
+clientY=e.clientY;
+}
+return{
+x:(clientX-rect.left)*(canvas.width/rect.width),
+y:(clientY-rect.top)*(canvas.height/rect.height)
+};
+}
+
+canvas.addEventListener('touchstart',function(e){
+e.preventDefault();
+const pos=getEventPos(e);
+handleTap(pos.x,pos.y);
+},{passive:false});
+
+canvas.addEventListener('mousedown',function(e){
+const pos=getEventPos(e);
+handleTap(pos.x,pos.y);
+});
+
+btnPlay.addEventListener('click',function(){
+playSound('sfxClick');
+if(!hasSeenTutorial()){
+markTutorialSeen();
+pendingTutorial=true;
+setState(State.TUTORIAL);
+}else{
+startGame();
+}
+});
+
+btnHowtoplay.addEventListener('click',function(){
+playSound('sfxClick');
+pendingTutorial=false;
+setState(State.TUTORIAL);
+});
+
+btnTutorialOk.addEventListener('click',function(){
+playSound('sfxClick');
+if(pendingTutorial){
+pendingTutorial=false;
+startGame();
+}else{
+setState(State.MENU);
+}
+});
+
+btnPause.addEventListener('click',function(e){
+e.stopPropagation();
+playSound('sfxClick');
+if(currentState===State.PLAYING)setState(State.PAUSED);
+});
+
+btnResume.addEventListener('click',function(){
+playSound('sfxClick');
+lastFrameTime=performance.now();
+setState(State.PLAYING);
+});
+
+btnMenu.addEventListener('click',function(){
+playSound('sfxClick');
+clearAllTimers();
+setState(State.MENU);
+});
+
+btnGameoverRestart.addEventListener('click',function(){
+playSound('sfxClick');
+startGame();
+});
+
+btnGameoverMenu.addEventListener('click',function(){
+playSound('sfxClick');
+setState(State.MENU);
+});
+
+btnSound.addEventListener('click',function(){
+soundEnabled=!soundEnabled;
+btnSound.style.opacity=soundEnabled?'1':'0.4';
+if(soundEnabled){
+initAudio();
+playSound('sfxClick');
+}
+});
+
+window.addEventListener('resize',resizeCanvas);
+
+loadHighScore();
+resizeCanvas();
+updateHighScoreDisplay();
+lastFrameTime=performance.now();
+animFrameId=requestAnimationFrame(gameLoop);
+
+});
+})();
+</script>
+</body>
+</html>

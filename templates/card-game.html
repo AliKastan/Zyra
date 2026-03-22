@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>Memory Match</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#1a0a2e 0%,#2a1a3e 100%);color:#fff;display:flex;align-items:center;justify-content:center;min-height:100%}
+#game-container{position:relative;width:100%;height:100%;max-width:480px;max-height:860px;overflow:hidden}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .3s ease}
+.screen.active{opacity:1;pointer-events:auto}
+h1{font-size:2.2rem;font-weight:800;color:#FF9800;text-shadow:0 2px 12px rgba(255,152,0,.4);margin-bottom:8px;letter-spacing:1px}
+h2{font-size:1.5rem;font-weight:700;color:#FFC107;margin-bottom:16px}
+.subtitle{font-size:.95rem;color:rgba(255,255,255,.6);margin-bottom:32px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-width:180px;padding:14px 28px;border:none;border-radius:12px;font-size:1.05rem;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s;-webkit-tap-highlight-color:transparent;outline:none;letter-spacing:.5px}
+.btn:active{transform:scale(.95)}
+.btn-primary{background:linear-gradient(135deg,#FF9800,#F57C00);color:#fff;box-shadow:0 4px 16px rgba(255,152,0,.4)}
+.btn-secondary{background:rgba(255,255,255,.1);color:#FFC107;border:2px solid rgba(255,193,7,.3);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.btn-small{min-width:auto;padding:10px 20px;font-size:.9rem;border-radius:10px}
+.menu-buttons{display:flex;flex-direction:column;gap:14px;align-items:center;margin-top:16px}
+.game-header{width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;position:absolute;top:0;left:0;z-index:10}
+.game-header .stat{display:flex;flex-direction:column;align-items:center;font-size:.7rem;color:rgba(255,255,255,.5)}
+.game-header .stat span{font-size:1.1rem;font-weight:700;color:#FFC107}
+.header-btn{width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);color:#fff;font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#game-area{position:absolute;inset:0;top:70px;bottom:10px;display:flex;align-items:center;justify-content:center;padding:10px}
+#game-stats{width:100%;display:flex;justify-content:space-around;padding:4px 8px;position:absolute;top:56px;left:0;z-index:9;background:rgba(0,0,0,.15);border-bottom:1px solid rgba(255,255,255,.05)}
+#game-stats .mini-stat{font-size:.7rem;color:rgba(255,255,255,.45)}
+#game-stats .mini-stat b{color:rgba(255,255,255,.7);font-weight:600}
+.card-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:100%;max-width:340px;aspect-ratio:auto}
+.card{position:relative;aspect-ratio:3/4;perspective:600px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.card-inner{position:relative;width:100%;height:100%;transition:transform .35s ease;transform-style:preserve-3d;border-radius:12px}
+.card.flipped .card-inner{transform:rotateY(180deg)}
+.card.matched .card-inner{transform:rotateY(180deg)}
+.card.matched .card-front{box-shadow:0 0 18px rgba(255,152,0,.5),0 0 6px rgba(255,193,7,.3);border-color:rgba(255,152,0,.4)}
+.card-face{position:absolute;inset:0;border-radius:12px;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:2px solid rgba(255,255,255,.08)}
+.card-back{background:linear-gradient(145deg,#3a2a5e,#2a1a4e);box-shadow:0 4px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.06);font-size:1.6rem;color:rgba(255,255,255,.2)}
+.card-back::before{content:'';position:absolute;inset:8px;border-radius:8px;border:2px dashed rgba(255,255,255,.07)}
+.card-front{background:linear-gradient(145deg,#2e1e4e,#1e0e3e);box-shadow:0 4px 12px rgba(0,0,0,.3);transform:rotateY(180deg);font-size:2.4rem}
+.overlay{position:absolute;inset:0;background:rgba(10,5,20,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;border-radius:16px;z-index:20}
+.gameover-stats{display:flex;flex-direction:column;gap:8px;margin:16px 0 12px;width:100%;max-width:260px}
+.gameover-stat{display:flex;justify-content:space-between;font-size:.9rem;color:rgba(255,255,255,.6);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.gameover-stat span:last-child{color:#FFC107;font-weight:600}
+.stars{display:flex;gap:8px;margin:12px 0}
+.star{font-size:2rem;opacity:.2;transition:opacity .3s,transform .3s}
+.star.earned{opacity:1;transform:scale(1.15)}
+#new-highscore{display:none;color:#FF9800;font-size:.85rem;font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:2px;animation:pulse 1s infinite}
+#gameover-highscore{font-size:.75rem;color:rgba(255,255,255,.35);margin-top:4px}
+.gameover-buttons{display:flex;gap:12px;margin-top:18px}
+#combo-display{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.6rem;font-weight:800;color:#FF9800;text-shadow:0 2px 12px rgba(255,152,0,.6);pointer-events:none;opacity:0;z-index:30;transition:none}
+.tutorial-content{text-align:left;max-width:300px;margin:16px 0 24px}
+.tutorial-content p{font-size:.88rem;color:rgba(255,255,255,.65);margin-bottom:10px;line-height:1.5}
+.tutorial-content strong{color:#FFC107}
+.particle{position:fixed;pointer-events:none;border-radius:50%;z-index:25}
+.score-popup{position:fixed;pointer-events:none;font-size:1.1rem;font-weight:800;z-index:25;text-shadow:0 1px 4px rgba(0,0,0,.4)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes shakeX{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.shake{animation:shakeX .3s ease}
+</style>
+</head>
+<body>
+<div id="game-container">
+
+<!-- MENU SCREEN -->
+<div id="screen-menu" class="screen active">
+<h1>Memory Match</h1>
+<p class="subtitle">Find all matching pairs!</p>
+<div class="menu-buttons">
+<button id="btn-play" class="btn btn-primary">Play</button>
+<button id="btn-howtoplay" class="btn btn-secondary">How to Play</button>
+<button id="btn-sound" class="btn btn-secondary btn-small">Sound: ON</button>
+</div>
+<p style="margin-top:24px;font-size:.75rem;color:rgba(255,255,255,.3)">Best: <span id="high-score-value">0</span></p>
+</div>
+
+<!-- TUTORIAL SCREEN -->
+<div id="screen-tutorial" class="screen">
+<h2>How to Play</h2>
+<div class="tutorial-content">
+<p>Tap a card to <strong>flip</strong> it and reveal the symbol underneath.</p>
+<p>Tap a <strong>second card</strong> — if both symbols match, the pair stays revealed!</p>
+<p>If they don't match, both cards flip back after a moment.</p>
+<p><strong>Consecutive matches</strong> build a combo for bonus points.</p>
+<p>Find all <strong>8 pairs</strong> as fast as you can for the best score!</p>
+</div>
+<button id="btn-tutorial-ok" class="btn btn-primary">Got It</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="screen-game" class="screen">
+<div class="game-header">
+<div class="stat">SCORE<br><span id="score-value">0</span></div>
+<div class="stat">TIME<br><span id="timer-value">0:00</span></div>
+<button id="btn-pause" class="header-btn">&#10074;&#10074;</button>
+</div>
+<div id="game-stats">
+<div class="mini-stat">Moves: <b id="stat-moves">0</b></div>
+<div class="mini-stat">Matches: <b id="stat-matches">0</b></div>
+<div class="mini-stat">Combo: <b id="stat-combo">0</b></div>
+</div>
+<div id="game-area">
+<div class="card-grid" id="card-grid"></div>
+</div>
+</div>
+
+<!-- PAUSE SCREEN -->
+<div id="screen-pause" class="screen">
+<div class="overlay">
+<h2>Paused</h2>
+<div class="menu-buttons">
+<button id="btn-resume" class="btn btn-primary">Resume</button>
+<button id="btn-restart" class="btn btn-secondary">Restart</button>
+<button id="btn-menu" class="btn btn-secondary">Menu</button>
+</div>
+</div>
+</div>
+
+<!-- GAMEOVER SCREEN -->
+<div id="screen-gameover" class="screen">
+<div class="overlay">
+<h2>Complete!</h2>
+<div id="new-highscore">New High Score!</div>
+<div class="stars">
+<div id="star-1" class="star">&#9733;</div>
+<div id="star-2" class="star">&#9733;</div>
+<div id="star-3" class="star">&#9733;</div>
+</div>
+<p style="font-size:1.4rem;font-weight:800;color:#FF9800" id="final-score">0</p>
+<p id="gameover-highscore" style="font-size:.75rem;color:rgba(255,255,255,.35)">Best: 0</p>
+<div class="gameover-stats" id="gameover-stats-list"></div>
+<div class="gameover-buttons">
+<button id="btn-gameover-restart" class="btn btn-primary btn-small">Play Again</button>
+<button id="btn-gameover-menu" class="btn btn-secondary btn-small">Menu</button>
+</div>
+</div>
+</div>
+
+<div id="combo-display"></div>
+</div>
+
+<script>
+(function(){'use strict';
+
+/* ===== CONSTANTS ===== */
+const State={MENU:0,PLAYING:1,PAUSED:2,GAMEOVER:3,TUTORIAL:4};
+const SYMBOLS=['\u{1F3AE}','\u{1F3AF}','\u{1F3AA}','\u{1F3A8}','\u{1F3AD}','\u{1F3B2}','\u{1F3B8}','\u{1F3BA}'];
+const GRID_COLS=4;
+const GRID_ROWS=4;
+const TOTAL_PAIRS=8;
+const FLIP_DURATION=350;
+const MISMATCH_DELAY=800;
+const MATCH_POINTS=100;
+const MISMATCH_PENALTY=10;
+const TIME_BONUS_MAX=5000;
+const TIME_BONUS_DECAY=50;
+const STAR_THRESHOLDS=[0,2000,4000];
+
+/* ===== STATE ===== */
+let state=State.MENU;
+let score=0;
+let highScore=0;
+let moves=0;
+let matchesFound=0;
+let combo=0;
+let longestCombo=0;
+let elapsedMs=0;
+let lastFrameTime=0;
+let flippedCards=[];
+let lockBoard=false;
+let cards=[];
+let soundEnabled=true;
+let animFrameId=null;
+let safeTimers=[];
+
+/* ===== AUDIO ===== */
+const AudioCtx=window.AudioContext||window.webkitAudioContext;
+let audioCtx=null;
+
+function ensureAudio(){
+if(!audioCtx){try{audioCtx=new AudioCtx()}catch(e){soundEnabled=false}}
+if(audioCtx&&audioCtx.state==='suspended'){audioCtx.resume()}
+}
+
+function playTone(freq,dur,type,vol){
+if(!soundEnabled||!audioCtx)return;
+try{
+const o=audioCtx.createOscillator();
+const g=audioCtx.createGain();
+o.type=type||'sine';
+o.frequency.setValueAtTime(freq,audioCtx.currentTime);
+g.gain.setValueAtTime(vol||.15,audioCtx.currentTime);
+g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);
+o.connect(g);g.connect(audioCtx.destination);
+o.start();o.stop(audioCtx.currentTime+dur);
+}catch(e){}
+}
+
+function sfxFlip(){playTone(600,.1,'sine',.12)}
+function sfxMatch(){playTone(880,.15,'sine',.18);setTimeout(function(){playTone(1100,.2,'sine',.15)},100)}
+function sfxMismatch(){playTone(250,.2,'square',.1)}
+function sfxCombo(n){playTone(660+n*110,.2,'sine',.2)}
+function sfxGameover(){playTone(523,.15,'sine',.15);setTimeout(function(){playTone(659,.15,'sine',.15)},150);setTimeout(function(){playTone(784,.3,'sine',.18)},300)}
+
+/* ===== DOM REFS ===== */
+const $=function(id){return document.getElementById(id)};
+const screens={
+menu:$('screen-menu'),
+game:$('screen-game'),
+pause:$('screen-pause'),
+gameover:$('screen-gameover'),
+tutorial:$('screen-tutorial')
+};
+const scoreEl=$('score-value');
+const timerEl=$('timer-value');
+const finalScoreEl=$('final-score');
+const highScoreEl=$('high-score-value');
+const gameoverHSEl=$('gameover-highscore');
+const newHSEl=$('new-highscore');
+const comboEl=$('combo-display');
+const cardGrid=$('card-grid');
+const statMoves=$('stat-moves');
+const statMatches=$('stat-matches');
+const statCombo=$('stat-combo');
+const star1=$('star-1');
+const star2=$('star-2');
+const star3=$('star-3');
+const gameoverStatsList=$('gameover-stats-list');
+const container=$('game-container');
+
+/* ===== SAFE TIMERS ===== */
+function safeTimeout(fn,ms){
+const id=setTimeout(fn,ms);
+safeTimers.push(id);
+return id;
+}
+function clearAllTimers(){
+safeTimers.forEach(function(id){clearTimeout(id)});
+safeTimers=[];
+}
+
+/* ===== SCREENS ===== */
+function showScreen(name){
+Object.keys(screens).forEach(function(k){screens[k].classList.remove('active')});
+screens[name].classList.add('active');
+}
+
+function setState(s){
+state=s;
+switch(s){
+case State.MENU:showScreen('menu');break;
+case State.PLAYING:showScreen('game');break;
+case State.PAUSED:showScreen('pause');break;
+case State.GAMEOVER:showScreen('gameover');break;
+case State.TUTORIAL:showScreen('tutorial');break;
+}
+}
+
+/* ===== HIGH SCORE ===== */
+function loadHighScore(){
+try{highScore=parseInt(localStorage.getItem('memoryMatch_hs'),10)||0}catch(e){highScore=0}
+highScoreEl.textContent=highScore;
+}
+function saveHighScore(){
+try{localStorage.setItem('memoryMatch_hs',String(highScore))}catch(e){}
+}
+
+/* ===== SHUFFLE ===== */
+function shuffle(arr){
+for(let i=arr.length-1;i>0;i--){
+const j=Math.floor(Math.random()*(i+1));
+const t=arr[i];arr[i]=arr[j];arr[j]=t;
+}
+return arr;
+}
+
+/* ===== CARD CREATION ===== */
+function createCards(){
+cardGrid.innerHTML='';
+cards=[];
+flippedCards=[];
+lockBoard=false;
+const pairs=[];
+for(let i=0;i<TOTAL_PAIRS;i++){pairs.push(SYMBOLS[i],SYMBOLS[i])}
+shuffle(pairs);
+pairs.forEach(function(sym,idx){
+const card=document.createElement('div');
+card.className='card';
+card.dataset.index=idx;
+card.dataset.symbol=sym;
+card.innerHTML='<div class="card-inner"><div class="card-face card-back">?</div><div class="card-face card-front">'+sym+'</div></div>';
+cardGrid.appendChild(card);
+cards.push({el:card,symbol:sym,flipped:false,matched:false});
+addInput(card,function(){onCardTap(idx)});
+});
+}
+
+/* ===== INPUT ===== */
+function addInput(el,fn){
+el.addEventListener('pointerdown',function(e){
+e.preventDefault();
+fn(e);
+},{passive:false});
+}
+
+/* ===== CARD TAP ===== */
+function onCardTap(idx){
+if(state!==State.PLAYING||lockBoard)return;
+const c=cards[idx];
+if(c.flipped||c.matched)return;
+ensureAudio();
+sfxFlip();
+c.flipped=true;
+c.el.classList.add('flipped');
+flippedCards.push(idx);
+moves++;
+statMoves.textContent=moves;
+
+if(flippedCards.length===2){
+lockBoard=true;
+const a=cards[flippedCards[0]];
+const b=cards[flippedCards[1]];
+if(a.symbol===b.symbol){
+onMatch(a,b);
+}else{
+onMismatch(a,b);
+}
+}
+}
+
+function onMatch(a,b){
+combo++;
+if(combo>longestCombo)longestCombo=combo;
+statCombo.textContent=combo;
+const bonus=MATCH_POINTS+(combo>1?(combo*50):0);
+score+=bonus;
+if(score<0)score=0;
+scoreEl.textContent=score;
+matchesFound++;
+statMatches.textContent=matchesFound;
+sfxMatch();
+if(combo>1)sfxCombo(combo);
+
+a.matched=true;
+b.matched=true;
+safeTimeout(function(){
+a.el.classList.add('matched');
+b.el.classList.add('matched');
+},100);
+
+const rect=b.el.getBoundingClientRect();
+spawnParticles(rect.left+rect.width/2,rect.top+rect.height/2,8);
+showScorePopup('+'+bonus,rect.left+rect.width/2,rect.top);
+if(combo>1)showCombo('Combo x'+combo+'!');
+
+flippedCards=[];
+lockBoard=false;
+
+if(matchesFound>=TOTAL_PAIRS){
+safeTimeout(function(){endGame()},500);
+}
+}
+
+function onMismatch(a,b){
+combo=0;
+statCombo.textContent=0;
+score=Math.max(0,score-MISMATCH_PENALTY);
+scoreEl.textContent=score;
+sfxMismatch();
+screenShake();
+
+const rect=b.el.getBoundingClientRect();
+showScorePopup('-'+MISMATCH_PENALTY,rect.left+rect.width/2,rect.top);
+
+safeTimeout(function(){
+a.flipped=false;
+b.flipped=false;
+a.el.classList.remove('flipped');
+b.el.classList.remove('flipped');
+flippedCards=[];
+lockBoard=false;
+},MISMATCH_DELAY);
+}
+
+/* ===== GAME LOOP ===== */
+function gameLoop(ts){
+if(state!==State.PLAYING){animFrameId=requestAnimationFrame(gameLoop);return}
+if(lastFrameTime===0)lastFrameTime=ts;
+const dt=ts-lastFrameTime;
+lastFrameTime=ts;
+elapsedMs+=dt;
+const secs=Math.floor(elapsedMs/1000);
+const m=Math.floor(secs/60);
+const s=secs%60;
+timerEl.textContent=m+':'+(s<10?'0':'')+s;
+animFrameId=requestAnimationFrame(gameLoop);
+}
+
+function startLoop(){
+lastFrameTime=0;
+if(animFrameId)cancelAnimationFrame(animFrameId);
+animFrameId=requestAnimationFrame(gameLoop);
+}
+function stopLoop(){
+if(animFrameId){cancelAnimationFrame(animFrameId);animFrameId=null}
+}
+
+/* ===== GAME FLOW ===== */
+function startGame(){
+ensureAudio();
+score=0;moves=0;matchesFound=0;combo=0;longestCombo=0;elapsedMs=0;
+scoreEl.textContent='0';
+timerEl.textContent='0:00';
+statMoves.textContent='0';
+statMatches.textContent='0';
+statCombo.textContent='0';
+clearAllTimers();
+createCards();
+setState(State.PLAYING);
+startLoop();
+}
+
+function endGame(){
+stopLoop();
+const seconds=Math.floor(elapsedMs/1000);
+const timeBonus=Math.max(0,TIME_BONUS_MAX-seconds*TIME_BONUS_DECAY);
+const finalScore=score+timeBonus;
+
+sfxGameover();
+
+const isNew=finalScore>highScore;
+if(isNew){highScore=finalScore;saveHighScore()}
+
+finalScoreEl.textContent=finalScore;
+gameoverHSEl.textContent='Best: '+highScore;
+newHSEl.style.display=isNew?'block':'none';
+
+const starCount=finalScore>=STAR_THRESHOLDS[2]?3:finalScore>=STAR_THRESHOLDS[1]?2:1;
+star1.className='star'+(starCount>=1?' earned':'');
+star2.className='star'+(starCount>=2?' earned':'');
+star3.className='star'+(starCount>=3?' earned':'');
+
+gameoverStatsList.innerHTML='';
+const stats=[
+['Moves',moves],
+['Time',Math.floor(elapsedMs/1000)+'s'],
+['Matches',matchesFound+'/'+TOTAL_PAIRS],
+['Best Combo',longestCombo+'x'],
+['Time Bonus','+'+timeBonus]
+];
+stats.forEach(function(s){
+const row=document.createElement('div');
+row.className='gameover-stat';
+row.innerHTML='<span>'+s[0]+'</span><span>'+s[1]+'</span>';
+gameoverStatsList.appendChild(row);
+});
+
+setState(State.GAMEOVER);
+}
+
+/* ===== PARTICLES ===== */
+function spawnParticles(x,y,count){
+const colors=['#FF9800','#FFC107','#FF5722','#FFEB3B','#FF7043'];
+for(let i=0;i<count;i++){
+const p=document.createElement('div');
+p.className='particle';
+const size=4+Math.random()*6;
+p.style.width=size+'px';
+p.style.height=size+'px';
+p.style.left=x+'px';
+p.style.top=y+'px';
+p.style.background=colors[Math.floor(Math.random()*colors.length)];
+document.body.appendChild(p);
+const angle=Math.random()*Math.PI*2;
+const speed=60+Math.random()*80;
+const dx=Math.cos(angle)*speed;
+const dy=Math.sin(angle)*speed;
+let life=0;
+const dur=400+Math.random()*300;
+let px=x,py=y;
+const startTime=performance.now();
+function animP(ts){
+const elapsed=ts-startTime;
+const t=elapsed/dur;
+if(t>=1){p.remove();return}
+px=x+dx*t;
+py=y+dy*t-40*t*(1-t);
+p.style.left=px+'px';
+p.style.top=py+'px';
+p.style.opacity=String(1-t);
+requestAnimationFrame(animP);
+}
+requestAnimationFrame(animP);
+}
+}
+
+/* ===== SCORE POPUP ===== */
+function showScorePopup(text,x,y){
+const el=document.createElement('div');
+el.className='score-popup';
+el.textContent=text;
+el.style.left=x+'px';
+el.style.top=y+'px';
+el.style.color=text.charAt(0)==='-'?'#EF5350':'#FFC107';
+document.body.appendChild(el);
+const start=performance.now();
+function animS(ts){
+const t=(ts-start)/800;
+if(t>=1){el.remove();return}
+el.style.top=(y-50*t)+'px';
+el.style.opacity=String(1-t);
+requestAnimationFrame(animS);
+}
+requestAnimationFrame(animS);
+}
+
+/* ===== COMBO DISPLAY ===== */
+function showCombo(text){
+comboEl.textContent=text;
+comboEl.style.opacity='1';
+comboEl.style.transform='translate(-50%,-50%) scale(1.2)';
+const start=performance.now();
+function animC(ts){
+const t=(ts-start)/1000;
+if(t>=1){comboEl.style.opacity='0';return}
+const s=1.2-0.2*t;
+comboEl.style.transform='translate(-50%,-50%) scale('+s+')';
+if(t>0.6)comboEl.style.opacity=String(1-(t-0.6)/0.4);
+requestAnimationFrame(animC);
+}
+requestAnimationFrame(animC);
+}
+
+/* ===== SCREEN SHAKE ===== */
+function screenShake(){
+container.classList.add('shake');
+safeTimeout(function(){container.classList.remove('shake')},300);
+}
+
+/* ===== BUTTON BINDINGS ===== */
+addInput($('btn-play'),function(){startGame()});
+addInput($('btn-howtoplay'),function(){setState(State.TUTORIAL)});
+addInput($('btn-tutorial-ok'),function(){setState(State.MENU)});
+addInput($('btn-pause'),function(){if(state===State.PLAYING){setState(State.PAUSED)}});
+addInput($('btn-resume'),function(){setState(State.PLAYING);lastFrameTime=0;startLoop()});
+addInput($('btn-restart'),function(){startGame()});
+addInput($('btn-menu'),function(){stopLoop();clearAllTimers();setState(State.MENU);loadHighScore()});
+addInput($('btn-gameover-restart'),function(){startGame()});
+addInput($('btn-gameover-menu'),function(){setState(State.MENU);loadHighScore()});
+addInput($('btn-sound'),function(){
+soundEnabled=!soundEnabled;
+$('btn-sound').textContent='Sound: '+(soundEnabled?'ON':'OFF');
+if(soundEnabled)ensureAudio();
+});
+
+/* ===== INIT ===== */
+loadHighScore();
+setState(State.MENU);
+
+})();
+</script>
+</body>
+</html>

@@ -319,7 +319,41 @@ SECTION 9: ABSOLUTE NEVER-DO LIST
 NEVER: use var, query DOM before DOMContentLoaded, leave rAF running when paused, forget to clear timers on reset, use external images/fonts/sounds, use alert/confirm/prompt/document.write, rely on hover states, make touch targets <44px, allow scroll/zoom, leave console.log, hardcode colors without variables, create infinite loops, reference undefined variables, access arrays without bounds checks, divide by zero without checking.
 
 ═══════════════════════════════════════
-SECTION 10: QUALITY CHECKLIST
+SECTION 10: LEVEL SYSTEM
+═══════════════════════════════════════
+
+Every game MUST have at least 5 levels with increasing difficulty. The template includes a level system framework — use it.
+
+Level system API (already in template):
+- addLevelScore(pts, x, y) — use instead of modifying score directly
+- addObjectiveProgress(n) — increment objective counter
+- getLevelSettings() — get current level's settings object
+- getCurrentLevelConfig() — get full config for current level
+- updateLevelProgress() — call every frame to update progress bar
+- updateTimeLimit(dt) — call every frame if level has time limit
+- setLevelConfigs(configs) — set custom level configurations
+
+HOW TO DESIGN 5 LEVELS:
+- Level 1 "Tutorial": Easy, slow, few enemies. Teaches core mechanic.
+- Level 2 "Speed Up": 30-40% faster, more enemies, higher score target.
+- Level 3 "New Element": Introduce ONE new mechanic. Set newMechanic in settings.
+- Level 4 "Pressure": Add time limit (45-60s). Combine all mechanics.
+- Level 5 "Finale/Boss": Boss fight or extreme challenge. Set bossLevel:true.
+
+BOSS DESIGN (level 5):
+- Boss has health bar, 2-3 attack patterns, vulnerable windows
+- Takes 8-15 hits to defeat. Screen shake + particles on hit.
+- When defeated: epic explosion sequence, then completeLevel()
+
+RULES:
+1. NEVER hardcode difficulty — always read from getLevelSettings()
+2. Call updateLevelProgress() and updateObjectiveDisplay() every frame
+3. Each level must have a different background color
+4. Level transitions show a countdown (3, 2, 1, GO!)
+5. New mechanics are announced on the transition screen
+
+═══════════════════════════════════════
+SECTION 11: QUALITY CHECKLIST
 ═══════════════════════════════════════
 
 Before outputting, verify ALL:
@@ -345,6 +379,11 @@ Before outputting, verify ALL:
 \u25A1 rAF stops on pause and game over?
 \u25A1 All timers cleared on reset?
 \u25A1 Would a real person enjoy playing this game?
+\u25A1 Does the game have 5 levels with increasing difficulty?
+\u25A1 Does level 3 introduce a new mechanic?
+\u25A1 Does level 5 have a boss or special challenge?
+\u25A1 Do level transitions show countdown and objective?
+\u25A1 Does completing all levels show a victory screen?
 
 If ANY answer is NO, fix the code before outputting.`;
 

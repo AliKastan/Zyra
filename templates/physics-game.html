@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Ball Drop</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a1a;font-family:system-ui,-apple-system,sans-serif;color:#fff;touch-action:none;user-select:none;-webkit-user-select:none}
+#game-container{position:relative;width:100%;height:100%;max-width:480px;margin:0 auto;overflow:hidden;background:linear-gradient(180deg,#0a0a1a 0%,#1a1030 50%,#0a0a1a 100%)}
+canvas{display:block;width:100%;height:100%}
+.screen{position:absolute;top:0;left:0;width:100%;height:100%;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:10;background:rgba(10,10,26,0.95)}
+.screen.active{display:flex}
+.title{font-size:2.4rem;font-weight:800;letter-spacing:0.04em;margin-bottom:0.2em;background:linear-gradient(135deg,#FF8C00,#FFD700);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.subtitle{font-size:1rem;color:#9a8e84;margin-bottom:2em;letter-spacing:0.06em}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-width:180px;padding:14px 32px;border:none;border-radius:12px;font-size:1rem;font-weight:700;letter-spacing:0.03em;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;-webkit-tap-highlight-color:transparent;outline:none;margin:6px 0}
+.btn:active{transform:scale(0.96)}
+.btn-primary{background:linear-gradient(135deg,#FF8C00,#e07000);color:#fff;box-shadow:0 4px 20px rgba(255,140,0,0.35)}
+.btn-secondary{background:rgba(255,255,255,0.08);color:#FFD700;border:1px solid rgba(255,215,0,0.2)}
+.btn-small{min-width:100px;padding:10px 20px;font-size:0.85rem}
+#screen-game{display:none;z-index:1;background:transparent}
+#screen-game.active{display:block}
+#game-area{width:100%;height:100%}
+#game-stats{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;z-index:5;background:linear-gradient(180deg,rgba(10,10,26,0.9) 0%,transparent 100%);pointer-events:none}
+#game-stats>div{display:flex;flex-direction:column;align-items:center}
+.stat-label{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:#9a8e84;margin-bottom:2px}
+.stat-val{font-size:1.2rem;font-weight:700;color:#FFD700}
+#btn-pause{position:absolute;top:10px;right:12px;z-index:6;width:40px;height:40px;min-width:40px;padding:0;border-radius:50%;background:rgba(255,255,255,0.1);color:#fff;font-size:1.1rem;border:none;cursor:pointer;pointer-events:all;display:flex;align-items:center;justify-content:center}
+#btn-sound{position:absolute;top:10px;left:12px;z-index:6;width:40px;height:40px;min-width:40px;padding:0;border-radius:50%;background:rgba(255,255,255,0.1);color:#fff;font-size:1.1rem;border:none;cursor:pointer;pointer-events:all;display:flex;align-items:center;justify-content:center}
+#combo-display{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2rem;font-weight:800;color:#FFD700;text-shadow:0 0 20px rgba(255,215,0,0.5);opacity:0;z-index:5;pointer-events:none;transition:none}
+.overlay-title{font-size:1.8rem;font-weight:800;margin-bottom:0.5em;background:linear-gradient(135deg,#FF8C00,#FFD700);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+#final-score{font-size:3rem;font-weight:800;color:#FFD700;margin:0.2em 0}
+#gameover-highscore{font-size:0.9rem;color:#9a8e84;margin-bottom:0.4em}
+#new-highscore{display:none;font-size:1rem;font-weight:700;color:#FF8C00;margin-bottom:0.6em;animation:pulse 0.8s ease infinite}
+.stars{display:flex;gap:8px;margin:0.6em 0 1.2em}
+.star{width:36px;height:36px;opacity:0.2;transition:opacity 0.3s}
+.star.earned{opacity:1}
+.star svg{width:100%;height:100%}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.tutorial-text{max-width:300px;text-align:center;font-size:0.95rem;color:#ccc;line-height:1.6;margin-bottom:2em}
+.tutorial-text strong{color:#FFD700}
+.ball-counter{display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:120px;justify-content:center}
+.ball-dot{width:8px;height:8px;border-radius:50%;background:#FF8C00;opacity:0.3}
+.ball-dot.remaining{opacity:1}
+#drop-zone-hint{position:absolute;top:60px;left:0;right:0;height:40px;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:4;opacity:0.4;font-size:0.7rem;color:#9a8e84;letter-spacing:0.1em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div id="game-container">
+
+  <div id="screen-menu" class="screen active">
+    <div class="title">Ball Drop</div>
+    <div class="subtitle">Physics Plinko</div>
+    <button id="btn-play" class="btn btn-primary">Play</button>
+    <button id="btn-howtoplay" class="btn btn-secondary">How to Play</button>
+  </div>
+
+  <div id="screen-game" class="screen">
+    <canvas id="game-area"></canvas>
+    <div id="game-stats">
+      <div>
+        <span class="stat-label">Score</span>
+        <span id="score-value" class="stat-val">0</span>
+      </div>
+      <div>
+        <span class="stat-label">Balls</span>
+        <div id="balls-display" class="ball-counter"></div>
+      </div>
+      <div>
+        <span class="stat-label">Best</span>
+        <span id="high-score-value" class="stat-val">0</span>
+      </div>
+    </div>
+    <button id="btn-pause">||</button>
+    <button id="btn-sound">S</button>
+    <div id="combo-display"></div>
+    <div id="drop-zone-hint">Tap above to drop</div>
+  </div>
+
+  <div id="screen-pause" class="screen">
+    <div class="overlay-title">Paused</div>
+    <button id="btn-resume" class="btn btn-primary">Resume</button>
+    <button id="btn-restart" class="btn btn-secondary">Restart</button>
+    <button id="btn-menu" class="btn btn-secondary">Menu</button>
+  </div>
+
+  <div id="screen-gameover" class="screen">
+    <div class="overlay-title">Game Over</div>
+    <div id="final-score">0</div>
+    <div id="gameover-highscore">Best: 0</div>
+    <div id="new-highscore">New High Score!</div>
+    <div class="stars">
+      <div id="star-1" class="star"><svg viewBox="0 0 24 24" fill="#FFD700"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z"/></svg></div>
+      <div id="star-2" class="star"><svg viewBox="0 0 24 24" fill="#FFD700"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z"/></svg></div>
+      <div id="star-3" class="star"><svg viewBox="0 0 24 24" fill="#FFD700"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z"/></svg></div>
+    </div>
+    <button id="btn-gameover-restart" class="btn btn-primary">Play Again</button>
+    <button id="btn-gameover-menu" class="btn btn-secondary">Menu</button>
+  </div>
+
+  <div id="screen-tutorial" class="screen">
+    <div class="overlay-title">How to Play</div>
+    <div class="tutorial-text">
+      <strong>Tap</strong> near the top of the screen to drop a ball.<br><br>
+      Balls bounce off <strong>pegs</strong> and land in <strong>scoring zones</strong> at the bottom.<br><br>
+      Zones award <strong>1x, 2x, 3x, 2x, 1x</strong> multipliers (x10 points).<br><br>
+      You have <strong>15 balls</strong> per round. Aim carefully!
+    </div>
+    <button id="btn-tutorial-ok" class="btn btn-primary">Got It</button>
+  </div>
+
+</div>
+
+<script src="/planck.min.js"></script>
+<script>
+(function(){'use strict';
+
+const SCALE = 30;
+const GRAVITY = planck.Vec2(0, 15);
+const TOTAL_BALLS = 15;
+const BALL_RADIUS = 0.3;
+const PEG_RADIUS = 0.25;
+const BALL_RESTITUTION = 0.6;
+const BALL_DENSITY = 1.0;
+const PEG_RESTITUTION = 0.5;
+const ZONE_MULTIPLIERS = [1, 2, 3, 2, 1];
+const STAR_THRESHOLDS = [100, 250];
+
+const State = { MENU: 0, PLAYING: 1, PAUSED: 2, GAMEOVER: 3, TUTORIAL: 4 };
+let state = State.MENU;
+
+const $ = (id) => document.getElementById(id);
+const canvas = $('game-area');
+const ctx = canvas.getContext('2d');
+const container = $('game-container');
+
+let W, H, worldW, worldH;
+let world;
+let balls = [];
+let pegs = [];
+let walls = [];
+let zones = [];
+let ballsRemaining = TOTAL_BALLS;
+let score = 0;
+let highScore = 0;
+let bestSingleBall = 0;
+let ballsDropped = 0;
+let soundOn = true;
+let tutorialSeen = false;
+let lastTime = 0;
+let animId = null;
+let shakeX = 0, shakeY = 0, shakeDur = 0, shakeInt = 0;
+let particles = [];
+let scorePopups = [];
+let safeTimers = [];
+let canDrop = true;
+let dropCooldown = 0;
+
+/* ---- Audio System ---- */
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playTone(freq, dur, vol, type) {
+  if (!soundOn || !audioCtx) return;
+  try {
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type || 'sine';
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(vol || 0.1, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (dur || 0.1));
+    o.connect(g);
+    g.connect(audioCtx.destination);
+    o.start();
+    o.stop(audioCtx.currentTime + (dur || 0.1));
+  } catch (_) {}
+}
+function sfxBounce() { playTone(400 + Math.random() * 300, 0.06, 0.06, 'triangle'); }
+function sfxScore(mult) { playTone(500 + mult * 150, 0.2, 0.12, 'sine'); }
+function sfxDrop() { playTone(250, 0.1, 0.08, 'square'); }
+function sfxGameOver() { playTone(200, 0.4, 0.1, 'sawtooth'); }
+function sfxHighScore() { playTone(800, 0.15, 0.12, 'sine'); setTimeout(() => playTone(1000, 0.15, 0.12, 'sine'), 150); setTimeout(() => playTone(1200, 0.3, 0.12, 'sine'), 300); }
+
+/* ---- Safe Timers ---- */
+function safeTimeout(fn, ms) {
+  const id = setTimeout(() => {
+    const idx = safeTimers.indexOf(id);
+    if (idx !== -1) safeTimers.splice(idx, 1);
+    fn();
+  }, ms);
+  safeTimers.push(id);
+  return id;
+}
+function clearAllTimers() {
+  safeTimers.forEach(id => clearTimeout(id));
+  safeTimers.length = 0;
+}
+
+/* ---- Particles ---- */
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 40 + Math.random() * 80;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 30,
+      life: 0.4 + Math.random() * 0.4,
+      maxLife: 0.4 + Math.random() * 0.4,
+      r: 2 + Math.random() * 3,
+      color
+    });
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 200 * dt;
+    p.life -= dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const alpha = Math.max(0, p.life / p.maxLife);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * alpha, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---- Score Popups ---- */
+function spawnScorePopup(x, y, text, color) {
+  scorePopups.push({ x, y, text, color, life: 1.0, maxLife: 1.0 });
+}
+
+function updatePopups(dt) {
+  for (let i = scorePopups.length - 1; i >= 0; i--) {
+    const p = scorePopups[i];
+    p.y -= 40 * dt;
+    p.life -= dt;
+    if (p.life <= 0) scorePopups.splice(i, 1);
+  }
+}
+
+function drawPopups() {
+  for (const p of scorePopups) {
+    const alpha = Math.max(0, p.life / p.maxLife);
+    const scale = 0.8 + 0.4 * (1 - alpha);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(p.x, p.y);
+    ctx.scale(scale, scale);
+    ctx.font = '700 18px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = p.color;
+    ctx.fillText(p.text, 0, 0);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---- Screen Shake ---- */
+function triggerShake(intensity, duration) {
+  shakeInt = intensity;
+  shakeDur = duration;
+}
+
+function updateShake(dt) {
+  if (shakeDur > 0) {
+    shakeDur -= dt;
+    shakeX = (Math.random() - 0.5) * shakeInt * 2;
+    shakeY = (Math.random() - 0.5) * shakeInt * 2;
+  } else {
+    shakeX = 0;
+    shakeY = 0;
+  }
+}
+
+/* ---- Resize ---- */
+function resize() {
+  const rect = container.getBoundingClientRect();
+  W = rect.width;
+  H = rect.height;
+  canvas.width = W;
+  canvas.height = H;
+  worldW = W / SCALE;
+  worldH = H / SCALE;
+}
+
+/* ---- Physics World Setup ---- */
+function createWorld() {
+  if (world) {
+    let b = world.getBodyList();
+    while (b) {
+      const next = b.getNext();
+      world.destroyBody(b);
+      b = next;
+    }
+  }
+
+  world = planck.World(GRAVITY);
+  balls = [];
+  pegs = [];
+  walls = [];
+  zones = [];
+
+  const leftWall = world.createBody({ type: 'static', position: planck.Vec2(-0.1, worldH / 2) });
+  leftWall.createFixture(planck.Box(0.1, worldH / 2), { friction: 0.3 });
+  walls.push(leftWall);
+
+  const rightWall = world.createBody({ type: 'static', position: planck.Vec2(worldW + 0.1, worldH / 2) });
+  rightWall.createFixture(planck.Box(0.1, worldH / 2), { friction: 0.3 });
+  walls.push(rightWall);
+
+  const bottomWall = world.createBody({ type: 'static', position: planck.Vec2(worldW / 2, worldH + 0.1) });
+  bottomWall.createFixture(planck.Box(worldW / 2, 0.1), { friction: 0.3 });
+  walls.push(bottomWall);
+
+  createPegs();
+  createZones();
+  setupContactListener();
+}
+
+function createPegs() {
+  const startY = 3.5;
+  const rows = 9;
+  const spacing = (worldW - 2) / 7;
+  const rowHeight = (worldH - startY - 4) / rows;
+
+  for (let row = 0; row < rows; row++) {
+    const cols = row % 2 === 0 ? 7 : 6;
+    const offsetX = row % 2 === 0 ? 1 : 1 + spacing / 2;
+    for (let col = 0; col < cols; col++) {
+      const x = offsetX + col * spacing;
+      const y = startY + row * rowHeight;
+      const peg = world.createBody({ type: 'static', position: planck.Vec2(x, y) });
+      peg.createFixture(planck.Circle(PEG_RADIUS), { restitution: PEG_RESTITUTION, friction: 0.1 });
+      pegs.push({ body: peg, x, y, hit: 0 });
+    }
+  }
+}
+
+function createZones() {
+  const zoneW = worldW / 5;
+  const zoneY = worldH - 1.2;
+  const dividerH = 1.5;
+
+  for (let i = 0; i <= 5; i++) {
+    const divX = i * zoneW;
+    const divider = world.createBody({ type: 'static', position: planck.Vec2(divX, zoneY) });
+    divider.createFixture(planck.Box(0.08, dividerH / 2), { friction: 0.3 });
+    walls.push(divider);
+  }
+
+  for (let i = 0; i < 5; i++) {
+    zones.push({
+      x: i * zoneW,
+      w: zoneW,
+      y: zoneY - dividerH / 2,
+      h: dividerH,
+      mult: ZONE_MULTIPLIERS[i],
+      flash: 0
+    });
+  }
+}
+
+function setupContactListener() {
+  world.on('begin-contact', function(contact) {
+    const fA = contact.getFixtureA();
+    const fB = contact.getFixtureB();
+    const bA = fA.getBody();
+    const bB = fB.getBody();
+
+    const ballA = balls.find(b => b.body === bA);
+    const ballB = balls.find(b => b.body === bB);
+    const ball = ballA || ballB;
+    const other = ballA ? bB : bA;
+
+    if (!ball) return;
+
+    const pegHit = pegs.find(p => p.body === other);
+    if (pegHit) {
+      pegHit.hit = 0.3;
+      sfxBounce();
+    }
+  });
+}
+
+/* ---- Drop Ball ---- */
+function dropBall(worldX) {
+  if (state !== State.PLAYING || ballsRemaining <= 0 || !canDrop) return;
+
+  ensureAudio();
+  const clampedX = Math.max(BALL_RADIUS + 0.2, Math.min(worldW - BALL_RADIUS - 0.2, worldX));
+  const ball = world.createDynamicBody({
+    position: planck.Vec2(clampedX, 1.5),
+    bullet: true
+  });
+  ball.createFixture(planck.Circle(BALL_RADIUS), {
+    density: BALL_DENSITY,
+    restitution: BALL_RESTITUTION,
+    friction: 0.1
+  });
+
+  const ballObj = { body: ball, scored: false, age: 0 };
+  balls.push(ballObj);
+  ballsRemaining--;
+  ballsDropped++;
+  canDrop = false;
+  dropCooldown = 0.4;
+
+  sfxDrop();
+  updateBallsDisplay();
+  spawnParticles(clampedX * SCALE, 1.5 * SCALE, '#FF8C00', 5);
+}
+
+/* ---- Check Scoring ---- */
+function checkScoring() {
+  for (const ball of balls) {
+    if (ball.scored) continue;
+    const pos = ball.body.getPosition();
+    const px = pos.x;
+    const py = pos.y;
+
+    if (py > worldH - 2.5) {
+      for (const zone of zones) {
+        const zoneCenter = zone.x + zone.w / 2;
+        const zoneWorldW = zone.w;
+        if (px > zone.x && px < zone.x + zoneWorldW && py > zone.y) {
+          ball.scored = true;
+          const points = zone.mult * 10;
+          score += points;
+          if (points > bestSingleBall) bestSingleBall = points;
+          zone.flash = 0.5;
+
+          const screenX = px * SCALE;
+          const screenY = py * SCALE;
+          spawnScorePopup(screenX, screenY - 20, '+' + points, zone.mult === 3 ? '#FFD700' : '#FF8C00');
+          spawnParticles(screenX, screenY, zone.mult === 3 ? '#FFD700' : '#FF8C00', zone.mult * 4);
+
+          sfxScore(zone.mult);
+          if (zone.mult === 3) triggerShake(3, 0.2);
+
+          $('score-value').textContent = score;
+          break;
+        }
+      }
+    }
+  }
+}
+
+/* ---- Clean Up Balls ---- */
+function cleanBalls() {
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const ball = balls[i];
+    ball.age += 1 / 60;
+    const pos = ball.body.getPosition();
+    if (ball.scored && ball.age > 2) {
+      world.destroyBody(ball.body);
+      balls.splice(i, 1);
+    } else if (pos.y > worldH + 2) {
+      if (!ball.scored) {
+        ball.scored = true;
+      }
+      world.destroyBody(ball.body);
+      balls.splice(i, 1);
+    }
+  }
+}
+
+/* ---- Check Game Over ---- */
+function checkGameOver() {
+  if (ballsRemaining <= 0 && balls.every(b => b.scored) && balls.length === 0) {
+    safeTimeout(() => {
+      if (state === State.PLAYING) endGame();
+    }, 500);
+  }
+}
+
+/* ---- Update Balls Display ---- */
+function updateBallsDisplay() {
+  const el = $('balls-display');
+  let html = '';
+  for (let i = 0; i < TOTAL_BALLS; i++) {
+    html += '<div class="ball-dot' + (i < ballsRemaining ? ' remaining' : '') + '"></div>';
+  }
+  el.innerHTML = html;
+}
+
+/* ---- Screen Management ---- */
+function showScreen(name) {
+  const screens = ['screen-menu', 'screen-game', 'screen-pause', 'screen-gameover', 'screen-tutorial'];
+  screens.forEach(s => {
+    const el = $(s);
+    el.classList.toggle('active', s === name);
+  });
+}
+
+function setState(s) {
+  state = s;
+  if (s === State.MENU) showScreen('screen-menu');
+  else if (s === State.PLAYING) showScreen('screen-game');
+  else if (s === State.PAUSED) showScreen('screen-pause');
+  else if (s === State.GAMEOVER) showScreen('screen-gameover');
+  else if (s === State.TUTORIAL) showScreen('screen-tutorial');
+}
+
+/* ---- Game Flow ---- */
+function startGame() {
+  ensureAudio();
+  score = 0;
+  ballsRemaining = TOTAL_BALLS;
+  ballsDropped = 0;
+  bestSingleBall = 0;
+  canDrop = true;
+  dropCooldown = 0;
+  particles = [];
+  scorePopups = [];
+
+  $('score-value').textContent = '0';
+  $('high-score-value').textContent = highScore;
+  updateBallsDisplay();
+
+  resize();
+  createWorld();
+  setState(State.PLAYING);
+
+  lastTime = performance.now();
+  if (animId) cancelAnimationFrame(animId);
+  loop(lastTime);
+}
+
+function endGame() {
+  sfxGameOver();
+  const isNew = score > highScore;
+  if (isNew) {
+    highScore = score;
+    try { localStorage.setItem('balldrop_hs', String(highScore)); } catch (_) {}
+    sfxHighScore();
+  }
+
+  $('final-score').textContent = score;
+  $('gameover-highscore').textContent = 'Best: ' + highScore;
+  $('new-highscore').style.display = isNew ? 'block' : 'none';
+
+  const stars = score >= STAR_THRESHOLDS[1] ? 3 : score >= STAR_THRESHOLDS[0] ? 2 : 1;
+  $('star-1').classList.toggle('earned', stars >= 1);
+  $('star-2').classList.toggle('earned', stars >= 2);
+  $('star-3').classList.toggle('earned', stars >= 3);
+
+  setState(State.GAMEOVER);
+}
+
+function pauseGame() {
+  if (state !== State.PLAYING) return;
+  setState(State.PAUSED);
+}
+
+function resumeGame() {
+  if (state !== State.PAUSED) return;
+  setState(State.PLAYING);
+  lastTime = performance.now();
+  loop(lastTime);
+}
+
+function goMenu() {
+  clearAllTimers();
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  setState(State.MENU);
+}
+
+/* ---- Game Loop ---- */
+function loop(now) {
+  if (state !== State.PLAYING) { animId = null; return; }
+  animId = requestAnimationFrame(loop);
+
+  let dt = (now - lastTime) / 1000;
+  lastTime = now;
+  if (dt > 0.05) dt = 0.05;
+
+  if (dropCooldown > 0) {
+    dropCooldown -= dt;
+    if (dropCooldown <= 0) canDrop = true;
+  }
+
+  world.step(1 / 60, 8, 3);
+  checkScoring();
+  cleanBalls();
+  checkGameOver();
+
+  for (const peg of pegs) {
+    if (peg.hit > 0) peg.hit -= dt;
+  }
+  for (const zone of zones) {
+    if (zone.flash > 0) zone.flash -= dt;
+  }
+
+  updateParticles(dt);
+  updatePopups(dt);
+  updateShake(dt);
+
+  draw();
+}
+
+/* ---- Drawing ---- */
+function draw() {
+  ctx.save();
+  ctx.clearRect(0, 0, W, H);
+  ctx.translate(shakeX, shakeY);
+
+  drawBackground();
+  drawZones();
+  drawPegs();
+  drawBalls();
+  drawParticles();
+  drawPopups();
+  drawDropGuide();
+
+  ctx.restore();
+}
+
+function drawBackground() {
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#0a0a1a');
+  grad.addColorStop(0.5, '#1a1030');
+  grad.addColorStop(1, '#0a0a1a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(-10, -10, W + 20, H + 20);
+}
+
+function drawZones() {
+  for (let i = 0; i < zones.length; i++) {
+    const z = zones[i];
+    const x = z.x * SCALE;
+    const y = z.y * SCALE;
+    const w = z.w * SCALE;
+    const h = z.h * SCALE;
+
+    const colors = ['#333850', '#555a20', '#886600', '#555a20', '#333850'];
+    const flashAlpha = z.flash > 0 ? z.flash * 0.6 : 0;
+
+    ctx.fillStyle = colors[i];
+    ctx.globalAlpha = 0.5 + flashAlpha;
+    ctx.fillRect(x + 1, y, w - 2, h);
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = z.mult === 3 ? '#FFD700' : '#FF8C00';
+    ctx.font = '700 14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(z.mult + 'x', x + w / 2, y + h / 2);
+  }
+
+  for (let i = 0; i <= 5; i++) {
+    const x = (i * worldW / 5) * SCALE;
+    const y = (zones[0] ? zones[0].y : worldH - 2) * SCALE;
+    ctx.strokeStyle = '#FF8C00';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x, y + zones[0].h * SCALE);
+    ctx.stroke();
+  }
+}
+
+function drawPegs() {
+  for (const peg of pegs) {
+    const x = peg.x * SCALE;
+    const y = peg.y * SCALE;
+    const r = PEG_RADIUS * SCALE;
+    const extra = peg.hit > 0 ? peg.hit * 8 : 0;
+
+    ctx.beginPath();
+    ctx.arc(x, y, r + extra, 0, Math.PI * 2);
+    ctx.fillStyle = peg.hit > 0 ? '#FFD700' : '#8888aa';
+    ctx.fill();
+
+    if (peg.hit > 0) {
+      ctx.beginPath();
+      ctx.arc(x, y, r + extra + 3, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,215,0,' + (peg.hit * 2) + ')';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+}
+
+function drawBalls() {
+  for (const ball of balls) {
+    const pos = ball.body.getPosition();
+    const x = pos.x * SCALE;
+    const y = pos.y * SCALE;
+    const r = BALL_RADIUS * SCALE;
+
+    const grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+    grad.addColorStop(0, '#FFD700');
+    grad.addColorStop(0.6, '#FF8C00');
+    grad.addColorStop(1, '#cc6600');
+
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(x - r * 0.25, y - r * 0.25, r * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fill();
+  }
+}
+
+function drawDropGuide() {
+  if (ballsRemaining <= 0) return;
+  const topY = 1.5 * SCALE;
+  ctx.setLineDash([4, 6]);
+  ctx.strokeStyle = 'rgba(255,140,0,0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, topY);
+  ctx.lineTo(W, topY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+/* ---- Input ---- */
+function handleInput(clientX, clientY) {
+  if (state !== State.PLAYING) return;
+  ensureAudio();
+  const rect = canvas.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+
+  if (y < H * 0.25) {
+    const worldX = x / SCALE;
+    dropBall(worldX);
+  }
+}
+
+canvas.addEventListener('touchstart', function(e) {
+  e.preventDefault();
+  const t = e.touches[0];
+  handleInput(t.clientX, t.clientY);
+}, { passive: false });
+
+canvas.addEventListener('mousedown', function(e) {
+  handleInput(e.clientX, e.clientY);
+});
+
+/* ---- Buttons ---- */
+$('btn-play').addEventListener('click', function() {
+  ensureAudio();
+  if (!tutorialSeen) {
+    tutorialSeen = true;
+    try { localStorage.setItem('balldrop_tut', '1'); } catch (_) {}
+    setState(State.TUTORIAL);
+  } else {
+    startGame();
+  }
+});
+
+$('btn-howtoplay').addEventListener('click', function() {
+  ensureAudio();
+  setState(State.TUTORIAL);
+});
+
+$('btn-tutorial-ok').addEventListener('click', function() {
+  startGame();
+});
+
+$('btn-pause').addEventListener('click', function(e) {
+  e.stopPropagation();
+  pauseGame();
+});
+
+$('btn-resume').addEventListener('click', function() {
+  resumeGame();
+});
+
+$('btn-restart').addEventListener('click', function() {
+  startGame();
+});
+
+$('btn-menu').addEventListener('click', function() {
+  goMenu();
+});
+
+$('btn-gameover-restart').addEventListener('click', function() {
+  startGame();
+});
+
+$('btn-gameover-menu').addEventListener('click', function() {
+  goMenu();
+});
+
+$('btn-sound').addEventListener('click', function(e) {
+  e.stopPropagation();
+  ensureAudio();
+  soundOn = !soundOn;
+  $('btn-sound').textContent = soundOn ? 'S' : 'X';
+});
+
+/* ---- Init ---- */
+function init() {
+  try {
+    const hs = localStorage.getItem('balldrop_hs');
+    if (hs) highScore = parseInt(hs, 10) || 0;
+    tutorialSeen = localStorage.getItem('balldrop_tut') === '1';
+  } catch (_) {}
+
+  resize();
+  window.addEventListener('resize', resize);
+
+  setState(State.MENU);
+}
+
+init();
+
+})();
+</script>
+</body>
+</html>

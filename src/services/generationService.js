@@ -210,7 +210,52 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
       assertProviderAvailable('plan');
       assertProviderAvailable('code');
 
-      if (shouldUseAdvancedPipeline(mode, complexity)) {
+      // ── Template-based pipeline (primary path for 2D games) ─────────────────
+      // Uses pre-built tested templates + step-by-step AI customization.
+      // Only falls through to legacy/advanced pipelines for 3D mode.
+      if (mode !== '3d') {
+        const { buildGame } = require('../pipeline/gameBuilder');
+        logger.info(`[GEN] provider_request_started pipeline=template job=${jobId}`);
+        await log('Selecting game template...');
+        await setJobStage(jobId, 'planning');
+
+        const codingStart   = Date.now();
+        const stopHeartbeat = startHeartbeat(log, codingStart, 20_000);
+
+        let buildResult;
+        try {
+          buildResult = await buildGame(userPrompt, {
+            costTracker: cost,
+            onProgress: async ({ step, message }) => {
+              await log(message);
+              await checkpoint(`template step ${step}`);
+              try { await updateJob(jobId, { progress: { step, message } }); } catch (_) {}
+            },
+          });
+        } finally {
+          stopHeartbeat();
+        }
+
+        await completeJobStage(jobId, 'planning');
+        await updateJob(jobId, { plan: { _source: 'template', template: buildResult.classification.template } });
+        await setJobStage(jobId, 'coding');
+        await completeJobStage(jobId, 'coding');
+
+        const slug = slugify(buildResult.classification.title || userPrompt);
+
+        codeOutput = {
+          projectName: slug,
+          files: [{ path: 'index.html', content: buildResult.html }],
+          _template: true,
+          _templatePipeline: true,
+          _classification: buildResult.classification,
+          _steps: buildResult.steps,
+        };
+
+        logger.info(`[GEN] provider_response_received pipeline=template template=${buildResult.classification.template} steps=[${buildResult.steps.join(',')}] job=${jobId}`);
+        await log(`Template pipeline complete — ${buildResult.classification.template} game "${buildResult.classification.title}"`);
+
+      } else if (shouldUseAdvancedPipeline(mode, complexity)) {
         // ── Advanced 7-stage pipeline (medium/complex + balanced/quality) ───────
         logger.info(`[GEN] provider_request_started pipeline=advanced job=${jobId}`);
 
