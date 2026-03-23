@@ -81,7 +81,8 @@ async function selectTemplate(userPrompt) {
       maxTokens: 300,
     });
 
-    const parsed = safeJsonParse(raw);
+    const parseResult = safeJsonParse(raw);
+    const parsed = parseResult.success ? parseResult.data : null;
     if (!parsed || typeof parsed !== 'object') {
       logger.warn('[templateSelector] failed to parse classification, using fallback');
       return fallback;
