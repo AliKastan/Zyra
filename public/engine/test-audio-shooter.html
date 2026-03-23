@@ -1,3 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>SPACE BLAST</title>
+</head>
+<body>
+<script>
 /**
  * Zyra Game Engine v1.0
  * A complete, config-driven 2D game engine.
@@ -3520,3 +3529,10 @@
   window.ZyraEngine = ZyraEngine;
   window.ZyraAudio = ZyraAudio;
 })();
+
+</script>
+<script>
+ZyraEngine.init({"id":"shooter-game","type":"shooter","title":"SPACE BLAST","subtitle":"Defend the galaxy","tutorial":"Drag to move your ship<br>Auto-fires at enemies<br>Collect power-ups","theme":{"primary":"#00D4FF","secondary":"#7B2FFF","background":"#0A0A2E","backgroundAlt":"#0F0F3A"},"settings":{"lives":3,"playerWidth":36,"playerHeight":36,"playerColor":"#00D4FF","fireRate":400,"projectileSpeed":10,"projectileColor":"#FFD700"},"entityTypes":{"basic":{"width":30,"height":30,"color":"#FF6B6B","health":1,"speed":2,"points":10,"shape":"rect"},"fast":{"width":24,"height":24,"color":"#FBBF24","health":1,"speed":4,"points":20,"shape":"circle"},"tank":{"width":40,"height":40,"color":"#A78BFA","health":3,"speed":1.2,"points":50,"shape":"rect"},"shooter":{"width":34,"height":34,"color":"#FF4757","health":2,"speed":1.5,"points":30,"shape":"rect","shoots":true,"fireRate":2000}},"powerUps":{"rapid":{"color":"#FFD700","icon":"R","duration":5},"shield":{"color":"#00D4FF","icon":"S","duration":8},"spread":{"color":"#FF6B6B","icon":"X","duration":5},"extra_life":{"color":"#34D399","icon":"+","duration":0}},"levels":[{"name":"Patrol","subtitle":"Easy targets","objective":{"type":"score","target":100},"spawnRate":2000,"spawnTypes":["basic"],"maxEnemies":4,"speedMultiplier":1,"powerUpChance":0.1,"background":"#0A0A2E"},{"name":"Skirmish","subtitle":"Faster enemies","objective":{"type":"score","target":250},"spawnRate":1500,"spawnTypes":["basic","fast"],"maxEnemies":6,"speedMultiplier":1.3,"powerUpChance":0.12,"background":"#0A0A2E"},{"name":"Heavy Fire","subtitle":"Armored foes","objective":{"type":"destroy","target":20},"spawnRate":1200,"spawnTypes":["basic","fast","tank"],"maxEnemies":7,"speedMultiplier":1.5,"powerUpChance":0.15,"newMechanic":"tank_enemies","background":"#0A0A2E"},{"name":"Crossfire","subtitle":"They shoot back","objective":{"type":"score","target":500},"timeLimit":60,"spawnRate":1000,"spawnTypes":["basic","fast","tank","shooter"],"maxEnemies":8,"speedMultiplier":1.7,"powerUpChance":0.2,"newMechanic":"shooting_enemies","background":"#0A0A2E"},{"name":"MOTHERSHIP","subtitle":"Final battle","objective":{"type":"destroy","target":1},"timeLimit":90,"spawnRate":1500,"spawnTypes":["basic","fast"],"maxEnemies":4,"speedMultiplier":2,"powerUpChance":0.25,"boss":{"name":"MOTHERSHIP","width":100,"height":60,"color":"#FF4757","health":15,"patterns":["spread_shot","charge","spawn_minions"],"patternDuration":3,"pauseDuration":1.5},"newMechanic":"boss","background":"#0A0A2E"}]});
+</script>
+</body>
+</html>
