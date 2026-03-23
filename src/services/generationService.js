@@ -210,14 +210,13 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
       assertProviderAvailable('plan');
       assertProviderAvailable('code');
 
-      // ── Engine-based pipeline (primary path for 2D games) ──────────────────
-      // Uses pre-built Zyra Engine + JSON config from Claude.
-      // AI outputs simple JSON config, engine does all rendering/logic.
+      // ── Template-based pipeline (primary path for 2D games) ─────────────────
+      // Uses pre-built tested templates + step-by-step AI customization.
       // Only falls through to legacy/advanced pipelines for 3D mode.
       if (mode !== '3d') {
-        const { buildGame } = require('../pipeline/engineBuilder');
-        logger.info(`[GEN] provider_request_started pipeline=engine job=${jobId}`);
-        await log('Designing game configuration...');
+        const { buildGame } = require('../pipeline/gameBuilder');
+        logger.info(`[GEN] provider_request_started pipeline=template job=${jobId}`);
+        await log('Selecting game template...');
         await setJobStage(jobId, 'planning');
 
         const codingStart   = Date.now();
@@ -238,7 +237,7 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
         }
 
         await completeJobStage(jobId, 'planning');
-        await updateJob(jobId, { plan: { _source: 'engine', template: buildResult.classification.template } });
+        await updateJob(jobId, { plan: { _source: 'template', template: buildResult.classification.template } });
         await setJobStage(jobId, 'coding');
         await completeJobStage(jobId, 'coding');
 
@@ -253,8 +252,8 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
           _steps: buildResult.steps,
         };
 
-        logger.info(`[GEN] provider_response_received pipeline=engine type=${buildResult.classification.template} steps=[${buildResult.steps.join(',')}] job=${jobId}`);
-        await log(`Engine pipeline complete — ${buildResult.classification.template} game "${buildResult.classification.title}"`);
+        logger.info(`[GEN] provider_response_received pipeline=template template=${buildResult.classification.template} steps=[${buildResult.steps.join(',')}] job=${jobId}`);
+        await log(`Template pipeline complete — ${buildResult.classification.template} game "${buildResult.classification.title}"`);
 
       } else if (shouldUseAdvancedPipeline(mode, complexity)) {
         // ── Advanced 7-stage pipeline (medium/complex + balanced/quality) ───────
@@ -409,18 +408,14 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
     const rawSlug     = codeOutput.projectName || slugify(userPrompt);
     const projectSlug = slugify(rawSlug) || `project-${jobId.slice(0, 8)}`;
 
-    // Skip injections for engine-built games — the engine handles everything internally.
-    // These injections are only needed for AI-generated code.
-    if (!codeOutput._templatePipeline) {
-      // Inject viewport normalize into all HTML files (must be first — before app styles)
-      codeOutput = { ...codeOutput, files: injectViewportNormalize(codeOutput.files) };
+    // Inject viewport normalize into all HTML files (must be first — before app styles)
+    codeOutput = { ...codeOutput, files: injectViewportNormalize(codeOutput.files) };
 
-      // Inject runtime error catcher into all HTML files
-      codeOutput = { ...codeOutput, files: injectRuntimeErrorCatcher(codeOutput.files) };
+    // Inject runtime error catcher into all HTML files
+    codeOutput = { ...codeOutput, files: injectRuntimeErrorCatcher(codeOutput.files) };
 
-      // Inject visual edit bridge so the studio can enable Figma-style element editing
-      codeOutput = { ...codeOutput, files: injectVisualEditBridge(codeOutput.files) };
-    }
+    // Inject visual edit bridge so the studio can enable Figma-style element editing
+    codeOutput = { ...codeOutput, files: injectVisualEditBridge(codeOutput.files) };
 
     // ── Writing files ─────────────────────────────────────────────────────────
     await checkpoint('before writing files');
@@ -442,27 +437,26 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
       .catch(e => logger.error(`[job:${jobId}] CRITICAL: storeProjectFiles failed — project "${projectSlug}" has no backup: ${e.message}`));
 
     // ── Post-generation auto-debug (non-blocking, non-fatal) ─────────────────
-    // Skip for engine-built games — the engine is pre-tested, no AI code to debug.
-    if (!codeOutput._templatePipeline) {
-      try {
-        const { validateGeneratedCode } = require('../utils/codeValidator');
-        const staticErrors = validateGeneratedCode(codeOutput.files || []);
-        const criticalErrors = staticErrors.filter(e => e.type === 'syntax' || e.type === 'error');
-        if (criticalErrors.length > 0) {
-          logger.info(`[job:${jobId}] post-gen static check: ${criticalErrors.length} issue(s) — starting auto-fix`);
-          const { startDebug } = require('./debugService');
-          const errorSignals = criticalErrors.slice(0, 10).map(e => ({
-            message: e.message,
-            source:  e.file,
-            level:   'error',
-          }));
-          startDebug(projectSlug, { consoleErrors: errorSignals, previewState: 'post_gen', trigger: 'post_gen' }, 'fast', { autoApply: true })
-            .then(debugJobId => logger.info(`[job:${jobId}] post-gen auto-fix job: ${debugJobId}`))
-            .catch(e => logger.warn(`[job:${jobId}] post-gen auto-fix start failed (non-fatal): ${e.message}`));
-        }
-      } catch (postDebugErr) {
-        logger.warn(`[job:${jobId}] post-gen debug check failed (non-fatal): ${postDebugErr.message}`);
+    // Runs a quick static check on the written files; if significant issues are
+    // found, fires an auto-fix job so the preview loads cleanly.
+    try {
+      const { validateGeneratedCode } = require('../utils/codeValidator');
+      const staticErrors = validateGeneratedCode(codeOutput.files || []);
+      const criticalErrors = staticErrors.filter(e => e.type === 'syntax' || e.type === 'error');
+      if (criticalErrors.length > 0) {
+        logger.info(`[job:${jobId}] post-gen static check: ${criticalErrors.length} issue(s) — starting auto-fix`);
+        const { startDebug } = require('./debugService');
+        const errorSignals = criticalErrors.slice(0, 10).map(e => ({
+          message: e.message,
+          source:  e.file,
+          level:   'error',
+        }));
+        startDebug(projectSlug, { consoleErrors: errorSignals, previewState: 'post_gen', trigger: 'post_gen' }, 'fast', { autoApply: true })
+          .then(debugJobId => logger.info(`[job:${jobId}] post-gen auto-fix job: ${debugJobId}`))
+          .catch(e => logger.warn(`[job:${jobId}] post-gen auto-fix start failed (non-fatal): ${e.message}`));
       }
+    } catch (postDebugErr) {
+      logger.warn(`[job:${jobId}] post-gen debug check failed (non-fatal): ${postDebugErr.message}`);
     }
 
     // ── Reviewing ─────────────────────────────────────────────────────────────

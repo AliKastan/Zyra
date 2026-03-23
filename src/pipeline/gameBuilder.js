@@ -54,16 +54,31 @@ function extractHtml(raw) {
  * Ask Claude to modify existing code. Returns the modified HTML.
  */
 async function modifyCode(currentCode, instruction, costTracker) {
-  const system = `You are modifying an existing working HTML5 mobile game. You will receive the COMPLETE current code and a specific modification request.
+  const system = `You are modifying an existing working HTML5 mobile game for a 375x812 mobile screen with touch controls.
 
 RULES:
 - Apply ONLY the requested changes
 - Do NOT rewrite the game from scratch
 - Do NOT remove any existing screens, buttons, state machine, audio system, particle system, or touch handling
-- Return ONLY the complete modified HTML code
-- No explanations, no markdown backticks, just the raw HTML starting with <!DOCTYPE html>
-- The output must be a single valid HTML file
-- Preserve ALL element IDs (screen-menu, btn-play, score-value, etc.)`;
+- Return ONLY the complete modified HTML code — no explanations, no markdown backticks, just raw HTML starting with <!DOCTYPE html>
+- The output must be a single valid HTML file with inline <style> and <script>
+- Preserve ALL element IDs (screen-menu, btn-play, score-value, etc.)
+- Use canvas for ALL game rendering (not DOM elements for game objects)
+- All game objects drawn with ctx.fillRect, ctx.arc, ctx.fillText etc.
+- NEVER use external images, fonts, or sound files — draw everything with canvas shapes and use emoji for icons
+- ALWAYS preventDefault on touch events
+- ALWAYS cancel requestAnimationFrame when game is not playing
+- ALWAYS provide mouse fallback for touch events
+
+GOOD GAME FEEL:
+- Smooth 60fps animation
+- Particles on score events (small colored circles that float up and fade)
+- Score popup text that floats up when you earn points
+- Screen shake on big hits (shift canvas position briefly)
+- Sound effects: tap (high beep), score (rising tone), hit (low thud), game over (descending tone)
+- Bright colors on dark background
+- Difficulty increases every 15 seconds (things get faster or more numerous)
+- Test your code mentally before outputting — would clicking Play actually start the game? Would the game loop actually run? Would game over actually trigger?`;
 
   const user = `CURRENT WORKING CODE:\n${currentCode}\n\nMODIFICATION REQUEST:\n${instruction}`;
 
@@ -87,11 +102,12 @@ async function fixCode(brokenCode, testResult, fallbackCode, costTracker) {
     .map((e, i) => `${i + 1}. [${e.check}] ${e.message}`)
     .join('\n');
 
-  const system = `You are a game bug fixer. Fix EVERY error listed. Return ONLY the complete fixed HTML. No explanations.
+  const system = `You are a game bug fixer. Fix EVERY error listed. Return ONLY the complete fixed HTML starting with <!DOCTYPE html>. No explanations, no markdown.
 
 RULES:
 - Fix the root cause, not symptoms
 - Do NOT remove features to fix bugs
+- Use canvas for rendering, not DOM elements for game objects
 - Do NOT rewrite from scratch
 - Keep all screens, buttons, and UI
 - If an element ID is missing, add the element
