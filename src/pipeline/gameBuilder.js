@@ -157,13 +157,15 @@ async function buildGame(userPrompt, options = {}) {
   const cost = externalCost || createCostTracker();
   const completedSteps = [];
 
-  function progress(step, message) {
+  async function progress(step, message) {
     logger.info(`[gameBuilder] step=${step} — ${message}`);
-    if (onProgress) onProgress({ step, message });
+    if (onProgress) {
+      try { await onProgress({ step, message }); } catch (_) {}
+    }
   }
 
   // ── STEP 1: Select template ─────────────────────────────────────────────────
-  progress(0, 'Choosing game type...');
+  await progress(0, 'Choosing game type...');
   const classification = await selectTemplate(userPrompt);
   logger.info(`[gameBuilder] classified as "${classification.template}" — "${classification.title}"`);
 
@@ -277,7 +279,7 @@ Return the COMPLETE modified HTML.`,
   ];
 
   for (const step of steps) {
-    progress(step.step, step.message);
+    await progress(step.step, step.message);
 
     try {
       const modified = await modifyCode(currentCode, step.prompt, cost);
@@ -312,7 +314,7 @@ Return the COMPLETE modified HTML.`,
   }
 
   // ── STEP 5: Final validation ────────────────────────────────────────────────
-  progress(5, 'Final checks...');
+  await progress(5, 'Final checks...');
   const finalTest = testCodeStatic(currentCode);
 
   if (!finalTest.pass) {

@@ -52,8 +52,7 @@ process.on('SIGINT', () => {
 });
 
 process.on('uncaughtException', (err) => {
-  logger.error('Uncaught exception', { error: err.message, stack: err.stack });
-  process.exit(1);
+  logger.error('Uncaught exception (kept alive)', { error: err.message, stack: err.stack });
 });
 
 process.on('unhandledRejection', (reason) => {
