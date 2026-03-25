@@ -41,13 +41,78 @@ async function loadTemplate(templateName) {
  */
 function extractHtml(raw) {
   if (!raw) return '';
-  // Strip markdown fences
-  const fenced = raw.match(/```(?:html)?\s*([\s\S]*?)```/);
-  if (fenced) return fenced[1].trim();
-  // If starts with <!DOCTYPE or <html, it's already clean
-  const trimmed = raw.trim();
-  if (trimmed.startsWith('<!') || trimmed.startsWith('<html')) return trimmed;
-  return trimmed;
+
+  let html = raw.trim();
+
+  // Strip markdown fences — use greedy match to grab the LAST closing ```
+  const fenced = html.match(/```(?:html)?\s*([\s\S]*)```\s*$/);
+  if (fenced) {
+    html = fenced[1].trim();
+  } else {
+    // Strip leading explanation text before the actual HTML
+    const htmlStart = html.search(/<!DOCTYPE\s|<html/i);
+    if (htmlStart > 0) html = html.slice(htmlStart);
+    // Strip trailing text/fences after </html>
+    const htmlEnd = html.lastIndexOf('</html>');
+    if (htmlEnd !== -1) html = html.slice(0, htmlEnd + '</html>'.length);
+  }
+
+  return repairTruncatedHtml(html);
+}
+
+/**
+ * Repair HTML that was truncated mid-output (e.g. unclosed script/style tags).
+ * This is a deterministic fix — no API call needed.
+ */
+function repairTruncatedHtml(html) {
+  if (!html) return html;
+
+  // Count open vs close for critical tags
+  const tags = ['script', 'style'];
+  for (const tag of tags) {
+    const opens  = (html.match(new RegExp(`<${tag}[\\s>]`, 'gi')) || []).length;
+    const closes = (html.match(new RegExp(`</${tag}>`, 'gi')) || []).length;
+    if (opens > closes) {
+      // Truncated inside a tag — close it
+      // Remove any partial/broken code at the end (after last complete statement)
+      const lastCloseIdx = html.lastIndexOf(`</${tag}>`);
+      const lastOpenIdx  = html.lastIndexOf(`<${tag}`);
+      if (lastOpenIdx > lastCloseIdx) {
+        // The last opened tag is unclosed — try to close it cleanly
+        // Find a safe cut point: last semicolon or closing brace inside the tag
+        const afterOpen = html.slice(lastOpenIdx);
+        const tagBodyStart = afterOpen.indexOf('>');
+        if (tagBodyStart !== -1) {
+          const bodyStart = lastOpenIdx + tagBodyStart + 1;
+          const body = html.slice(bodyStart);
+          // Find last safe cut point (semicolon, closing brace, or newline after a statement)
+          const safeCut = Math.max(
+            body.lastIndexOf(';\n'),
+            body.lastIndexOf('}\n'),
+            body.lastIndexOf(';')
+          );
+          if (safeCut > 0) {
+            html = html.slice(0, bodyStart + safeCut + 1) + `\n</${tag}>` + (html.slice(bodyStart + body.length) || '');
+          } else {
+            html += `\n</${tag}>`;
+          }
+        } else {
+          html += `>`;
+          html += `\n</${tag}>`;
+        }
+      }
+    }
+  }
+
+  // Ensure closing </body> and </html> exist
+  if (/<body/i.test(html) && !/<\/body>/i.test(html)) {
+    html += '\n</body>';
+  }
+  if (/<html/i.test(html) && !/<\/html>/i.test(html)) {
+    html += '\n</html>';
+  }
+
+  return html;
 }
 
 /**
