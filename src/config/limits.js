@@ -15,8 +15,8 @@ module.exports = {
   MEDIUM_MAX_FILES:         parseInt(process.env.MEDIUM_MAX_FILES         || '14',      10),
 
   // ── Global job timeout ───────────────────────────────────────────────────────
-  // Advanced pipeline: 5 Sonnet planning calls + 2 Sonnet streaming passes + repair = ~15-20 min
-  MAX_JOB_DURATION_MS: parseInt(process.env.MAX_JOB_DURATION_MS || '1800000', 10), // 30 min ceiling
+  // Template pipeline: 1 Haiku classify + 3 Haiku modify + fix passes = ~2-5 min
+  MAX_JOB_DURATION_MS: parseInt(process.env.MAX_JOB_DURATION_MS || '600000', 10), // 10 min ceiling
 
   // ── Planner timeouts ─────────────────────────────────────────────────────────
   SIMPLE_PLANNER_TIMEOUT_MS:   parseInt(process.env.SIMPLE_PLANNER_TIMEOUT_MS   || '5000',  10),
@@ -24,7 +24,7 @@ module.exports = {
   QUALITY_PLANNER_TIMEOUT_MS:  parseInt(process.env.QUALITY_PLANNER_TIMEOUT_MS  || '35000', 10),
 
   // ── Stage timeouts ───────────────────────────────────────────────────────────
-  CODER_TIMEOUT_MS:    parseInt(process.env.CODER_TIMEOUT_MS    || '600000', 10), // 10 min for large multi-file outputs
+  CODER_TIMEOUT_MS:    parseInt(process.env.CODER_TIMEOUT_MS    || '180000', 10), // 3 min — Haiku is much faster
   REVIEW_TIMEOUT_MS:   parseInt(process.env.REVIEW_TIMEOUT_MS   || '90000',  10),
   FINALIZE_TIMEOUT_MS: parseInt(process.env.FINALIZE_TIMEOUT_MS || '60000',  10),
 

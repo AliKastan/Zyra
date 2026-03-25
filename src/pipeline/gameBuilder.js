@@ -12,7 +12,7 @@
 
 const path = require('path');
 const fse = require('fs-extra');
-const { callClaude, SONNET_MODEL } = require('../providers/anthropicProvider');
+const { callClaude, HAIKU_MODEL } = require('../providers/anthropicProvider');
 const { selectTemplate } = require('./templateSelector');
 const { testCodeStatic } = require('./testEngine');
 const { createCostTracker } = require('../utils/costTracker');
@@ -53,7 +53,7 @@ function extractHtml(raw) {
 /**
  * Ask Claude to modify existing code. Returns the modified HTML.
  */
-async function modifyCode(currentCode, instruction, costTracker) {
+async function modifyCode(currentCode, instruction, costTracker, { model = HAIKU_MODEL, maxTokens = 12000 } = {}) {
   const system = `You are modifying an existing working HTML5 mobile game for a 375x812 mobile screen with touch controls.
 
 RULES:
@@ -83,8 +83,8 @@ GOOD GAME FEEL:
   const user = `CURRENT WORKING CODE:\n${currentCode}\n\nMODIFICATION REQUEST:\n${instruction}`;
 
   const raw = await callClaude(system, user, {
-    model: SONNET_MODEL,
-    maxTokens: 16000,
+    model,
+    maxTokens,
   });
 
   if (costTracker) {
@@ -118,8 +118,8 @@ RULES:
 
   try {
     const raw = await callClaude(system, user, {
-      model: SONNET_MODEL,
-      maxTokens: 16000,
+      model: HAIKU_MODEL,
+      maxTokens: 12000,
     });
 
     if (costTracker) {
@@ -186,6 +186,7 @@ async function buildGame(userPrompt, options = {}) {
       name: 'Theme & Visuals',
       step: 1,
       message: 'Designing the look...',
+      maxTokens: 8000,
       prompt: `Modify this working game's visual theme. Change:
 - Game title to "${classification.title}"
 - Primary accent color to ${classification.primaryColor}
@@ -195,6 +196,8 @@ async function buildGame(userPrompt, options = {}) {
 - Update the tutorial text to match the new game concept
 - Update any CSS color variables to match the new theme
 - Update the <title> tag to "${classification.title}"
+- Ensure text is readable against all backgrounds
+- Ensure colors look good together
 
 DO NOT change any game logic, state machine, audio system, or touch handling.
 ONLY change: title text, colors, subtitle, tutorial text, CSS color values, and <title>.
@@ -205,6 +208,7 @@ Return the COMPLETE modified HTML.`,
       name: 'Game Mechanics',
       step: 2,
       message: 'Building gameplay...',
+      maxTokens: 14000,
       prompt: `Now modify the game mechanics to match this description: "${userPrompt}"
 
 The current code is a working ${classification.template} game. Modify the game-specific functions to match what the user wants:
@@ -225,6 +229,8 @@ RULES:
 5. Make sure the game accurately represents what the user described
 6. Keep all button wiring (btn-play, btn-pause, etc.) and screen transitions working
 7. ${classification.template === 'physics' || classification.template === 'platformer' ? 'Use planck.js for physics (it is pre-loaded as global `planck`). SCALE=30, create boundary walls, use setUserData.' : 'Do not add physics unless the game concept requires it.'}
+8. Ensure every interaction has visual + audio feedback (particles + sound on score, hit feedback, etc.)
+9. Add null checks for edge cases (score=0, no game objects, game just started)
 
 Return the COMPLETE modified HTML.`,
     },
@@ -232,6 +238,7 @@ Return the COMPLETE modified HTML.`,
       name: 'Level Design',
       step: 3,
       message: 'Designing levels...',
+      maxTokens: 14000,
       prompt: `Now customize the 5 level configurations for this specific game: "${userPrompt}"
 
 The game has a level system with a levelConfigs array of 5 levels. Each level has: name, subtitle, objective, objectiveType, objectiveTarget, timeLimit, background color, and settings (spawnRate, enemySpeed, maxEnemies, etc.).
@@ -244,6 +251,8 @@ Customize the levelConfigs array so:
 - Level 4 adds time pressure (set timeLimit to 45-60 seconds)
 - Level 5 is a boss fight or special finale (set bossLevel:true, objectiveType:'destroy')
 - Each level has a slightly different background color
+- Starting difficulty is fair — a new player can survive 10-15 seconds
+- Game over displays final score correctly, play again fully resets everything
 
 Also customize:
 - The applyLevelSettings() function to use the level settings properly
@@ -261,28 +270,13 @@ IMPORTANT:
 
 Return the COMPLETE modified HTML.`,
     },
-    {
-      name: 'Polish & Balance',
-      step: 4,
-      message: 'Adding polish...',
-      prompt: `Review this game and make targeted improvements:
-
-1. BALANCE: Is the starting difficulty fair? Can a new player survive 10-15 seconds? Adjust speeds and spawn rates if too hard/easy at the start.
-2. FEEDBACK: Does every interaction have visual + audio feedback? Make sure scoring triggers particles + sound + score popup. Make sure hits/misses have feedback too.
-3. EDGE CASES: What happens when score is 0? When no game objects exist? When game just started? Add null checks where needed.
-4. COLORS: Is text readable against backgrounds? Do colors look good together?
-5. GAME OVER: Does the final score display correctly? Does play again fully reset everything?
-
-Make TARGETED improvements — do not rewrite the game.
-Return the COMPLETE modified HTML.`,
-    },
   ];
 
   for (const step of steps) {
     await progress(step.step, step.message);
 
     try {
-      const modified = await modifyCode(currentCode, step.prompt, cost);
+      const modified = await modifyCode(currentCode, step.prompt, cost, { maxTokens: step.maxTokens });
 
       // Validate the modification
       const testResult = testCodeStatic(modified);
@@ -314,7 +308,7 @@ Return the COMPLETE modified HTML.`,
   }
 
   // ── STEP 5: Final validation ────────────────────────────────────────────────
-  await progress(5, 'Final checks...');
+  await progress(4, 'Final checks...');
   const finalTest = testCodeStatic(currentCode);
 
   if (!finalTest.pass) {
