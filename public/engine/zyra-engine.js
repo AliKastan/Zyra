@@ -1137,6 +1137,9 @@
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
+      // Themed background decoration (stars, clouds, grid, etc.)
+      this.drawBackground(ctx, W, H);
+
       // Game-type specific rendering
       var type = this.config.type;
       if (type === 'tap') this.renderTap(ctx);
@@ -1214,6 +1217,7 @@
         y: rand(100 + margin, this.HEIGHT - 100 - margin),
         radius: radius,
         color: et.color || this.config.theme.primary,
+        emoji: et.emoji || null,
         life: (et.lifetime || 2.5),
         maxLife: (et.lifetime || 2.5),
         points: et.points || 10,
@@ -1234,14 +1238,21 @@
         ctx.fillStyle = rgba(e.color, 0.15 * pct);
         ctx.fill();
 
-        // Main circle
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
-        var grad = ctx.createRadialGradient(e.x - r * 0.3, e.y - r * 0.3, 0, e.x, e.y, r);
-        grad.addColorStop(0, lighten(e.color, 40));
-        grad.addColorStop(1, e.color);
-        ctx.fillStyle = grad;
-        ctx.fill();
+        // Main entity — use emoji if available
+        if (e.emoji) {
+          ctx.font = Math.floor(r * 1.8) + 'px serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(e.emoji, e.x, e.y);
+        } else {
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+          var grad = ctx.createRadialGradient(e.x - r * 0.3, e.y - r * 0.3, 0, e.x, e.y, r);
+          grad.addColorStop(0, lighten(e.color, 40));
+          grad.addColorStop(1, e.color);
+          ctx.fillStyle = grad;
+          ctx.fill();
+        }
 
         // Ring timer
         ctx.beginPath();
@@ -1353,6 +1364,7 @@
         height: h,
         speed: (et.speed || 3) * (lvl.speedMultiplier || 1),
         color: isGood ? '#FFD700' : (et.color || '#FF6B6B'),
+        emoji: isGood ? '🪙' : (et.emoji || null),
         points: isGood ? 20 : (et.points || 0),
         isGood: isGood,
         shape: et.shape || 'rect'
@@ -1363,8 +1375,8 @@
       var p = this.player;
       if (!p) return;
 
-      // Draw player
-      this.drawEntity(ctx, p.x, p.y, p.width, p.height, p.color, 'rect');
+      // Draw player with emoji
+      this.drawPlayer(ctx, p);
 
       // Draw shield if active
       if (this.activePowerUps.shield) {
@@ -1375,18 +1387,10 @@
         ctx.stroke();
       }
 
-      // Draw entities
+      // Draw entities with emoji
       var self = this;
       this.entities.forEach(function (e) {
-        if (e.isGood) {
-          // Draw as circle/star
-          ctx.beginPath();
-          ctx.arc(e.x + e.width / 2, e.y + e.height / 2, e.width / 2, 0, Math.PI * 2);
-          ctx.fillStyle = e.color;
-          ctx.fill();
-        } else {
-          self.drawEntity(ctx, e.x, e.y, e.width, e.height, e.color, e.shape);
-        }
+        self.drawEntity(ctx, e.x, e.y, e.width, e.height, e.color, e.isGood ? 'circle' : e.shape, e.emoji);
       });
     },
 
@@ -1605,6 +1609,7 @@
         speed: et.speed || 2,
         vx: (et.speed || 2) * (Math.random() > 0.5 ? 1 : -1) * 0.5,
         color: et.color || '#FF6B6B',
+        emoji: et.emoji || null,
         health: et.health || 1,
         points: et.points || 10,
         shape: et.shape || 'rect',
@@ -1618,8 +1623,8 @@
       var p = this.player;
       if (!p) return;
 
-      // Draw player
-      this.drawEntity(ctx, p.x, p.y, p.width, p.height, p.color, 'triangle-up');
+      // Draw player with emoji
+      this.drawPlayer(ctx, p);
 
       // Shield
       if (this.activePowerUps.shield) {
@@ -1645,9 +1650,9 @@
         ctx.fill();
       });
 
-      // Enemies
+      // Enemies with emoji
       this.entities.forEach(function (e) {
-        self.drawEntity(ctx, e.x, e.y, e.width, e.height, e.color, e.shape);
+        self.drawEntity(ctx, e.x, e.y, e.width, e.height, e.color, e.shape, e.emoji);
         // Health bar for multi-hp enemies
         if (e.health > 1) {
           var bw = e.width;
@@ -1659,22 +1664,30 @@
         }
       });
 
-      // Power-ups
+      // Power-ups with emoji
       this.powerUps.forEach(function (pu) {
-        ctx.beginPath();
-        ctx.arc(pu.x + pu.width / 2, pu.y + pu.height / 2, pu.width / 2, 0, Math.PI * 2);
-        ctx.fillStyle = pu.color;
-        ctx.fill();
-        ctx.fillStyle = 'white';
-        ctx.font = '12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(pu.icon || '?', pu.x + pu.width / 2, pu.y + pu.height / 2);
+        if (pu.emoji) {
+          ctx.font = (pu.width + 4) + 'px serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(pu.emoji, pu.x + pu.width / 2, pu.y + pu.height / 2);
+        } else {
+          ctx.beginPath();
+          ctx.arc(pu.x + pu.width / 2, pu.y + pu.height / 2, pu.width / 2, 0, Math.PI * 2);
+          ctx.fillStyle = pu.color;
+          ctx.fill();
+          ctx.fillStyle = 'white';
+          ctx.font = '12px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(pu.icon || '?', pu.x + pu.width / 2, pu.y + pu.height / 2);
+        }
       });
 
-      // Boss
+      // Boss with emoji
       if (this.boss && this.boss.active) {
-        self.drawEntity(ctx, self.boss.x, self.boss.y, self.boss.width, self.boss.height, self.boss.color, 'rect');
+        var bossEmoji = (this.getLevelConfig().boss && this.getLevelConfig().boss.emoji) || null;
+        self.drawEntity(ctx, self.boss.x, self.boss.y, self.boss.width, self.boss.height, self.boss.color, 'rect', bossEmoji);
       }
     },
 
@@ -1842,21 +1855,22 @@
         ctx.fill();
       });
 
-      // Obstacles
+      // Obstacles with emoji
+      var obstacleEmoji = (this.config.entityTypes && this.config.entityTypes.basic && this.config.entityTypes.basic.emoji) || null;
       this.obstacles.forEach(function (o) {
-        self.drawEntity(ctx, o.x, o.y, o.width, o.height, o.color, 'rect');
+        self.drawEntity(ctx, o.x, o.y, o.width, o.height, o.color, 'rect', obstacleEmoji);
       });
 
       // Coins
       this.coins.forEach(function (c) {
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
-        ctx.fillStyle = c.color;
-        ctx.fill();
+        ctx.font = (c.radius * 2) + 'px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🪙', c.x, c.y);
       });
 
-      // Player
-      this.drawEntity(ctx, p.x, p.y, p.width, p.height, p.color, 'rect');
+      // Player with emoji
+      this.drawPlayer(ctx, p);
     },
 
     // ═══════════════════════════════════════════════════════════════════
@@ -2498,6 +2512,7 @@
         height: et.height || 28,
         speed: et.speed || 3,
         color: et.color || (isGood ? '#FFD700' : '#FF4757'),
+        emoji: et.emoji || null,
         points: et.points || 10,
         isGood: isGood,
         shape: et.shape || 'circle',
@@ -2509,19 +2524,12 @@
       var p = this.player;
       if (!p) return;
 
-      // Basket/character
-      this.drawEntity(ctx, p.x, p.y, p.width, p.height, p.color, 'rect');
+      // Basket/character with emoji
+      this.drawPlayer(ctx, p);
 
       var self = this;
       this.entities.forEach(function (e) {
-        if (e.shape === 'circle') {
-          ctx.beginPath();
-          ctx.arc(e.x + e.width / 2, e.y + e.height / 2, e.width / 2, 0, Math.PI * 2);
-          ctx.fillStyle = e.color;
-          ctx.fill();
-        } else {
-          self.drawEntity(ctx, e.x, e.y, e.width, e.height, e.color, e.shape);
-        }
+        self.drawEntity(ctx, e.x, e.y, e.width, e.height, e.color, e.shape, e.emoji);
       });
     },
 
@@ -2722,28 +2730,29 @@
         ctx.fill();
       });
 
-      // Coins
+      // Coins with emoji
       this.coins.forEach(function (c) {
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
-        ctx.fillStyle = c.color;
-        ctx.fill();
         if (c.isGoal) {
-          ctx.beginPath();
-          ctx.arc(c.x, c.y, c.radius + 6, 0, Math.PI * 2);
-          ctx.strokeStyle = rgba(c.color, 0.3);
-          ctx.lineWidth = 2;
-          ctx.stroke();
+          ctx.font = (c.radius * 2.5) + 'px serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🏆', c.x, c.y);
+        } else {
+          ctx.font = (c.radius * 2) + 'px serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🪙', c.x, c.y);
         }
       });
 
-      // Obstacles
+      // Obstacles with emoji
+      var obstEmoji = (self.config.entityTypes && self.config.entityTypes.basic && self.config.entityTypes.basic.emoji) || null;
       this.obstacles.forEach(function (o) {
-        self.drawEntity(ctx, o.x, o.y, o.width, o.height, o.color, 'rect');
+        self.drawEntity(ctx, o.x, o.y, o.width, o.height, o.color, 'rect', obstEmoji);
       });
 
-      // Player
-      this.drawEntity(ctx, p.x, p.y, p.width, p.height, p.color, 'rect');
+      // Player with emoji
+      this.drawPlayer(ctx, p);
 
       ctx.restore();
     },
@@ -3422,7 +3431,8 @@
         width: 24, height: 24,
         puType: puType,
         color: pu.color || '#FFD700',
-        icon: pu.icon || '?'
+        icon: pu.icon || '?',
+        emoji: pu.emoji || null
       });
     },
 
@@ -3521,8 +3531,14 @@
       ctx.closePath();
     },
 
-    drawEntity: function (ctx, x, y, w, h, color, shape) {
-      if (shape === 'circle') {
+    drawEntity: function (ctx, x, y, w, h, color, shape, emoji) {
+      if (emoji) {
+        // Draw emoji as sprite — much more visually appealing than plain shapes
+        ctx.font = Math.max(w, h) + 'px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(emoji, x + w / 2, y + h / 2);
+      } else if (shape === 'circle') {
         ctx.beginPath();
         ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
         var grad = ctx.createRadialGradient(x + w * 0.35, y + h * 0.35, 0, x + w / 2, y + h / 2, Math.min(w, h) / 2);
@@ -3543,6 +3559,162 @@
         this.roundRect(ctx, x, y, w, h, Math.min(w, h) * 0.2);
         ctx.fill();
       }
+    },
+
+    // Draw player with emoji if configured
+    drawPlayer: function (ctx, p) {
+      var emoji = (this.config.settings && this.config.settings.playerEmoji) || null;
+      if (emoji) {
+        ctx.font = Math.max(p.width, p.height) * 1.2 + 'px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(emoji, p.x + p.width / 2, p.y + p.height / 2);
+      } else {
+        ctx.fillStyle = p.color;
+        this.roundRect(ctx, p.x, p.y, p.width, p.height, 6);
+        ctx.fill();
+      }
+    },
+
+    // ─── THEMED BACKGROUNDS ──────────────────────────────────────────
+    _bgStars: null,
+    _bgClouds: null,
+
+    drawBackground: function (ctx, W, H) {
+      var bgType = (this.config.theme && this.config.theme.backgroundType) || 'plain';
+
+      if (bgType === 'starfield') {
+        // Twinkling star field
+        if (!this._bgStars) {
+          this._bgStars = [];
+          for (var i = 0; i < 80; i++) {
+            this._bgStars.push({ x: rand(0, W), y: rand(0, H), r: rand(0.5, 2.5), b: rand(0.3, 1), s: rand(0.5, 2) });
+          }
+        }
+        for (var i = 0; i < this._bgStars.length; i++) {
+          var s = this._bgStars[i];
+          var twinkle = 0.5 + 0.5 * Math.sin(this.gameTime * s.s + i);
+          ctx.globalAlpha = s.b * twinkle;
+          ctx.fillStyle = '#fff';
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+      } else if (bgType === 'clouds') {
+        // Floating cloud puffs
+        if (!this._bgClouds) {
+          this._bgClouds = [];
+          for (var i = 0; i < 6; i++) {
+            this._bgClouds.push({ x: rand(0, W), y: rand(40, H * 0.4), w: rand(60, 140), h: rand(25, 45), s: rand(0.2, 0.6) });
+          }
+        }
+        for (var i = 0; i < this._bgClouds.length; i++) {
+          var c = this._bgClouds[i];
+          c.x -= c.s * 0.5;
+          if (c.x + c.w < -20) c.x = W + 20;
+          ctx.fillStyle = 'rgba(255,255,255,0.06)';
+          ctx.beginPath();
+          ctx.ellipse(c.x + c.w / 2, c.y, c.w / 2, c.h / 2, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+      } else if (bgType === 'grid') {
+        // Neon grid lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.lineWidth = 1;
+        var gs = 40;
+        for (var x = 0; x < W; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+        for (var y = 0; y < H; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+      } else if (bgType === 'mountains' || bgType === 'forest') {
+        // Layered mountain silhouettes
+        var c1 = this.config.theme.backgroundAlt || '#1a1a3e';
+        var layers = [
+          { y: H * 0.55, a: 0.3, h: 120, n: 5 },
+          { y: H * 0.65, a: 0.2, h: 80, n: 7 },
+          { y: H * 0.75, a: 0.1, h: 50, n: 9 }
+        ];
+        for (var l = 0; l < layers.length; l++) {
+          var layer = layers[l];
+          ctx.fillStyle = rgba(c1, layer.a + 0.1);
+          ctx.beginPath();
+          ctx.moveTo(0, H);
+          for (var i = 0; i <= layer.n; i++) {
+            var px = (i / layer.n) * W;
+            var py = layer.y + Math.sin(i * 2.5 + l * 1.3) * layer.h;
+            if (i === 0) ctx.lineTo(0, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.lineTo(W, H);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+      } else if (bgType === 'city') {
+        // City skyline silhouette
+        ctx.fillStyle = 'rgba(255,255,255,0.03)';
+        var bx = 0;
+        while (bx < W) {
+          var bw = rand(20, 50);
+          var bh = rand(60, 200);
+          ctx.fillRect(bx, H - 120 - bh, bw, bh);
+          // Windows
+          ctx.fillStyle = 'rgba(255,200,50,0.06)';
+          for (var wy = H - 120 - bh + 8; wy < H - 130; wy += 14) {
+            for (var wx = bx + 4; wx < bx + bw - 4; wx += 10) {
+              if (Math.random() > 0.4) ctx.fillRect(wx, wy, 5, 7);
+            }
+          }
+          ctx.fillStyle = 'rgba(255,255,255,0.03)';
+          bx += bw + rand(3, 12);
+        }
+        // Ground line
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fillRect(0, H - 120, W, 2);
+
+      } else if (bgType === 'ocean') {
+        // Animated wave lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.lineWidth = 1.5;
+        for (var w = 0; w < 4; w++) {
+          ctx.beginPath();
+          var baseY = H * 0.3 + w * 50;
+          for (var x = 0; x < W; x += 4) {
+            var y = baseY + Math.sin((x + this.gameTime * 40 + w * 30) * 0.03) * 15;
+            if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+
+      } else if (bgType === 'neon') {
+        // Subtle neon glow circles
+        var pri = this.config.theme.primary;
+        var sec = this.config.theme.secondary;
+        ctx.globalAlpha = 0.03;
+        ctx.beginPath();
+        ctx.arc(W * 0.2, H * 0.3, 150, 0, Math.PI * 2);
+        ctx.fillStyle = pri;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(W * 0.8, H * 0.7, 120, 0, Math.PI * 2);
+        ctx.fillStyle = sec;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+      } else if (bgType === 'dungeon') {
+        // Stone-like grid pattern
+        ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+        ctx.lineWidth = 1;
+        var ts = 50;
+        for (var x = 0; x < W; x += ts) {
+          for (var y = 0; y < H; y += ts) {
+            ctx.strokeRect(x + 1, y + 1, ts - 2, ts - 2);
+          }
+        }
+      }
+      // 'plain' and unknown types: no background decoration — just the solid bg color
     }
   };
 

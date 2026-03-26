@@ -34,13 +34,23 @@ try { getEngineSource(); } catch (e) { logger.error(`[engineBuilder] failed to p
 
 const CONFIG_SYSTEM_PROMPT = `Output a JSON game config for the Zyra Engine. NO code, NO markdown, NO explanation — ONLY raw JSON.
 
+Think about what real games like this LOOK like. Pick emoji that match real game characters and objects.
+
 Game types: tap, dodge, shooter, runner, physics, puzzle, platformer, snake, breakout, catcher
 Mapping: billiards/pool→physics(topdown), angry-birds→physics(launch), fruit-ninja/whack→tap, flappy/avoid→dodge, space-invaders→shooter, mario/jump→platformer, candy-crush/match-3→puzzle, snake→snake, breakout/brick→breakout, catch-falling→catcher, endless-runner→runner
 
 Schema:
-{"id":"kebab-id","type":"<type>","physicsMode":"topdown|launch|bounce (physics only)","title":"CAPS TITLE","subtitle":"3-5 words","tutorial":"controls with <br>","theme":{"primary":"#hex","secondary":"#hex","background":"#hex (dark)","backgroundAlt":"#hex"},"settings":{"lives":3,...type-specific},"entityTypes":{"basic":{"width":30,"height":30,"color":"#hex","health":1,"speed":2,"points":10,"shape":"rect|circle"},...},"powerUps":{"shield":{"color":"#hex","icon":"S","duration":8},...},"levels":[5 levels, increasing difficulty, each with: name, subtitle, objective:{type:"score|survive|destroy|collect",target:N}, spawnRate(ms), spawnTypes(array of entityType keys), maxEnemies, speedMultiplier, powerUpChance, newMechanic(null or string), optional timeLimit(s), optional boss:{name,width,height,color,health,patterns}]}
+{"id":"kebab-id","type":"<type>","physicsMode":"topdown|launch|bounce (physics only)","title":"CAPS TITLE","subtitle":"3-5 words","tutorial":"controls with <br>","theme":{"primary":"#hex","secondary":"#hex","background":"#hex (dark)","backgroundAlt":"#hex","backgroundType":"starfield|clouds|grid|ocean|mountains|city|plain|neon|dungeon|forest"},"settings":{"lives":3,"playerEmoji":"single emoji for player, e.g. 🚀 🏃 🐍 🏓",...type-specific},"entityTypes":{"basic":{"width":30,"height":30,"color":"#hex","emoji":"single emoji e.g. 👾 🍎 💎 ☄️","health":1,"speed":2,"points":10,"shape":"rect|circle"},...},"powerUps":{"shield":{"color":"#hex","emoji":"🛡️","duration":8},...},"levels":[5 levels, increasing difficulty, each with: name, subtitle, objective:{type:"score|survive|destroy|collect",target:N}, spawnRate(ms), spawnTypes(array of entityType keys), maxEnemies, speedMultiplier, powerUpChance, newMechanic(null or string), optional timeLimit(s), optional boss:{name,width,height,color,health,emoji:"single emoji",patterns}]}
 
-Rules: valid JSON only, 5 levels, level 3 introduces new mechanic, reasonable values (speeds 1-10, sizes 20-100, spawns 500-3000ms), fun difficulty curve, spawnTypes must reference entityTypes keys, no emoji in icons.`;
+Visual rules — make it look like a REAL game:
+- playerEmoji REQUIRED: pick an emoji that matches the game character (🚀 spaceship, 🏃 runner, 🐸 frog, 🏓 paddle, etc.)
+- Every entityType MUST have emoji: enemies(👾🦇💀👹🔴), items(🍎💎⭐🪙🍕), obstacles(🪨🌵💣☄️🧱)
+- boss.emoji REQUIRED if boss exists (🐉👹🤖👽🦑)
+- powerUp emoji REQUIRED (🛡️⚡❤️🔥⭐)
+- backgroundType REQUIRED: pick the most fitting background for the game theme
+- theme colors should match the game mood (dark+neon for space, green+brown for nature, etc.)
+
+Rules: valid JSON only, 5 levels, level 3 introduces new mechanic, reasonable values (speeds 1-10, sizes 20-100, spawns 500-3000ms), fun difficulty curve, spawnTypes must reference entityTypes keys.`;
 
 // ── Complete default configs per game type ───────────────────────────────────
 
@@ -48,12 +58,12 @@ const DEFAULT_CONFIGS = {
   tap: {
     id: 'tap-game', type: 'tap', title: 'TAP MASTER', subtitle: 'Tap fast, score big',
     tutorial: 'Tap targets before they disappear<br>Miss 3 and it is game over',
-    theme: { primary: '#FF6B6B', secondary: '#FF8E53', background: '#1A0A2E', backgroundAlt: '#2D1B4E' },
+    theme: { primary: '#FF6B6B', secondary: '#FF8E53', background: '#1A0A2E', backgroundAlt: '#2D1B4E', backgroundType: 'neon' },
     settings: { lives: 3 },
     entityTypes: {
-      basic: { width: 50, color: '#FF6B6B', points: 10, lifetime: 2.5, shape: 'circle' },
-      small: { width: 36, color: '#FBBF24', points: 25, lifetime: 1.8, shape: 'circle' },
-      big: { width: 70, color: '#4ECDC4', points: 5, lifetime: 3.0, shape: 'circle' }
+      basic: { width: 50, color: '#FF6B6B', emoji: '🔴', points: 10, lifetime: 2.5, shape: 'circle' },
+      small: { width: 36, color: '#FBBF24', emoji: '⭐', points: 25, lifetime: 1.8, shape: 'circle' },
+      big: { width: 70, color: '#4ECDC4', emoji: '💎', points: 5, lifetime: 3.0, shape: 'circle' }
     },
     levels: [
       { name: 'Warm Up', subtitle: 'Big targets', objective: { type: 'score', target: 50 }, spawnRate: 2000, spawnTypes: ['basic', 'big'], maxEnemies: 3, speedMultiplier: 1, powerUpChance: 0.05 },
@@ -67,11 +77,11 @@ const DEFAULT_CONFIGS = {
   dodge: {
     id: 'dodge-game', type: 'dodge', title: 'SKY DODGE', subtitle: 'Dodge and survive',
     tutorial: 'Drag to move<br>Dodge falling objects<br>Collect gold coins',
-    theme: { primary: '#4ECDC4', secondary: '#45B7D1', background: '#0A1628', backgroundAlt: '#0D1F3C' },
-    settings: { lives: 3, playerWidth: 40, playerHeight: 40, playerColor: '#4ECDC4' },
+    theme: { primary: '#4ECDC4', secondary: '#45B7D1', background: '#0A1628', backgroundAlt: '#0D1F3C', backgroundType: 'starfield' },
+    settings: { lives: 3, playerWidth: 40, playerHeight: 40, playerColor: '#4ECDC4', playerEmoji: '🚀' },
     entityTypes: {
-      rock: { width: 30, height: 30, color: '#FF6B6B', speed: 3, points: 0, shape: 'rect' },
-      fast_rock: { width: 24, height: 24, color: '#FF4757', speed: 5, points: 0, shape: 'circle' }
+      rock: { width: 30, height: 30, color: '#FF6B6B', emoji: '☄️', speed: 3, points: 0, shape: 'rect' },
+      fast_rock: { width: 24, height: 24, color: '#FF4757', emoji: '🔥', speed: 5, points: 0, shape: 'circle' }
     },
     levels: [
       { name: 'Clear Skies', subtitle: 'Ease into it', objective: { type: 'survive', target: 15 }, spawnRate: 1800, spawnTypes: ['rock'], maxEnemies: 5, speedMultiplier: 1, powerUpChance: 0.1 },
@@ -85,15 +95,15 @@ const DEFAULT_CONFIGS = {
   shooter: {
     id: 'shooter-game', type: 'shooter', title: 'SPACE BLAST', subtitle: 'Defend the galaxy',
     tutorial: 'Drag to move your ship<br>Auto-fires at enemies<br>Collect power-ups',
-    theme: { primary: '#00D4FF', secondary: '#7B2FFF', background: '#0A0A2E', backgroundAlt: '#0F0F3A' },
-    settings: { lives: 3, playerWidth: 36, playerHeight: 36, playerColor: '#00D4FF', fireRate: 400, projectileSpeed: 10, projectileColor: '#FFD700' },
+    theme: { primary: '#00D4FF', secondary: '#7B2FFF', background: '#0A0A2E', backgroundAlt: '#0F0F3A', backgroundType: 'starfield' },
+    settings: { lives: 3, playerWidth: 36, playerHeight: 36, playerColor: '#00D4FF', playerEmoji: '🚀', fireRate: 400, projectileSpeed: 10, projectileColor: '#FFD700' },
     entityTypes: {
-      basic: { width: 30, height: 30, color: '#FF6B6B', health: 1, speed: 2, points: 10, shape: 'rect' },
-      fast: { width: 24, height: 24, color: '#FBBF24', health: 1, speed: 4, points: 20, shape: 'circle' },
-      tank: { width: 40, height: 40, color: '#A78BFA', health: 3, speed: 1.2, points: 50, shape: 'rect' },
-      shooter: { width: 34, height: 34, color: '#FF4757', health: 2, speed: 1.5, points: 30, shape: 'rect', shoots: true, fireRate: 2000 }
+      basic: { width: 30, height: 30, color: '#FF6B6B', emoji: '👾', health: 1, speed: 2, points: 10, shape: 'rect' },
+      fast: { width: 24, height: 24, color: '#FBBF24', emoji: '🛸', health: 1, speed: 4, points: 20, shape: 'circle' },
+      tank: { width: 40, height: 40, color: '#A78BFA', emoji: '🤖', health: 3, speed: 1.2, points: 50, shape: 'rect' },
+      shooter: { width: 34, height: 34, color: '#FF4757', emoji: '👹', health: 2, speed: 1.5, points: 30, shape: 'rect', shoots: true, fireRate: 2000 }
     },
-    powerUps: { rapid: { color: '#FFD700', icon: 'R', duration: 5 }, shield: { color: '#00D4FF', icon: 'S', duration: 8 }, spread: { color: '#FF6B6B', icon: 'X', duration: 5 }, extra_life: { color: '#34D399', icon: '+', duration: 0 } },
+    powerUps: { rapid: { color: '#FFD700', emoji: '⚡', icon: 'R', duration: 5 }, shield: { color: '#00D4FF', emoji: '🛡️', icon: 'S', duration: 8 }, spread: { color: '#FF6B6B', emoji: '🔥', icon: 'X', duration: 5 }, extra_life: { color: '#34D399', emoji: '❤️', icon: '+', duration: 0 } },
     levels: [
       { name: 'Patrol', subtitle: 'Easy targets', objective: { type: 'score', target: 100 }, spawnRate: 2000, spawnTypes: ['basic'], maxEnemies: 4, speedMultiplier: 1, powerUpChance: 0.1 },
       { name: 'Skirmish', subtitle: 'Faster enemies', objective: { type: 'score', target: 250 }, spawnRate: 1500, spawnTypes: ['basic', 'fast'], maxEnemies: 6, speedMultiplier: 1.3, powerUpChance: 0.12 },
@@ -106,9 +116,9 @@ const DEFAULT_CONFIGS = {
   runner: {
     id: 'runner-game', type: 'runner', title: 'DASH RUN', subtitle: 'Run and jump',
     tutorial: 'Tap to jump<br>Collect coins<br>Dodge obstacles',
-    theme: { primary: '#FF8E53', secondary: '#FF6B6B', background: '#0A1628', backgroundAlt: '#0D1F3C' },
-    settings: { lives: 3, playerWidth: 30, playerHeight: 40, playerColor: '#FF8E53', playerSpeed: 4 },
-    entityTypes: { basic: { width: 30, height: 40, color: '#FF6B6B', speed: 1, points: 0, shape: 'rect' } },
+    theme: { primary: '#FF8E53', secondary: '#FF6B6B', background: '#0A1628', backgroundAlt: '#0D1F3C', backgroundType: 'city' },
+    settings: { lives: 3, playerWidth: 30, playerHeight: 40, playerColor: '#FF8E53', playerEmoji: '🏃', playerSpeed: 4 },
+    entityTypes: { basic: { width: 30, height: 40, color: '#FF6B6B', emoji: '🌵', speed: 1, points: 0, shape: 'rect' } },
     levels: [
       { name: 'Jog', subtitle: 'Easy pace', objective: { type: 'score', target: 100 }, spawnRate: 2000, spawnTypes: ['basic'], maxEnemies: 3, speedMultiplier: 1, powerUpChance: 0.1 },
       { name: 'Run', subtitle: 'Faster now', objective: { type: 'score', target: 250 }, spawnRate: 1600, spawnTypes: ['basic'], maxEnemies: 4, speedMultiplier: 1.3, powerUpChance: 0.12 },
@@ -121,11 +131,11 @@ const DEFAULT_CONFIGS = {
   puzzle: {
     id: 'puzzle-game', type: 'puzzle', title: 'GEM MATCH', subtitle: 'Match 3 to clear',
     tutorial: 'Tap two adjacent gems to swap<br>Match 3 or more in a row<br>Chain combos for bonus',
-    theme: { primary: '#A78BFA', secondary: '#7C3AED', background: '#1A0A2E', backgroundAlt: '#2D1B4E' },
+    theme: { primary: '#A78BFA', secondary: '#7C3AED', background: '#1A0A2E', backgroundAlt: '#2D1B4E', backgroundType: 'neon' },
     settings: { lives: 99, cols: 7, rows: 9 },
     entityTypes: {
-      red: { color: '#FF6B6B' }, blue: { color: '#4ECDC4' }, yellow: { color: '#FFD93D' },
-      purple: { color: '#6C5CE7' }, green: { color: '#A8E6CF' }, pink: { color: '#FF8B94' }
+      red: { color: '#FF6B6B', emoji: '🔴' }, blue: { color: '#4ECDC4', emoji: '🔷' }, yellow: { color: '#FFD93D', emoji: '⭐' },
+      purple: { color: '#6C5CE7', emoji: '🟣' }, green: { color: '#A8E6CF', emoji: '🍀' }, pink: { color: '#FF8B94', emoji: '💗' }
     },
     levels: [
       { name: 'Tutorial', subtitle: 'Learn to match', objective: { type: 'score', target: 100 }, spawnRate: 9999, spawnTypes: ['red'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 },
@@ -139,9 +149,9 @@ const DEFAULT_CONFIGS = {
   platformer: {
     id: 'platformer-game', type: 'platformer', title: 'SKY JUMPER', subtitle: 'Jump to the top',
     tutorial: 'Touch left/right to move<br>Swipe up to jump<br>Collect coins',
-    theme: { primary: '#45B7D1', secondary: '#2C8EAD', background: '#0A1628', backgroundAlt: '#0D1F3C' },
-    settings: { lives: 3, playerWidth: 28, playerHeight: 36, playerColor: '#45B7D1' },
-    entityTypes: { basic: { width: 20, height: 20, color: '#FF6B6B', speed: 1, points: 0, shape: 'rect' } },
+    theme: { primary: '#45B7D1', secondary: '#2C8EAD', background: '#0A1628', backgroundAlt: '#0D1F3C', backgroundType: 'mountains' },
+    settings: { lives: 3, playerWidth: 28, playerHeight: 36, playerColor: '#45B7D1', playerEmoji: '🐱' },
+    entityTypes: { basic: { width: 20, height: 20, color: '#FF6B6B', emoji: '🦇', speed: 1, points: 0, shape: 'rect' } },
     levels: [
       { name: 'Ground Floor', subtitle: 'Learn to jump', objective: { type: 'collect', target: 5 }, spawnRate: 9999, spawnTypes: ['basic'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 },
       { name: 'Higher Up', subtitle: 'Longer gaps', objective: { type: 'collect', target: 8 }, spawnRate: 9999, spawnTypes: ['basic'], maxEnemies: 1, speedMultiplier: 1.2, powerUpChance: 0 },
@@ -154,9 +164,9 @@ const DEFAULT_CONFIGS = {
   snake: {
     id: 'snake-game', type: 'snake', title: 'NEON SNAKE', subtitle: 'Eat and grow',
     tutorial: 'Swipe to change direction<br>Eat red dots to grow<br>Do not hit walls or yourself',
-    theme: { primary: '#34D399', secondary: '#059669', background: '#0A0A1A', backgroundAlt: '#0F0F2A' },
-    settings: { lives: 1, cellSize: 18, moveInterval: 0.14 },
-    entityTypes: { basic: { color: '#FF6B6B' } },
+    theme: { primary: '#34D399', secondary: '#059669', background: '#0A0A1A', backgroundAlt: '#0F0F2A', backgroundType: 'grid' },
+    settings: { lives: 1, cellSize: 18, moveInterval: 0.14, playerEmoji: '🐍' },
+    entityTypes: { basic: { color: '#FF6B6B', emoji: '🍎' } },
     levels: [
       { name: 'Garden', subtitle: 'Open field', objective: { type: 'collect', target: 5 }, spawnRate: 9999, spawnTypes: ['basic'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 },
       { name: 'Park', subtitle: 'Getting longer', objective: { type: 'collect', target: 10 }, spawnRate: 9999, spawnTypes: ['basic'], maxEnemies: 1, speedMultiplier: 1.2, powerUpChance: 0 },
@@ -169,10 +179,10 @@ const DEFAULT_CONFIGS = {
   breakout: {
     id: 'breakout-game', type: 'breakout', title: 'BRICK SMASH', subtitle: 'Break them all',
     tutorial: 'Drag paddle left and right<br>Bounce the ball to break bricks<br>Do not let the ball fall',
-    theme: { primary: '#FF6B6B', secondary: '#FBBF24', background: '#0A0A2E', backgroundAlt: '#15153E' },
-    settings: { lives: 3, paddleWidth: 80, paddleHeight: 14, paddleColor: '#FF6B6B', ballRadius: 8, ballColor: '#FFD700', ballSpeed: 5, brickCols: 8, brickRows: 4 },
-    entityTypes: { red: { color: '#FF6B6B' }, yellow: { color: '#FBBF24' }, teal: { color: '#4ECDC4' }, purple: { color: '#6C5CE7' }, green: { color: '#A8E6CF' } },
-    powerUps: { extra_life: { color: '#34D399', icon: '+', duration: 0 } },
+    theme: { primary: '#FF6B6B', secondary: '#FBBF24', background: '#0A0A2E', backgroundAlt: '#15153E', backgroundType: 'neon' },
+    settings: { lives: 3, paddleWidth: 80, paddleHeight: 14, paddleColor: '#FF6B6B', ballRadius: 8, ballColor: '#FFD700', ballSpeed: 5, brickCols: 8, brickRows: 4, playerEmoji: '🏓' },
+    entityTypes: { red: { color: '#FF6B6B', emoji: '🧱' }, yellow: { color: '#FBBF24', emoji: '🧱' }, teal: { color: '#4ECDC4', emoji: '🧱' }, purple: { color: '#6C5CE7', emoji: '🧱' }, green: { color: '#A8E6CF', emoji: '🧱' } },
+    powerUps: { extra_life: { color: '#34D399', emoji: '❤️', icon: '+', duration: 0 } },
     levels: [
       { name: 'Warm Up', subtitle: '4 rows', objective: { type: 'destroy', target: 32 }, spawnRate: 9999, spawnTypes: ['red'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0.1 },
       { name: 'Double Up', subtitle: '5 rows', objective: { type: 'destroy', target: 40 }, spawnRate: 9999, spawnTypes: ['red'], maxEnemies: 1, speedMultiplier: 1.15, powerUpChance: 0.1 },
@@ -185,12 +195,12 @@ const DEFAULT_CONFIGS = {
   catcher: {
     id: 'catcher-game', type: 'catcher', title: 'CATCH IT', subtitle: 'Catch the good stuff',
     tutorial: 'Drag basket left and right<br>Catch good items for points<br>Avoid bad items',
-    theme: { primary: '#FFD93D', secondary: '#FF8E53', background: '#1A0A28', backgroundAlt: '#2D1540' },
-    settings: { lives: 3, playerWidth: 60, playerHeight: 30, playerColor: '#FFD93D' },
+    theme: { primary: '#FFD93D', secondary: '#FF8E53', background: '#1A0A28', backgroundAlt: '#2D1540', backgroundType: 'clouds' },
+    settings: { lives: 3, playerWidth: 60, playerHeight: 30, playerColor: '#FFD93D', playerEmoji: '🧺' },
     entityTypes: {
-      good: { width: 24, height: 24, color: '#4ECDC4', speed: 3, points: 10, isGood: true, shape: 'circle' },
-      great: { width: 28, height: 28, color: '#FFD700', speed: 2.5, points: 25, isGood: true, shape: 'circle' },
-      bad: { width: 26, height: 26, color: '#FF4757', speed: 3.5, points: 0, isGood: false, shape: 'rect' }
+      good: { width: 24, height: 24, color: '#4ECDC4', emoji: '🍎', speed: 3, points: 10, isGood: true, shape: 'circle' },
+      great: { width: 28, height: 28, color: '#FFD700', emoji: '💎', speed: 2.5, points: 25, isGood: true, shape: 'circle' },
+      bad: { width: 26, height: 26, color: '#FF4757', emoji: '💣', speed: 3.5, points: 0, isGood: false, shape: 'rect' }
     },
     levels: [
       { name: 'Easy', subtitle: 'Slow drops', objective: { type: 'score', target: 80 }, spawnRate: 1800, spawnTypes: ['good'], maxEnemies: 5, speedMultiplier: 1, powerUpChance: 0.05 },
@@ -204,9 +214,9 @@ const DEFAULT_CONFIGS = {
   physics: {
     id: 'physics-game', type: 'physics', physicsMode: 'topdown', title: 'POOL MASTER', subtitle: '8-Ball Pool',
     tutorial: 'Drag from cue ball to aim<br>Pull further for more power<br>Pocket all balls to win',
-    theme: { primary: '#34D399', secondary: '#059669', background: '#0A2E1A', backgroundAlt: '#0D3A20' },
-    settings: { lives: 99, gravity: { x: 0, y: 0 }, linearDamping: 1.8, tableColor: '#0B6623', cushionColor: '#8B4513', cushionRestitution: 0.8, ballRadius: 10, ballDensity: 1, ballFriction: 0.4, ballRestitution: 0.95, maxPower: 8, pocketRadius: 18 },
-    entityTypes: { basic: { color: '#FFD700' } },
+    theme: { primary: '#34D399', secondary: '#059669', background: '#0A2E1A', backgroundAlt: '#0D3A20', backgroundType: 'plain' },
+    settings: { lives: 99, playerEmoji: '🎱', gravity: { x: 0, y: 0 }, linearDamping: 1.8, tableColor: '#0B6623', cushionColor: '#8B4513', cushionRestitution: 0.8, ballRadius: 10, ballDensity: 1, ballFriction: 0.4, ballRestitution: 0.95, maxPower: 8, pocketRadius: 18 },
+    entityTypes: { basic: { color: '#FFD700', emoji: '🟡' } },
     levels: [
       { name: 'Easy Break', subtitle: '3 balls', objective: { type: 'collect', target: 3 }, ballCount: 3, spawnRate: 9999, spawnTypes: ['basic'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 },
       { name: 'Standard', subtitle: '6 balls', objective: { type: 'collect', target: 6 }, ballCount: 6, spawnRate: 9999, spawnTypes: ['basic'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 },
