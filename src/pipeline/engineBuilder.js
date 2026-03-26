@@ -338,13 +338,13 @@ async function buildGame(userPrompt, options = {}) {
   const completedSteps = [];
   const t0 = Date.now();
 
-  function progress(step, message) {
+  async function progress(step, message) {
     logger.info(`[engineBuilder] step=${step} — ${message}`);
-    if (onProgress) onProgress({ step, message });
+    if (onProgress) await onProgress({ step, message });
   }
 
   // ── STEP 1: Get JSON config from Claude API (Haiku = fast + cheap) ─────
-  progress(0, 'Designing game...');
+  await progress(0, 'Designing game...');
 
   let config;
   try {
@@ -376,7 +376,7 @@ async function buildGame(userPrompt, options = {}) {
   completedSteps.push('Config validated');
 
   // ── STEP 3: Assemble HTML (instant — string concat) ───────────────────
-  progress(1, 'Building game...');
+  await progress(1, 'Building game...');
   const html = buildGameHTML(config);
   completedSteps.push('HTML assembled');
 
