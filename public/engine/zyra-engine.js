@@ -454,16 +454,56 @@
 
     // ─── INITIALIZATION ──────────────────────────────────────────────
     init: function (config) {
+      var self = this;
       this.config = config;
       this.highScore = parseInt(localStorage.getItem('zyra_hs_' + config.id) || '0');
       this.dpr = Math.min(window.devicePixelRatio || 1, 3);
-      this.WIDTH = Math.min(window.innerWidth, 430);
-      this.HEIGHT = window.innerHeight;
+
+      // Measure dimensions — if iframe hasn't laid out yet, defer until it has
+      this.WIDTH = Math.min(window.innerWidth || 360, 430);
+      this.HEIGHT = window.innerHeight || 640;
+
+      // Guard: if dimensions are too small (iframe not ready), wait and retry
+      if (this.WIDTH < 50 || this.HEIGHT < 50) {
+        var retries = 0;
+        var waitForSize = setInterval(function () {
+          retries++;
+          self.WIDTH = Math.min(window.innerWidth || 360, 430);
+          self.HEIGHT = window.innerHeight || 640;
+          if (self.WIDTH >= 50 && self.HEIGHT >= 50) {
+            clearInterval(waitForSize);
+            self._finishInit();
+          } else if (retries > 50) { // 2.5s max wait
+            clearInterval(waitForSize);
+            self.WIDTH = 360; self.HEIGHT = 640; // safe fallback
+            self._finishInit();
+          }
+        }, 50);
+        return;
+      }
+      this._finishInit();
+    },
+
+    _finishInit: function () {
+      var self = this;
       this.createDOM();
       this.setupCanvas();
       this.setupInput();
       this.setupButtons();
       this.showScreen('menu');
+
+      // Handle iframe/window resize — re-measure and re-setup canvas
+      window.addEventListener('resize', function () {
+        var newW = Math.min(window.innerWidth || 360, 430);
+        var newH = window.innerHeight || 640;
+        if (newW !== self.WIDTH || newH !== self.HEIGHT) {
+          self.WIDTH = newW;
+          self.HEIGHT = newH;
+          if (self.wrap) self.wrap.style.width = newW + 'px';
+          if (self.wrap) self.wrap.style.height = newH + 'px';
+          self.setupCanvas();
+        }
+      });
     },
 
     // ─── DOM CREATION ────────────────────────────────────────────────

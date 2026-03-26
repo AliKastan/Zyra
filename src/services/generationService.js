@@ -413,14 +413,13 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
     const rawSlug     = codeOutput.projectName || slugify(userPrompt);
     const projectSlug = slugify(rawSlug) || `project-${jobId.slice(0, 8)}`;
 
-    // Inject viewport normalize into all HTML files (must be first — before app styles)
-    codeOutput = { ...codeOutput, files: injectViewportNormalize(codeOutput.files) };
-
-    // Inject runtime error catcher into all HTML files
-    codeOutput = { ...codeOutput, files: injectRuntimeErrorCatcher(codeOutput.files) };
-
-    // Inject visual edit bridge so the studio can enable Figma-style element editing
-    codeOutput = { ...codeOutput, files: injectVisualEditBridge(codeOutput.files) };
+    // Engine-built games: skip all injections — they have a tested DOM structure that
+    // viewport normalize, edit bridge, and error catcher can break.
+    if (!codeOutput._enginePipeline) {
+      codeOutput = { ...codeOutput, files: injectViewportNormalize(codeOutput.files) };
+      codeOutput = { ...codeOutput, files: injectRuntimeErrorCatcher(codeOutput.files) };
+      codeOutput = { ...codeOutput, files: injectVisualEditBridge(codeOutput.files) };
+    }
 
     // ── Writing files ─────────────────────────────────────────────────────────
     await checkpoint('before writing files');
@@ -442,26 +441,30 @@ async function runPipeline(jobId, userPrompt, mode, complexity, complexityRisk, 
       .catch(e => logger.error(`[job:${jobId}] CRITICAL: storeProjectFiles failed — project "${projectSlug}" has no backup: ${e.message}`));
 
     // ── Post-generation auto-debug (non-blocking, non-fatal) ─────────────────
-    // Runs a quick static check on the written files; if significant issues are
-    // found, fires an auto-fix job so the preview loads cleanly.
-    try {
-      const { validateGeneratedCode } = require('../utils/codeValidator');
-      const staticErrors = validateGeneratedCode(codeOutput.files || []);
-      const criticalErrors = staticErrors.filter(e => e.type === 'syntax' || e.type === 'error');
-      if (criticalErrors.length > 0) {
-        logger.info(`[job:${jobId}] post-gen static check: ${criticalErrors.length} issue(s) — starting auto-fix`);
-        const { startDebug } = require('./debugService');
-        const errorSignals = criticalErrors.slice(0, 10).map(e => ({
-          message: e.message,
-          source:  e.file,
-          level:   'error',
-        }));
-        startDebug(projectSlug, { consoleErrors: errorSignals, previewState: 'post_gen', trigger: 'post_gen' }, 'fast', { autoApply: true })
-          .then(debugJobId => logger.info(`[job:${jobId}] post-gen auto-fix job: ${debugJobId}`))
-          .catch(e => logger.warn(`[job:${jobId}] post-gen auto-fix start failed (non-fatal): ${e.message}`));
+    // Skip for engine-built games: the engine is pre-tested, and auto-fix would
+    // overwrite the working game with broken AI-generated code.
+    if (!codeOutput._enginePipeline) {
+      try {
+        const { validateGeneratedCode } = require('../utils/codeValidator');
+        const staticErrors = validateGeneratedCode(codeOutput.files || []);
+        const criticalErrors = staticErrors.filter(e => e.type === 'syntax' || e.type === 'error');
+        if (criticalErrors.length > 0) {
+          logger.info(`[job:${jobId}] post-gen static check: ${criticalErrors.length} issue(s) — starting auto-fix`);
+          const { startDebug } = require('./debugService');
+          const errorSignals = criticalErrors.slice(0, 10).map(e => ({
+            message: e.message,
+            source:  e.file,
+            level:   'error',
+          }));
+          startDebug(projectSlug, { consoleErrors: errorSignals, previewState: 'post_gen', trigger: 'post_gen' }, 'fast', { autoApply: true })
+            .then(debugJobId => logger.info(`[job:${jobId}] post-gen auto-fix job: ${debugJobId}`))
+            .catch(e => logger.warn(`[job:${jobId}] post-gen auto-fix start failed (non-fatal): ${e.message}`));
+        }
+      } catch (postDebugErr) {
+        logger.warn(`[job:${jobId}] post-gen debug check failed (non-fatal): ${postDebugErr.message}`);
       }
-    } catch (postDebugErr) {
-      logger.warn(`[job:${jobId}] post-gen debug check failed (non-fatal): ${postDebugErr.message}`);
+    } else {
+      logger.info(`[job:${jobId}] skipping post-gen validation (engine pipeline — pre-tested)`);
     }
 
     // ── Reviewing ─────────────────────────────────────────────────────────────
