@@ -1011,9 +1011,21 @@
 
     updateHUD: function () {
       this.scoreEl.textContent = this.score;
-      var hearts = '';
-      for (var i = 0; i < this.lives; i++) hearts += '\u2764\uFE0F';
-      this.livesEl.textContent = hearts;
+      // Physics/billiards games don't use lives — show shot count or hide
+      var type = this.config.type;
+      if (type === 'physics') {
+        // Billiards: show pocketed/total instead of hearts
+        var active = this.physicsBodies ? this.physicsBodies.filter(function (b) { return b.active && b.type !== 'cue'; }).length : 0;
+        var total = this.physicsBodies ? this.physicsBodies.filter(function (b) { return b.type !== 'cue'; }).length : 0;
+        this.livesEl.textContent = '\uD83C\uDFB1 ' + (total - active) + '/' + total;
+      } else if (this.lives > 10) {
+        // Don't render 99 hearts — just show number
+        this.livesEl.textContent = '\u2764\uFE0F ' + this.lives;
+      } else {
+        var hearts = '';
+        for (var i = 0; i < this.lives; i++) hearts += '\u2764\uFE0F';
+        this.livesEl.textContent = hearts;
+      }
       var lvl = this.getLevelConfig();
       var obj = lvl.objective || {};
       var objText = '';
@@ -2807,20 +2819,37 @@
       this.physicsBodies = [];
       var balls = (this.config.entities && this.config.entities.balls) || [];
       if (balls.length === 0) {
-        // Default: cue ball + triangle rack
+        // Default: cue ball + triangle rack with REAL pool ball colors
         balls = [{ x: this.WIDTH / 2, y: this.tableBottom - 120, color: '#FFFFFF', type: 'cue' }];
         var rackX = this.WIDTH / 2;
         var rackY = this.tableTop + this.tableHeight * 0.35;
-        var colors = ['#FFD700', '#0000FF', '#FF0000', '#800080', '#FF8C00', '#006400', '#8B0000', '#000000',
-          '#FFD700', '#0000FF', '#FF0000', '#800080', '#FF8C00', '#006400', '#8B0000'];
+        // Real pool ball colors: 1-7 solids, 8 black, 9-15 stripes
+        var poolBalls = [
+          { color: '#FFD700', stripe: false }, // 1 Yellow
+          { color: '#0000CC', stripe: false }, // 2 Blue
+          { color: '#DD0000', stripe: false }, // 3 Red
+          { color: '#6B0080', stripe: false }, // 4 Purple
+          { color: '#FF6600', stripe: false }, // 5 Orange
+          { color: '#006400', stripe: false }, // 6 Green
+          { color: '#8B0000', stripe: false }, // 7 Maroon
+          { color: '#111111', stripe: false }, // 8 Black (8-ball)
+          { color: '#FFD700', stripe: true  }, // 9 Yellow stripe
+          { color: '#0000CC', stripe: true  }, // 10 Blue stripe
+          { color: '#DD0000', stripe: true  }, // 11 Red stripe
+          { color: '#6B0080', stripe: true  }, // 12 Purple stripe
+          { color: '#FF6600', stripe: true  }, // 13 Orange stripe
+          { color: '#006400', stripe: true  }, // 14 Green stripe
+          { color: '#8B0000', stripe: true  }, // 15 Maroon stripe
+        ];
         var ballCount = Math.min((this.getLevelConfig().ballCount || 6), 15);
         var row = 0, col = 0, maxInRow = 1;
-        for (var i = 0; i < ballCount && i < colors.length; i++) {
+        for (var i = 0; i < ballCount && i < poolBalls.length; i++) {
           balls.push({
             x: rackX + (col - (maxInRow - 1) / 2) * (ballR * 2.2),
             y: rackY + row * (ballR * 2),
-            color: colors[i],
-            type: 'solid',
+            color: poolBalls[i].color,
+            stripe: poolBalls[i].stripe,
+            type: i === 7 ? 'eight' : (poolBalls[i].stripe ? 'stripe' : 'solid'),
             number: i + 1
           });
           col++;
@@ -3131,24 +3160,83 @@
         ctx.fill();
       });
 
-      // Balls
+      // Balls — rendered as realistic pool balls
+      var ballR = (this.config.settings || {}).ballRadius || 10;
       this.physicsBodies.forEach(function (b) {
         if (!b.active) return;
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-        var grad = ctx.createRadialGradient(b.x - b.radius * 0.3, b.y - b.radius * 0.3, 0, b.x, b.y, b.radius);
-        grad.addColorStop(0, lighten(b.color, 60));
-        grad.addColorStop(1, b.color);
-        ctx.fillStyle = grad;
-        ctx.fill();
-        // Number
-        if (b.number) {
-          ctx.fillStyle = b.color === '#000000' || b.color === '#000' ? '#FFF' : '#000';
-          ctx.font = 'bold 8px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(String(b.number), b.x, b.y);
+        var r = b.radius;
+
+        if (b.type === 'cue') {
+          // Cue ball — pure white with shine
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
+          var cueGrad = ctx.createRadialGradient(b.x - r * 0.3, b.y - r * 0.3, r * 0.1, b.x, b.y, r);
+          cueGrad.addColorStop(0, '#FFFFFF');
+          cueGrad.addColorStop(1, '#DDDDDD');
+          ctx.fillStyle = cueGrad;
+          ctx.fill();
+          ctx.strokeStyle = '#BBBBBB';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        } else if (b.stripe) {
+          // Stripe ball — white body with colored stripe band through middle
+          // White base
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
+          var stripeBaseGrad = ctx.createRadialGradient(b.x - r * 0.3, b.y - r * 0.3, 0, b.x, b.y, r);
+          stripeBaseGrad.addColorStop(0, '#FFFFFF');
+          stripeBaseGrad.addColorStop(1, '#E8E8E8');
+          ctx.fillStyle = stripeBaseGrad;
+          ctx.fill();
+          // Colored stripe band (horizontal band across middle)
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.fillStyle = b.color;
+          ctx.fillRect(b.x - r, b.y - r * 0.5, r * 2, r * 1);
+          ctx.restore();
+          // Number circle in center
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, r * 0.38, 0, Math.PI * 2);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fill();
+          if (b.number) {
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold ' + Math.max(7, Math.round(r * 0.7)) + 'px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(b.number), b.x, b.y + 0.5);
+          }
+        } else {
+          // Solid ball — full color with gradient shine
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
+          var solidGrad = ctx.createRadialGradient(b.x - r * 0.3, b.y - r * 0.3, 0, b.x, b.y, r);
+          solidGrad.addColorStop(0, lighten(b.color, 50));
+          solidGrad.addColorStop(0.7, b.color);
+          solidGrad.addColorStop(1, b.color === '#111111' ? '#000000' : b.color);
+          ctx.fillStyle = solidGrad;
+          ctx.fill();
+          // Number circle in center
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, r * 0.38, 0, Math.PI * 2);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fill();
+          if (b.number) {
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold ' + Math.max(7, Math.round(r * 0.7)) + 'px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(b.number), b.x, b.y + 0.5);
+          }
         }
+
+        // Glossy shine highlight on all balls
+        ctx.beginPath();
+        ctx.arc(b.x - r * 0.25, b.y - r * 0.25, r * 0.22, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fill();
       });
 
       // Aim line

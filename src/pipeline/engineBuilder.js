@@ -39,6 +39,10 @@ Think about what real games like this LOOK like. Pick emoji that match real game
 Game types: tap, dodge, shooter, runner, physics, puzzle, platformer, snake, breakout, catcher
 Mapping: billiards/pool→physics(topdown), angry-birds→physics(launch), fruit-ninja/whack→tap, flappy/avoid→dodge, space-invaders→shooter, mario/jump→platformer, candy-crush/match-3→puzzle, snake→snake, breakout/brick→breakout, catch-falling→catcher, endless-runner→runner
 
+GAME-SPECIFIC RULES:
+- physics(topdown) i.e. billiards/pool: NO emoji on balls (engine renders proper numbered pool balls with solids and stripes). entityTypes should just define shape:"circle" and colors. Do NOT add powerUps — billiards has no power-ups. lives:99 (unlimited). Theme: green table (#0B6623), brown cushions (#8B4513), dark background.
+- For non-physics games: emoji on entityTypes and playerEmoji are REQUIRED and should match the game theme.
+
 Schema:
 {"id":"kebab-id","type":"<type>","physicsMode":"topdown|launch|bounce (physics only)","title":"CAPS TITLE","subtitle":"3-5 words","tutorial":"controls with <br>","theme":{"primary":"#hex","secondary":"#hex","background":"#hex (dark)","backgroundAlt":"#hex","backgroundType":"starfield|clouds|grid|ocean|mountains|city|plain|neon|dungeon|forest"},"settings":{"lives":3,"playerEmoji":"single emoji for player, e.g. 🚀 🏃 🐍 🏓",...type-specific},"entityTypes":{"basic":{"width":30,"height":30,"color":"#hex","emoji":"single emoji e.g. 👾 🍎 💎 ☄️","health":1,"speed":2,"points":10,"shape":"rect|circle"},...},"powerUps":{"shield":{"color":"#hex","emoji":"🛡️","duration":8},...},"levels":[5 levels, increasing difficulty, each with: name, subtitle, objective:{type:"score|survive|destroy|collect",target:N}, spawnRate(ms), spawnTypes(array of entityType keys), maxEnemies, speedMultiplier, powerUpChance, newMechanic(null or string), optional timeLimit(s), optional boss:{name,width,height,color,health,emoji:"single emoji",patterns}]}
 
@@ -215,14 +219,14 @@ const DEFAULT_CONFIGS = {
     id: 'physics-game', type: 'physics', physicsMode: 'topdown', title: 'POOL MASTER', subtitle: '8-Ball Pool',
     tutorial: 'Drag from cue ball to aim<br>Pull further for more power<br>Pocket all balls to win',
     theme: { primary: '#34D399', secondary: '#059669', background: '#0A2E1A', backgroundAlt: '#0D3A20', backgroundType: 'plain' },
-    settings: { lives: 99, playerEmoji: '🎱', gravity: { x: 0, y: 0 }, linearDamping: 1.8, tableColor: '#0B6623', cushionColor: '#8B4513', cushionRestitution: 0.8, ballRadius: 10, ballDensity: 1, ballFriction: 0.4, ballRestitution: 0.95, maxPower: 8, pocketRadius: 18 },
-    entityTypes: { basic: { color: '#FFD700', emoji: '🟡' } },
+    settings: { lives: 99, playerEmoji: '🎱', gravity: { x: 0, y: 0 }, linearDamping: 1.8, tableColor: '#0B6623', cushionColor: '#8B4513', cushionRestitution: 0.8, ballRadius: 12, ballDensity: 1, ballFriction: 0.4, ballRestitution: 0.95, maxPower: 8, pocketRadius: 20 },
+    entityTypes: { solid: { color: '#FFD700', shape: 'circle' }, stripe: { color: '#0000CC', shape: 'circle' } },
     levels: [
-      { name: 'Easy Break', subtitle: '3 balls', objective: { type: 'collect', target: 3 }, ballCount: 3, spawnRate: 9999, spawnTypes: ['basic'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 },
-      { name: 'Standard', subtitle: '6 balls', objective: { type: 'collect', target: 6 }, ballCount: 6, spawnRate: 9999, spawnTypes: ['basic'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 },
-      { name: 'Full Rack', subtitle: '10 balls', objective: { type: 'collect', target: 10 }, ballCount: 10, spawnRate: 9999, spawnTypes: ['basic'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0, newMechanic: 'more_balls' },
-      { name: 'Time Attack', subtitle: 'Beat the clock', objective: { type: 'collect', target: 10 }, ballCount: 10, timeLimit: 120, spawnRate: 9999, spawnTypes: ['basic'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 },
-      { name: 'Championship', subtitle: '15 balls', objective: { type: 'collect', target: 15 }, ballCount: 15, spawnRate: 9999, spawnTypes: ['basic'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 }
+      { name: 'Easy Break', subtitle: '3 balls', objective: { type: 'collect', target: 3 }, ballCount: 3, spawnRate: 9999, spawnTypes: ['solid'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 },
+      { name: 'Standard', subtitle: '6 balls', objective: { type: 'collect', target: 6 }, ballCount: 6, spawnRate: 9999, spawnTypes: ['solid'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 },
+      { name: 'Full Rack', subtitle: '10 balls', objective: { type: 'collect', target: 10 }, ballCount: 10, spawnRate: 9999, spawnTypes: ['solid'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0, newMechanic: 'stripes' },
+      { name: 'Time Attack', subtitle: 'Beat the clock', objective: { type: 'collect', target: 10 }, ballCount: 10, timeLimit: 120, spawnRate: 9999, spawnTypes: ['solid'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 },
+      { name: 'Championship', subtitle: '15 balls', objective: { type: 'collect', target: 15 }, ballCount: 15, spawnRate: 9999, spawnTypes: ['solid'], maxEnemies: 1, speedMultiplier: 1, powerUpChance: 0 }
     ]
   }
 };
