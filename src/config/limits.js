@@ -50,11 +50,11 @@ module.exports = {
   // ── Auto-fix (syntax self-healing) ───────────────────────────────────────────
   AUTOFIX_TIMEOUT_MS:  parseInt(process.env.AUTOFIX_TIMEOUT_MS  || '60000', 10),
   // Max AI syntax-fix rounds after the quick-fix pass (each = 1 extra API call)
-  AUTOFIX_MAX_ROUNDS:  parseInt(process.env.AUTOFIX_MAX_ROUNDS  || '1',     10),
+  AUTOFIX_MAX_ROUNDS:  parseInt(process.env.AUTOFIX_MAX_ROUNDS  || '2',     10),
 
   // ── Game-fix (playability repair) ────────────────────────────────────────────
   GAME_FIX_TIMEOUT_MS: parseInt(process.env.GAME_FIX_TIMEOUT_MS || '120000', 10), // 2 min
-  GAME_FIX_MAX_ROUNDS: parseInt(process.env.GAME_FIX_MAX_ROUNDS || '1',      10),
+  GAME_FIX_MAX_ROUNDS: parseInt(process.env.GAME_FIX_MAX_ROUNDS || '2',      10),
   // Output token budgets for game-fix call per mode
   GAME_FIX_TOKENS: {
     fast:     parseInt(process.env.GAME_FIX_TOKENS_FAST     || '8000',  10),
@@ -75,12 +75,14 @@ module.exports = {
   // ── Token budgets per mode ───────────────────────────────────────────────────
   // Template-hybrid uses CONTENT_EXTRACTION_TOKENS (~400) instead of these.
   //
-  // Fast (Haiku):     2-6 files,  6K output  — ultra-cheap (~$0.005/gen)
-  // Balanced (Haiku): 8-14 files, 4.5K/file  — ~$0.020/gen (was $0.215 with Sonnet, ~90% savings)
-  // Quality (Sonnet): 15-22 files, 28K output — production-grade (~$0.42/gen)
+  // All modes use Sonnet for game quality — games need reasoning for complete logic.
+  // Budgets sized for complete games: 5 screens, 5 levels, audio, particles, boss fights.
+  // Fast (Sonnet):     single-file, 12K output  — fast but complete (~$0.06/gen)
+  // Balanced (Sonnet): single/multi, 16K output  — good quality (~$0.10/gen)
+  // Quality (Sonnet):  multi-file, 28K output — production-grade (~$0.42/gen)
   MODE_TOKENS: {
-    fast:     { planner: 200,  coder: 6000,  reviewer: 0    },
-    balanced: { planner: 400,  coder: 10000, reviewer: 0    },
+    fast:     { planner: 200,  coder: 12000, reviewer: 0    },
+    balanced: { planner: 400,  coder: 16000, reviewer: 0    },
     quality:  { planner: 600,  coder: 28000, reviewer: 1500 },
   },
 

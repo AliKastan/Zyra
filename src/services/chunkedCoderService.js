@@ -25,10 +25,10 @@ const logger = require('../utils/logger');
 // ── Per-file output token budgets ─────────────────────────────────────────────
 // Small enough to complete in ~30-90s. game.js gets the most (it's the largest file).
 const CHUNK_TOKENS = {
-  fast:     4_000,
-  balanced: 4_500, // Haiku handles 4500 tokens cleanly — was 7000 with Sonnet
-  quality:  9_000,
-  '3d':     4_000, // 3D games are 3-file max with simple shapes — Haiku handles this fine
+  fast:     6_000,
+  balanced: 8_000, // Sonnet needs room for complete game files (5 screens, 5 levels, audio, particles)
+  quality:  12_000,
+  '3d':     6_000,
 };
 
 // Timeout per file (generous but much shorter than the 10-min coder timeout)
@@ -76,6 +76,16 @@ MANDATORY OUTPUT FORMAT — start immediately with the file block (no other text
 ---END FILE---
 
 VISUAL RULE: Derive ONE coherent visual style from the game's theme. Do NOT default to dark-bg + purple + red-accent — that is the generic AI game look. Choose something intentional that fits this specific game. Use a consistent 2-3 color palette across all files. No random gradients on every element. No glow on every text. Menus must feel like they belong to THIS game.`;
+
+// For game-critical files (game.js, index.html), inject the full GAME_SYSTEM_PROMPT
+// so the AI knows about mandatory screens, state machine, audio, particles, levels, etc.
+const { CODER_SYSTEM } = promptBuilder;
+const FULL_GAME_CHUNK_SYSTEM = (CODER_SYSTEM?.balanced || '') + `
+
+IMPORTANT: You are generating ONE file of a multi-file game project. Output ONLY the requested file using:
+---FILE: path/to/file.ext---
+[complete content]
+---END FILE---`;
 
 const CORE_GAME_RULES = `
 MOBILE GAME RULES (for game.js and any file containing game logic):
@@ -131,8 +141,8 @@ function getFileRules(filePath, plan) {
 function buildPreviousContext(previousFiles) {
   if (!previousFiles.length) return '';
 
-  const MAX_TOTAL = 2_000;
-  const MAX_PER_FILE = 1_000;
+  const MAX_TOTAL = 4_000;
+  const MAX_PER_FILE = 2_000;
   let total = 0;
   const lines = ['\n\nPREVIOUSLY GENERATED FILES (reference for DOM IDs, function names, imports):'];
 
@@ -173,9 +183,16 @@ function buildChunkPrompt(targetPath, plan, userPrompt, previousFiles, mode) {
   // 3D mode: use the dedicated 3D system prompt instead of the standard chunk base
   const is3d = mode === '3d';
   const coderSystem3d = promptBuilder.CODER_SYSTEM?.['3d'];
+  // For game-critical files (game.js, index.html), use the full GAME_SYSTEM_PROMPT
+  // so the AI produces complete games with all mandatory screens, audio, levels, etc.
+  const isGameCriticalFile = targetPath.toLowerCase().includes('game.js') ||
+    targetPath.toLowerCase().endsWith('.html') ||
+    (targetPath.toLowerCase().endsWith('.js') && !targetPath.includes('/') && plan?.files?.length <= 3);
   const systemBase = (is3d && coderSystem3d)
     ? coderSystem3d + `\n\nFILE TO GENERATE: Only generate ${targetPath}. Output: ---FILE: ${targetPath}--- [full content] ---END FILE---`
-    : CHUNK_SYSTEM_BASE + fileRules + genreRules;
+    : isGameCriticalFile && FULL_GAME_CHUNK_SYSTEM
+      ? FULL_GAME_CHUNK_SYSTEM + genreRules
+      : CHUNK_SYSTEM_BASE + fileRules + genreRules;
 
   return {
     system: systemBase,
@@ -224,8 +241,9 @@ function makeStub(filePath, plan) {
  * @returns {Promise<{path: string, content: string}|null>} null only on critical failure
  */
 async function generateOneFile(targetPath, plan, userPrompt, previousFiles, mode, costTracker) {
-  // quality → Sonnet for best output; everything else (fast, balanced, 3d) → Haiku for cost
-  const claudeModel = (mode === 'quality') ? SONNET_MODEL : HAIKU_MODEL;
+  // balanced/quality → Sonnet for game quality (games need reasoning for complete logic)
+  // fast/3d → Haiku for speed
+  const claudeModel = (mode === 'balanced' || mode === 'quality') ? SONNET_MODEL : HAIKU_MODEL;
   const maxTokens   = CHUNK_TOKENS[mode] || 7_000;
 
   const { system, user } = buildChunkPrompt(targetPath, plan, userPrompt, previousFiles, mode);

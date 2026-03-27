@@ -125,10 +125,10 @@ function makeStreamProgressTracker(plan, onProgress) {
 async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTracker, onProgress, options = {}) {
   const modelName   = env.DEFAULT_CODER_MODEL;
   // Model tiering:
-  //   fast     → Haiku  (ultra-cheap, simple 2-6 file apps)
-  //   balanced → Sonnet (real SaaS quality; 14K budget = ~55% cheaper than old 32K)
+  //   fast     → Sonnet (was Haiku — upgraded for game quality; games need reasoning)
+  //   balanced → Sonnet (real game quality; needs full GAME_SYSTEM_PROMPT comprehension)
   //   quality  → Sonnet (maximum quality, 28K budget)
-  const claudeModel = mode === 'fast' ? HAIKU_MODEL : SONNET_MODEL;
+  const claudeModel = SONNET_MODEL;
   const maxFiles    = limits.MODE_MAX_FILES[mode] || 20;
   const maxTokens   = limits.MODE_TOKENS[mode]?.coder || 16000;
   const maxRetries  = limits.CODER_MAX_RETRIES || 2;
@@ -246,15 +246,23 @@ async function runCoder(userPrompt, plan, mode, onRetry, costTracker, complexity
   // ZyraApp SDK injection is not used for full-generation output.
   //
   // Routing:
-  //   fast     → runFullCoder   (Haiku, streaming, ~30-60s, single call)
+  //   fast     → runFullCoder    (Haiku, streaming, ~30-60s, single call)
+  //   single-file (any mode) → runFullCoder (gets full GAME_SYSTEM_PROMPT — critical for quality)
   //   balanced → runChunkedCoder (Sonnet, non-streaming per file, robust against connection drops)
   //   quality  → runChunkedCoder (Sonnet, non-streaming per file, larger per-file budget)
+  const planFiles = Array.isArray(plan?.files) ? plan.files : [];
+  const isSingleFile = planFiles.length <= 1;
+
   let result;
-  if (mode !== 'fast') {
-    logger.info(`coderService: routing mode="${mode}" to chunked coder`);
-    result = await runChunkedCoder(userPrompt, plan, mode, costTracker, onProgress, log || null, options);
-  } else {
+  if (mode === 'fast' || isSingleFile) {
+    // Single-file games (most games) always use runFullCoder which sends the
+    // comprehensive GAME_SYSTEM_PROMPT (388 lines, 11 sections). Chunking a
+    // single file adds overhead and loses the detailed game requirements.
+    logger.info(`coderService: routing to full coder (mode="${mode}" files=${planFiles.length})`);
     result = await runFullCoder(userPrompt, plan, mode, onRetry, costTracker, onProgress, options);
+  } else {
+    logger.info(`coderService: routing mode="${mode}" to chunked coder (${planFiles.length} files)`);
+    result = await runChunkedCoder(userPrompt, plan, mode, costTracker, onProgress, log || null, options);
   }
 
   // ── Post-generation quality pipeline ─────────────────────────────────────

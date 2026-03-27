@@ -341,18 +341,66 @@ function validateGamePlayability(files) {
 
   // 8. Score variable exists but never drawn — invisible progress
   const hasScore = /\bscore\b/i.test(allJs);
-  const drawsScore = /fillText.*score|score.*fillText|innerHTML.*score|score.*innerHTML/i.test(allJs);
+  const drawsScore = /fillText.*score|score.*fillText|innerHTML.*score|score.*innerHTML|textContent.*score|score.*textContent/i.test(allJs);
   if (hasScore && !drawsScore) {
     warnings.push({ type: 'score_not_displayed', message: 'score variable exists but never drawn to canvas or HUD — add a fillText(score, ...) call' });
   }
 
-  // Warnings (possible issues, not guaranteed broken)
-  if (!/gameState|game_state/i.test(allJs)) {
-    warnings.push({ type: 'no_state_machine', message: 'No gameState variable — add: let gameState = "menu"; // menu|playing|paused|gameover' });
+  // 9. Missing game state machine — critical for screen management
+  if (!/gameState|game_state|currentState|State\s*=\s*\{/i.test(allJs)) {
+    critical.push({
+      type: 'no_state_machine',
+      message: 'No game state machine found — add: const State = { MENU:0, PLAYING:1, PAUSED:2, GAMEOVER:3 }; let currentState = State.MENU;',
+    });
   }
-  if (!/restart|resetGame|initGame|startGame/i.test(allJs)) {
-    warnings.push({ type: 'no_restart', message: 'No restart/reset function — player may be stuck after game over' });
+
+  // 10. Missing restart/reset — player stuck after game over
+  if (!/restart|resetGame|initGame|startGame|resetGameSpecificState/i.test(allJs)) {
+    critical.push({
+      type: 'no_restart',
+      message: 'No restart/reset function — add a function that resets score, enemies, and game state so player can retry',
+    });
   }
+
+  // 11. Missing menu screen — game has no entry point
+  const hasMenuScreen = /screen-menu|menu-screen|menuScreen|showMenu|State\.MENU|MENU/i.test(allJs) ||
+    /id=["']screen-menu|id=["']menu/i.test(allHtml);
+  if (!hasMenuScreen) {
+    critical.push({
+      type: 'no_menu_screen',
+      message: 'No menu/title screen found — add a MENU screen with Play button, title, and high score display',
+    });
+  }
+
+  // 12. Missing game over screen — no feedback when player loses
+  const hasGameOver = /game.?over|gameover|screen-gameover|GAMEOVER|State\.GAMEOVER/i.test(allJs) ||
+    /id=["']screen-gameover|id=["']gameover/i.test(allHtml);
+  if (!hasGameOver) {
+    critical.push({
+      type: 'no_gameover_screen',
+      message: 'No game over screen found — add a GAME OVER overlay with final score, high score, star rating, and Play Again button',
+    });
+  }
+
+  // 13. Missing pause functionality — mandatory for mobile games
+  const hasPause = /pause|PAUSED|State\.PAUSED|isPaused/i.test(allJs);
+  if (!hasPause) {
+    warnings.push({
+      type: 'no_pause',
+      message: 'No pause functionality found — add a pause button that freezes all game logic, physics, and timers',
+    });
+  }
+
+  // 14. Missing audio/sound system — games feel lifeless without sound
+  const hasAudio = /AudioContext|webkitAudioContext|playTone|sfx|createOscillator/i.test(allJs);
+  if (!hasAudio) {
+    warnings.push({
+      type: 'no_audio',
+      message: 'No Web Audio API sound system — add sfxTap(), sfxScore(), sfxHit(), sfxGameOver() using oscillators',
+    });
+  }
+
+  // 15. Missing high score persistence
   if (!/localStorage/i.test(allJs)) {
     warnings.push({ type: 'no_persistence', message: 'No localStorage usage — best score will not persist between sessions' });
   }
