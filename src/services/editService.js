@@ -17,6 +17,7 @@ const { formatElapsed }     = require('../utils/generationTimer');
 const { withTimeout }       = require('../utils/withTimeout');
 const { callClaude, callClaudeStream, HAIKU_MODEL, SONNET_MODEL } = require('../providers/anthropicProvider');
 const { callOpenAI }        = require('../providers/openaiProvider');
+const { callKimi }          = require('../providers/kimiProvider');
 const { buildEditCoderPrompt } = require('../generators/promptBuilder');
 const { safeJsonParse }     = require('../utils/safeJsonParse');
 const { parseFileDelimited } = require('../utils/parseFileDelimited');
@@ -368,6 +369,8 @@ async function runEditCoder(userPrompt, existingFiles, projectSlug, mode, costTr
   try {
     const call = modelName === 'openai'
       ? callOpenAI(system, user, { maxTokens })
+      : modelName === 'kimi'
+      ? callKimi(system, user, { maxTokens })
       : (useStream
           ? callClaudeStream(system, user, { maxTokens, model: claudeModel })
           : callClaude(system, user, { maxTokens, model: claudeModel }));

@@ -46,6 +46,11 @@ function assertProviderAvailable(taskType) {
       `Task "${taskType}" is routed to OpenAI, but OPENAI_API_KEY is not set.`
     );
   }
+  if (model === 'kimi' && !env.KIMI_API_KEY) {
+    throw new Error(
+      `Task "${taskType}" is routed to Kimi, but KIMI_API_KEY is not set.`
+    );
+  }
 }
 
 /**
@@ -59,6 +64,7 @@ function getRoutingConfig() {
     repair: 'openai',
     anthropicKeySet: !!env.ANTHROPIC_API_KEY,
     openaiKeySet: !!env.OPENAI_API_KEY,
+    kimiKeySet: !!env.KIMI_API_KEY,
   };
 }
 

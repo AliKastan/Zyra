@@ -11,6 +11,7 @@ const env = {
 
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  KIMI_API_KEY: process.env.KIMI_API_KEY || '',
   DEFAULT_PLANNER_MODEL: process.env.DEFAULT_PLANNER_MODEL || 'claude',
   DEFAULT_CODER_MODEL: process.env.DEFAULT_CODER_MODEL || 'claude',
   DEFAULT_REVIEW_MODEL: process.env.DEFAULT_REVIEW_MODEL || 'claude',
@@ -32,20 +33,23 @@ function validateEnv() {
   if (!env.ANTHROPIC_API_KEY) {
     warnings.push('ANTHROPIC_API_KEY is not set — Claude provider will be unavailable');
   }
-  const openaiModels = [env.DEFAULT_PLANNER_MODEL, env.DEFAULT_CODER_MODEL, env.DEFAULT_REVIEW_MODEL];
-  if (!env.OPENAI_API_KEY && openaiModels.includes('openai')) {
+  const stageModels = [env.DEFAULT_PLANNER_MODEL, env.DEFAULT_CODER_MODEL, env.DEFAULT_REVIEW_MODEL];
+  if (!env.OPENAI_API_KEY && stageModels.includes('openai')) {
     warnings.push('OPENAI_API_KEY is not set — but one or more stages are routed to OpenAI');
   }
+  if (!env.KIMI_API_KEY && stageModels.includes('kimi')) {
+    warnings.push('KIMI_API_KEY is not set — but one or more stages are routed to Kimi');
+  }
 
-  const validModels = ['claude', 'openai'];
+  const validModels = ['claude', 'openai', 'kimi'];
   if (!validModels.includes(env.DEFAULT_PLANNER_MODEL)) {
-    warnings.push(`DEFAULT_PLANNER_MODEL "${env.DEFAULT_PLANNER_MODEL}" is not recognized. Use "claude" or "openai".`);
+    warnings.push(`DEFAULT_PLANNER_MODEL "${env.DEFAULT_PLANNER_MODEL}" is not recognized. Use "claude", "openai", or "kimi".`);
   }
   if (!validModels.includes(env.DEFAULT_CODER_MODEL)) {
-    warnings.push(`DEFAULT_CODER_MODEL "${env.DEFAULT_CODER_MODEL}" is not recognized. Use "claude" or "openai".`);
+    warnings.push(`DEFAULT_CODER_MODEL "${env.DEFAULT_CODER_MODEL}" is not recognized. Use "claude", "openai", or "kimi".`);
   }
   if (!validModels.includes(env.DEFAULT_REVIEW_MODEL)) {
-    warnings.push(`DEFAULT_REVIEW_MODEL "${env.DEFAULT_REVIEW_MODEL}" is not recognized. Use "claude" or "openai".`);
+    warnings.push(`DEFAULT_REVIEW_MODEL "${env.DEFAULT_REVIEW_MODEL}" is not recognized. Use "claude", "openai", or "kimi".`);
   }
 
   return warnings;

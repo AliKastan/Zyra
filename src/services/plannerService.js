@@ -1,5 +1,6 @@
 const { callClaude, HAIKU_MODEL } = require('../providers/anthropicProvider');
 const { callOpenAI } = require('../providers/openaiProvider');
+const { callKimi } = require('../providers/kimiProvider');
 const { buildPlannerPrompt } = require('../generators/promptBuilder');
 const { getInlinePlan, getFallbackPlan } = require('../generators/inlinePlanner');
 const { safeJsonParse } = require('../utils/safeJsonParse');
@@ -49,6 +50,8 @@ async function callPlannerAPI(userPrompt, mode, timeoutMs, options = {}) {
   // Planner outputs small structured JSON — Haiku is fast and cheap
   const call = modelName === 'openai'
     ? callOpenAI(system, user, { maxTokens })
+    : modelName === 'kimi'
+    ? callKimi(system, user, { maxTokens })
     : callClaude(system, user, { maxTokens, model: HAIKU_MODEL });
 
   let raw;

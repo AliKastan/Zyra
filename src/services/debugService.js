@@ -22,6 +22,7 @@ const { formatElapsed }         = require('../utils/generationTimer');
 const { withTimeout }           = require('../utils/withTimeout');
 const { callClaude }            = require('../providers/anthropicProvider');
 const { callOpenAI }            = require('../providers/openaiProvider');
+const { callKimi }              = require('../providers/kimiProvider');
 const { buildDebugPrompt, selectRelevantFiles } = require('../generators/debugPromptBuilder');
 const { safeJsonParse }         = require('../utils/safeJsonParse');
 const { analyzeProject, generateLocalPatch } = require('../utils/debugAnalyzer');
@@ -275,6 +276,8 @@ async function runDebugPipeline(jobId, projectSlug, signals, mode, startedAt, op
     try {
       const call = modelName === 'openai'
         ? callOpenAI(system, user, { maxTokens: DEBUG_MAX_TOKENS })
+        : modelName === 'kimi'
+        ? callKimi(system, user, { maxTokens: DEBUG_MAX_TOKENS })
         : callClaude(system, user, { maxTokens: DEBUG_MAX_TOKENS });
       raw = await withTimeout(call, DEBUG_TIMEOUT_MS, 'DebugDiagnoser');
     } catch (err) {

@@ -1,5 +1,6 @@
 const { callClaude, callClaudeStream, HAIKU_MODEL, SONNET_MODEL } = require('../providers/anthropicProvider');
 const { callOpenAI } = require('../providers/openaiProvider');
+const { callKimi } = require('../providers/kimiProvider');
 const {
   buildCoderPrompt,
   buildCoderRetryPrompt,
@@ -60,6 +61,8 @@ async function runTemplateCoder(userPrompt, appType, costTracker) {
   try {
     const call = modelName === 'openai'
       ? callOpenAI(system, user, { maxTokens: limits.CONTENT_EXTRACTION_TOKENS })
+      : modelName === 'kimi'
+      ? callKimi(system, user, { maxTokens: limits.CONTENT_EXTRACTION_TOKENS })
       : callClaude(system, user, { maxTokens: limits.CONTENT_EXTRACTION_TOKENS, model: claudeModel });
 
     raw = await withTimeout(call, 30_000, 'ContentExtract');
@@ -161,6 +164,8 @@ async function runFullCoder(userPrompt, plan, mode = 'balanced', onRetry, costTr
 
       const call = modelName === 'openai'
         ? callOpenAI(system, user, { maxTokens: attemptTokens })
+        : modelName === 'kimi'
+        ? callKimi(system, user, { maxTokens: attemptTokens })
         : (onChunk
             ? callClaudeStream(system, user, { maxTokens: attemptTokens, model: claudeModel }, onChunk)
             : callClaude(system, user, { maxTokens: attemptTokens, model: claudeModel }));
@@ -360,6 +365,8 @@ async function runAutoFix(userPrompt, files, errors, mode, costTracker) {
   try {
     const call = modelName === 'openai'
       ? callOpenAI(system, user, { maxTokens })
+      : modelName === 'kimi'
+      ? callKimi(system, user, { maxTokens })
       : callClaude(system, user, { maxTokens, model: HAIKU_MODEL });
     raw = await withTimeout(call, limits.AUTOFIX_TIMEOUT_MS || 60_000, 'AutoFix');
   } catch (err) {
@@ -409,6 +416,8 @@ async function runGameFix(userPrompt, files, issues, mode, costTracker) {
   try {
     const call = modelName === 'openai'
       ? callOpenAI(system, user, { maxTokens })
+      : modelName === 'kimi'
+      ? callKimi(system, user, { maxTokens })
       : callClaude(system, user, { maxTokens, model: claudeModel });
     raw = await withTimeout(call, limits.GAME_FIX_TIMEOUT_MS || 120_000, 'GameFix');
   } catch (err) {
