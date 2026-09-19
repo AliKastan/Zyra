@@ -5,3 +5,6 @@ generated-projects/
 storage/jobs/
 storage/projects/
 *.log
+
+# Claude Code local settings (may contain credentials from approved commands)
+.claude/
